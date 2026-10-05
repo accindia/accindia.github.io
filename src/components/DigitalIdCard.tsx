@@ -23,6 +23,14 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
   const [copied, setCopied] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
+  if (!member) {
+    return (
+      <div className="p-8 text-center text-slate-500 bg-white rounded-xl border border-gray-200">
+        <p className="font-semibold text-sm">कोई 🆔 कार्ड उपलब्ध नहीं है। कृपया रजिस्ट्रेशन या लॉगिन करें।</p>
+      </div>
+    );
+  }
+
   const handleCopyId = () => {
     navigator.clipboard.writeText(member.accId);
     setCopied(true);
