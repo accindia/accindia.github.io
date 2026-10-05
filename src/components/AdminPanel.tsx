@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck,
   Users,
@@ -31,7 +31,8 @@ import {
   Phone,
 } from 'lucide-react';
 import { Member, PlanType, VerificationStatus, WithdrawalRequest } from '../types';
-import { StorageService } from '../services/storage';
+import { StorageService, subscribeToSync, SEED_MEMBERS } from '../services/storage';
+import { FirestoreService } from '../services/firestore';
 
 interface AdminPanelProps {
   onRefresh: () => void;
@@ -52,6 +53,55 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   const [filterStatus, setFilterStatus] = useState<'ALL' | VerificationStatus>('ALL');
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [actionSuccess, setActionSuccess] = useState('');
+
+  // Real-time Firestore sync on mount & when unlocked
+  useEffect(() => {
+    // 1. Initial background sync with Firestore
+    refreshData();
+
+    // 2. Real-time Firestore snapshot listener for instant multi-device updates
+    const unsubscribeMembers = FirestoreService.subscribeToMembers((cloudMembers) => {
+      if (cloudMembers && cloudMembers.length > 0) {
+        const mergedMap = new Map<string, Member>();
+        // Add existing local & seed
+        StorageService.getMembers().forEach((m) => {
+          if (m && (m.accId || m.id)) {
+            mergedMap.set((m.accId || m.id).toUpperCase(), m);
+          }
+        });
+        // Overwrite with cloud authoritative members
+        cloudMembers.forEach((m) => {
+          if (m && (m.accId || m.id)) {
+            mergedMap.set((m.accId || m.id).toUpperCase(), m);
+          }
+        });
+        const combined = Array.from(mergedMap.values());
+        combined.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        setMembers(combined);
+        StorageService.saveMembers(combined);
+      }
+    });
+
+    // 3. Real-time Firestore listener for withdrawals
+    const unsubscribeWithdrawals = FirestoreService.subscribeToWithdrawals((cloudWds) => {
+      if (cloudWds && cloudWds.length > 0) {
+        setWithdrawals(cloudWds);
+        StorageService.saveWithdrawals(cloudWds);
+      }
+    });
+
+    // 4. Tab / local sync
+    const unsubscribeSync = subscribeToSync(() => {
+      setMembers(StorageService.getMembers());
+      setWithdrawals(StorageService.getWithdrawals());
+    });
+
+    return () => {
+      unsubscribeMembers();
+      unsubscribeWithdrawals();
+      unsubscribeSync();
+    };
+  }, []);
 
   // Screenshot Preview & Verification Modal State
   const [screenshotModalMember, setScreenshotModalMember] = useState<Member | null>(null);
@@ -82,6 +132,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
       sessionStorage.setItem('acc_admin_authenticated', 'true');
       setAdminPasswordError('');
       setAdminPasswordInput('');
+      refreshData();
     } else {
       setAdminPasswordError('अमान्य एडमिन पासवर्ड! पहुँच अस्वीकृत। कृपया सही गुप्त पासवर्ड दर्ज करें।');
     }
@@ -119,10 +170,49 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
     }, 2000);
   };
 
-  const refreshData = () => {
-    setMembers(StorageService.getMembers());
-    setWithdrawals(StorageService.getWithdrawals());
-    onRefresh();
+  const [isCloudSyncing, setIsCloudSyncing] = useState(false);
+
+  const refreshData = async () => {
+    setIsCloudSyncing(true);
+    try {
+      const cloudMembers = await FirestoreService.getMembers();
+      if (cloudMembers && cloudMembers.length > 0) {
+        const mergedMap = new Map<string, Member>();
+        StorageService.getMembers().forEach((m) => {
+          if (m && (m.accId || m.id)) {
+            mergedMap.set((m.accId || m.id).toUpperCase(), m);
+          }
+        });
+        cloudMembers.forEach((m) => {
+          if (m && (m.accId || m.id)) {
+            mergedMap.set((m.accId || m.id).toUpperCase(), m);
+          }
+        });
+        const combined = Array.from(mergedMap.values());
+        combined.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        setMembers(combined);
+        StorageService.saveMembers(combined);
+      } else {
+        setMembers(StorageService.getMembers());
+      }
+
+      const cloudWds = await FirestoreService.getWithdrawals();
+      if (cloudWds && cloudWds.length > 0) {
+        setWithdrawals(cloudWds);
+        StorageService.saveWithdrawals(cloudWds);
+      } else {
+        setWithdrawals(StorageService.getWithdrawals());
+      }
+      setActionSuccess('क्लाउड डेटाबेस (Firestore) से ताज़ा यूजर रिकॉर्ड लोड हो गए!');
+      setTimeout(() => setActionSuccess(''), 3000);
+    } catch (e) {
+      console.warn('refreshData error:', e);
+      setMembers(StorageService.getMembers());
+      setWithdrawals(StorageService.getWithdrawals());
+    } finally {
+      setIsCloudSyncing(false);
+      onRefresh();
+    }
   };
 
   const handleToggleActive = (member: Member) => {
@@ -250,11 +340,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
 
   // Filtered members
   const filteredMembers = members.filter((m) => {
+    if (!m) return false;
+    const q = searchQuery.toLowerCase().trim();
     const matchesSearch =
-      m.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.accId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.mobile.includes(searchQuery) ||
-      m.utrNumber.includes(searchQuery);
+      !q ||
+      (m.fullName || '').toLowerCase().includes(q) ||
+      (m.accId || '').toLowerCase().includes(q) ||
+      String(m.mobile || '').includes(q) ||
+      String(m.utrNumber || '').toLowerCase().includes(q) ||
+      (m.email || '').toLowerCase().includes(q) ||
+      (m.city || '').toLowerCase().includes(q);
 
     const matchesPlan = filterPlan === 'ALL' || m.plan === filterPlan;
     const matchesStatus = filterStatus === 'ALL' || m.status === filterStatus;
@@ -263,9 +358,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   });
 
   // System stats
-  const pendingMembers = members.filter((m) => m.status === 'pending');
-  const verifiedMembers = members.filter((m) => m.status === 'verified');
-  const rejectedMembers = members.filter((m) => m.status === 'rejected');
+  const pendingMembers = members.filter((m) => m && m.status === 'pending');
+  const verifiedMembers = members.filter((m) => m && m.status === 'verified');
+  const rejectedMembers = members.filter((m) => m && m.status === 'rejected');
   const totalRevenue = verifiedMembers.length * 249;
 
   // IF ADMIN IS LOCKED: SHOW SECURE PIN/PASSWORD SCREEN (NO PASSWORD DISPLAYED)
@@ -354,6 +449,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
 
         {/* Database backup, change password & logout buttons */}
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={refreshData}
+            disabled={isCloudSyncing}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-sm shadow-xs transition disabled:opacity-75"
+            title="क्लाउड डेटाबेस (Firestore) से ताज़ा यूजर फेच करें"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isCloudSyncing ? 'animate-spin' : ''}`} />
+            <span>{isCloudSyncing ? 'सिंक हो रहा है...' : '🔄 लाइव क्लाउड सिंक'}</span>
+          </button>
+
           <button
             onClick={() => setShowPasswordModal(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-[#2874f0] text-xs font-semibold rounded-sm border border-blue-200 transition"
@@ -565,22 +670,49 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
           <table className="w-full text-left text-xs text-slate-700">
             <thead className="bg-[#f1f2f4] text-slate-800 uppercase font-bold text-[11px] border-b border-gray-200">
               <tr>
-                <th className="py-3 px-3">सदस्य विवरण</th>
+                <th className="py-3 px-3">सदस्य प्रोफाइल</th>
                 <th className="py-3 px-3">Unique ACC 🆔</th>
                 <th className="py-3 px-3">सिस्टम</th>
                 <th className="py-3 px-3">मोबाइल</th>
                 <th className="py-3 px-3">UTR No. (₹249)</th>
-                <th className="py-3 px-3">पेमेंट स्क्रीनशॉट</th>
+                <th className="py-3 px-3">रसीद व QR</th>
                 <th className="py-3 px-3">सत्यापन स्थिति</th>
                 <th className="py-3 px-3 text-right">सत्यापन कार्रवाई (Approve / Reject)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-sans bg-white">
               {filteredMembers.map((m) => (
-                <tr key={m.id} className="hover:bg-blue-50/40 transition">
+                <tr key={m.id || m.accId} className="hover:bg-blue-50/40 transition">
                   <td className="py-2.5 px-3">
-                    <span className="font-bold text-slate-900 block">{m.fullName}</span>
-                    <span className="text-[10px] text-slate-500">{m.city}, {m.state}</span>
+                    <div className="flex items-center gap-2.5">
+                      {m.avatarUrl ? (
+                        <img
+                          src={m.avatarUrl}
+                          alt={m.fullName}
+                          className="w-9 h-9 rounded-full object-cover border-2 border-[#2874f0] shadow-xs shrink-0"
+                        />
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-blue-100 text-[#2874f0] font-bold text-xs flex items-center justify-center shrink-0 border border-blue-200">
+                          {(m.fullName || 'M').substring(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <span className="font-bold text-slate-900 block truncate">{m.fullName}</span>
+                        <span className="text-[10px] text-slate-500 block truncate">{m.city || 'शहर'}, {m.state || 'राज्य'}</span>
+                        {m.profileLink && (
+                          <a
+                            href={m.profileLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[10px] text-[#2874f0] hover:underline"
+                            title="प्रोफाइल लिंक खोलें"
+                          >
+                            <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                            <span className="truncate max-w-[120px]">{m.profileLink.replace(/^https?:\/\//, '')}</span>
+                          </a>
+                        )}
+                      </div>
+                    </div>
                   </td>
                   <td className="py-2.5 px-3">
                     <span className="font-mono-acc font-bold text-[#2874f0] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
@@ -615,33 +747,41 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                     <span className="text-[10px] text-slate-500 font-bold">{m.utrNumber || 'N/A'}</span>
                   </td>
 
-                  {/* PAYMENT SCREENSHOT COLUMN */}
+                  {/* PAYMENT SCREENSHOT & PERSONAL QR COLUMN */}
                   <td className="py-2.5 px-3">
-                    {m.paymentScreenshotUrl ? (
-                      <button
-                        onClick={() => {
-                          setScreenshotModalMember(m);
-                          setZoomLevel(1);
-                        }}
-                        className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-[#2874f0] border border-blue-200 rounded text-[11px] font-bold shadow-xs transition group"
-                        title="स्क्रीनशॉट रसीद देखें"
-                      >
-                        <ImageIcon className="w-3.5 h-3.5 text-[#2874f0] group-hover:scale-110 transition-transform" />
-                        <span>रसीद देखें</span>
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          setScreenshotModalMember(m);
-                          setZoomLevel(1);
-                        }}
-                        className="text-[10px] text-slate-400 hover:text-slate-700 flex items-center gap-1"
-                        title="रसीद संलग्न नहीं, केवल UTR देखें"
-                      >
-                        <span>कोई रसीद नहीं</span>
-                      </button>
-                    )}
+                    <div className="flex flex-col gap-1">
+                      {m.paymentScreenshotUrl ? (
+                        <button
+                          onClick={() => {
+                            setScreenshotModalMember(m);
+                            setZoomLevel(1);
+                          }}
+                          className="flex items-center gap-1 px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-[#2874f0] border border-blue-200 rounded text-[10px] font-bold shadow-xs transition group w-fit"
+                          title="स्क्रीनशॉट रसीद देखें"
+                        >
+                          <ImageIcon className="w-3 h-3 text-[#2874f0] group-hover:scale-110 transition-transform" />
+                          <span>रसीद देखें</span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setScreenshotModalMember(m);
+                            setZoomLevel(1);
+                          }}
+                          className="text-[10px] text-slate-400 hover:text-slate-700 flex items-center gap-1"
+                          title="रसीद संलग्न नहीं, केवल UTR देखें"
+                        >
+                          <span>कोई रसीद नहीं</span>
+                        </button>
+                      )}
+
+                      {m.personalQrUrl && (
+                        <span className="text-[9px] text-purple-700 font-bold bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 w-fit">
+                          पर्सनल QR उपलब्ध ✓
+                        </span>
+                      )}
+                    </div>
                   </td>
 
                   {/* STATUS BADGE */}
@@ -838,9 +978,61 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
               <div className="lg:col-span-5 flex flex-col justify-between space-y-4">
                 <div className="space-y-3">
                   <div className="bg-[#f1f2f4] p-3.5 rounded-xl border border-gray-200 space-y-2 text-xs">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                      सत्यापन विवरण (Verification Summary)
-                    </span>
+                    <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                        सत्यापन विवरण (Verification Summary)
+                      </span>
+                      {screenshotModalMember.avatarUrl && (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                          फोटो संलग्न ✓
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Member Profile Photo Header in Modal */}
+                    <div className="flex items-center gap-3 bg-white p-2.5 rounded-lg border border-gray-200">
+                      {screenshotModalMember.avatarUrl ? (
+                        <img
+                          src={screenshotModalMember.avatarUrl}
+                          alt={screenshotModalMember.fullName}
+                          className="w-14 h-14 rounded-full object-cover border-2 border-[#2874f0] shadow-sm shrink-0"
+                        />
+                      ) : (
+                        <div className="w-14 h-14 rounded-full bg-blue-100 text-[#2874f0] font-black text-base flex items-center justify-center border-2 border-blue-300 shrink-0">
+                          {(screenshotModalMember.fullName || 'M').substring(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <strong className="text-slate-900 text-sm block truncate">{screenshotModalMember.fullName}</strong>
+                        <span className="text-[#2874f0] font-mono-acc text-xs font-bold block">{screenshotModalMember.accId}</span>
+                        {screenshotModalMember.profileLink && (
+                          <a
+                            href={screenshotModalMember.profileLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] text-[#2874f0] hover:underline font-semibold mt-0.5"
+                          >
+                            <ExternalLink className="w-3 h-3 shrink-0" />
+                            <span className="truncate max-w-[180px]">{screenshotModalMember.profileLink}</span>
+                          </a>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Personal QR code preview if provided */}
+                    {screenshotModalMember.personalQrUrl && (
+                      <div className="p-2.5 bg-purple-50/70 border border-purple-200 rounded-lg flex items-center gap-3">
+                        <img
+                          src={screenshotModalMember.personalQrUrl}
+                          alt="Personal QR"
+                          className="w-12 h-12 object-contain rounded bg-white p-1 border border-purple-300 shrink-0 shadow-xs"
+                        />
+                        <div className="text-[11px]">
+                          <span className="font-bold text-purple-900 block">सदस्य पर्सनल QR कोड</span>
+                          <span className="text-slate-600 block text-[10px]">डिजिटल ID कार्ड पर प्रदर्शित पर्सनल QR कोड</span>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-2 pt-1">
                       <div>

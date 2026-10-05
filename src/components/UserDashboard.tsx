@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import {
   Smartphone,
@@ -14,16 +14,28 @@ import {
   ExternalLink,
   ShieldCheck,
   Check,
-  Mail,
-  Send,
   Zap,
   Wallet,
   ArrowUpRight,
   Clock,
   BookOpen,
+  Lock,
+  RefreshCw,
+  FileText,
+  HelpCircle,
+  TrendingUp,
+  MessageCircle,
+  Camera,
+  Globe,
+  QrCode,
+  Trash2,
+  User,
+  Upload,
 } from 'lucide-react';
 import { Member, WithdrawalRequest } from '../types';
 import { StorageService } from '../services/storage';
+import { FirestoreService } from '../services/firestore';
+import { compressImage } from '../utils/imageCompressor';
 import { DigitalIdCard } from './DigitalIdCard';
 
 interface UserDashboardProps {
@@ -32,9 +44,84 @@ interface UserDashboardProps {
 }
 
 export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpdateUser }) => {
-  const [activeTab, setActiveTab] = useState<'applink' | 'twis' | 'swis' | 'idcard' | 'courses'>('applink');
+  const [activeTab, setActiveTab] = useState<'applink' | 'twis' | 'swis' | 'idcard' | 'kit' | 'courses' | 'profile'>('applink');
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [statusCheckMsg, setStatusCheckMsg] = useState('');
+
+  // Profile Customization State (Photo, Link, Personal QR)
+  const [profileAvatar, setProfileAvatar] = useState<string>(currentUser.avatarUrl || '');
+  const [profileLinkInput, setProfileLinkInput] = useState<string>(currentUser.profileLink || '');
+  const [personalQrInput, setPersonalQrInput] = useState<string>(currentUser.personalQrUrl || '');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileSaveSuccess, setProfileSaveSuccess] = useState('');
+  const [profileSaveError, setProfileSaveError] = useState('');
+
+  // Keep state synced with currentUser updates
+  useEffect(() => {
+    if (currentUser.avatarUrl) setProfileAvatar(currentUser.avatarUrl);
+    if (currentUser.profileLink) setProfileLinkInput(currentUser.profileLink);
+    if (currentUser.personalQrUrl) setPersonalQrInput(currentUser.personalQrUrl);
+  }, [currentUser.avatarUrl, currentUser.profileLink, currentUser.personalQrUrl]);
+
+  const handleUpdateProfileAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const compressed = await compressImage(file, 300, 300, 0.7);
+        setProfileAvatar(compressed);
+        // Also auto-save avatar to profile
+        const updated = StorageService.updateMember(currentUser.accId, { avatarUrl: compressed });
+        await FirestoreService.updateMember(currentUser.accId, { avatarUrl: compressed });
+        if (updated) onUpdateUser(updated);
+        setProfileSaveSuccess('प्रोफाइल फोटो सफलतापूर्वक अपडेट हो गई!');
+        setTimeout(() => setProfileSaveSuccess(''), 3000);
+      } catch (err) {
+        console.warn('Avatar compression err:', err);
+      }
+    }
+  };
+
+  const handleUpdatePersonalQr = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const compressed = await compressImage(file, 300, 300, 0.7);
+        setPersonalQrInput(compressed);
+      } catch (err) {
+        console.warn('Personal QR compression err:', err);
+      }
+    }
+  };
+
+  const handleSaveProfileSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingProfile(true);
+    setProfileSaveSuccess('');
+    setProfileSaveError('');
+
+    try {
+      const updates: Partial<Member> = {
+        avatarUrl: profileAvatar || undefined,
+        profileLink: profileLinkInput.trim() || undefined,
+        personalQrUrl: personalQrInput || undefined,
+      };
+
+      const updated = StorageService.updateMember(currentUser.accId, updates);
+      await FirestoreService.updateMember(currentUser.accId, updates);
+
+      if (updated) {
+        onUpdateUser(updated);
+        setProfileSaveSuccess('प्रोफाइल फोटो, लिंक एवं पर्सनल QR डिजिटल 🆔 कार्ड में अपडेट हो गए!');
+        setTimeout(() => setProfileSaveSuccess(''), 3500);
+      }
+    } catch (err) {
+      setProfileSaveError('प्रोफाइल अपडेट करने में त्रुटि आई। कृपया पुनः प्रयास करें।');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
 
   // Withdrawal Modal State
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
@@ -42,6 +129,62 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
   const [withdrawUpi, setWithdrawUpi] = useState('');
   const [withdrawMsg, setWithdrawMsg] = useState('');
   const [withdrawError, setWithdrawError] = useState('');
+
+  // Real-time Firestore subscription for this member
+  useEffect(() => {
+    const unsubscribe = FirestoreService.subscribeToSingleMember(currentUser.accId, (cloudUser) => {
+      if (cloudUser) {
+        // If status changed from pending to verified, show celebration!
+        if (currentUser.status === 'pending' && cloudUser.status === 'verified') {
+          try {
+            confetti({
+              particleCount: 150,
+              spread: 80,
+              origin: { y: 0.5 },
+            });
+          } catch {
+            // ignore
+          }
+        }
+        StorageService.setCurrentUser(cloudUser);
+        onUpdateUser(cloudUser);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [currentUser.accId, currentUser.status]);
+
+  // Manual Check Live Status from Firestore
+  const handleCheckStatus = async () => {
+    setIsCheckingStatus(true);
+    setStatusCheckMsg('');
+    try {
+      const fresh = await FirestoreService.findMemberByMobileOrEmail(currentUser.accId);
+      if (fresh) {
+        StorageService.setCurrentUser(fresh);
+        onUpdateUser(fresh);
+        if (fresh.status === 'verified') {
+          setStatusCheckMsg('🎉 बधाई हो! आपका खाता एडमिन द्वारा सत्यापित (VERIFIED) कर दिया गया है!');
+          try {
+            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+          } catch {}
+        } else if (fresh.status === 'rejected') {
+          setStatusCheckMsg('⚠️ खाता सत्यापन अस्वीकृत हुआ है। कृपया विवरण जांचें।');
+        } else {
+          setStatusCheckMsg('⏳ सत्यापन प्रक्रियाधीन है। एडमिन द्वारा UTR और रसीद का मिलान किया जा रहा है।');
+        }
+      } else {
+        setStatusCheckMsg('क्लाउड से डेटा प्राप्त नहीं हुआ। कृपया पुनः प्रयास करें।');
+      }
+    } catch (e) {
+      setStatusCheckMsg('क्लाउड कनेक्शन त्रुटि।');
+    } finally {
+      setIsCheckingStatus(false);
+      setTimeout(() => setStatusCheckMsg(''), 5000);
+    }
+  };
 
   // Referrals
   const referrals = StorageService.getReferrals().filter(
@@ -62,15 +205,11 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
   };
 
   const handleShareWhatsApp = () => {
-    const message = encodeURIComponent(
-      `🔥 कॉलेज की पढ़ाई के साथ घर बैठे 1-2 घंटे में ₹150 प्रति रेफरल कमाएं! 🔥\n\n` +
-      `Achievers Club Community (ACC) में कोई बड़ा investment नहीं है, सिर्फ 🆔 activation के लिए केवल ₹249 One-Time शुल्क है।\n` +
-      `⚡ SWIS: मोबाइल रिचार्ज पर 3.30% फिक्स्ड कमीशन!\n` +
-      `🤝 TWIS: हर दोस्त को रेफर करने पर सीधा ₹150 UPI/बैंक में!\n` +
-      `🆔 My Sponsor ID: ${currentUser.accId}\n` +
-      `🔗 Register Now: ${window.location.origin}/?sponsor=${currentUser.accId}`
+    const link = `${window.location.origin}/?sponsor=${currentUser.accId}`;
+    const text = encodeURIComponent(
+      `नमस्ते! मैंने Achievers Club Community (ACC) जॉइन किया है जहाँ मोबाइल रिचार्ज पर 3.30% फिक्स्ड कमीशन और हर रेफरल पर ₹150 डायरेक्ट इनकम मिलती है।\n\nमेरी Sponsor ID: ${currentUser.accId}\nजॉइन करने का लिंक:\n${link}\n\nStart Young, Retire Young! 🔥`
     );
-    window.open(`https://api.whatsapp.com/send?text=${message}`, '_blank');
+    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
   };
 
   const handleRequestWithdrawal = (e: React.FormEvent) => {
@@ -78,18 +217,21 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
     setWithdrawError('');
     setWithdrawMsg('');
 
-    if (currentUser.walletBalance < 100) {
-      setWithdrawError('निकासी के लिए न्यूनतम वॉलेट बैलेंस ₹100 होना आवश्यक है।');
+    if (currentUser.status !== 'verified') {
+      setWithdrawError('केवल एडमिन द्वारा सत्यापित सदस्य ही निकासी कर सकते हैं।');
       return;
     }
 
-    if (withdrawAmount < 100 || withdrawAmount > currentUser.walletBalance) {
-      setWithdrawError(`कृपया ₹100 से ₹${currentUser.walletBalance} के बीच राशि दर्ज करें।`);
+    if (withdrawAmount < 100) {
+      setWithdrawError('न्यूनतम निकासी राशि ₹100 है।');
       return;
     }
-
+    if (withdrawAmount > currentUser.walletBalance) {
+      setWithdrawError('वॉलेट में पर्याप्त बैलेंस नहीं है!');
+      return;
+    }
     if (!withdrawUpi.trim() || !withdrawUpi.includes('@')) {
-      setWithdrawError('कृपया वैध UPI ID दर्ज करें (उदा: mobile@paytm या name@okhdfcbank)');
+      setWithdrawError('कृपया मान्य UPI ID दर्ज करें (उदा. yourname@okaxis)');
       return;
     }
 
@@ -105,7 +247,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
       setWithdrawError(res.error);
     } else {
       setWithdrawMsg('निकासी अनुरोध सफलतापूर्वक सबमिट हो गया! एडमिन द्वारा जल्द ही स्वीकृत किया जाएगा।');
-      // Update parent user state
       const updated = StorageService.getMembers().find((m) => m.accId === currentUser.accId);
       if (updated) onUpdateUser(updated);
 
@@ -116,13 +257,294 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
     }
   };
 
+  // =========================================================================
+  // VIEW 1: LOCKED / PENDING VERIFICATION SCREEN
+  // If user has not been approved by admin, they cannot access the operations
+  // =========================================================================
+  if (currentUser.status === 'pending') {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6 animate-fadeIn py-2">
+        {/* Main Status Header */}
+        <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-600 text-white rounded-2xl p-6 sm:p-8 shadow-lg relative overflow-hidden">
+          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+            <div className="flex items-center gap-4">
+              <div className="relative shrink-0">
+                {currentUser.avatarUrl ? (
+                  <img
+                    src={currentUser.avatarUrl}
+                    alt={currentUser.fullName}
+                    className="w-16 h-16 rounded-2xl object-cover border-2 border-white/50 shadow-md"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-xs text-white flex items-center justify-center font-black text-2xl shadow-inner border border-white/30">
+                    <User className="w-8 h-8 text-amber-100" />
+                  </div>
+                )}
+                <label
+                  className="absolute -bottom-1 -right-1 bg-white hover:bg-slate-100 text-amber-900 p-1.5 rounded-full shadow-md cursor-pointer border border-amber-300 transition"
+                  title="प्रोफाइल फोटो अपलोड करें / बदलें"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <input type="file" accept="image/*" onChange={handleUpdateProfileAvatar} className="hidden" />
+                </label>
+              </div>
+              <div>
+                <span className="text-[11px] font-black uppercase tracking-widest bg-amber-950/40 text-amber-200 px-3 py-1 rounded-full border border-amber-300/30 inline-block mb-1.5">
+                  सुरक्षा लॉक • सत्यापन प्रक्रियाधीन
+                </span>
+                <h2 className="text-xl sm:text-2xl font-black font-display text-white">
+                  नमस्ते, {currentUser.fullName}
+                </h2>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs text-amber-100">आपकी यूनिक 🆔:</span>
+                  <span className="font-mono-acc font-black text-white text-sm bg-black/30 px-2.5 py-0.5 rounded border border-white/30">
+                    {currentUser.accId}
+                  </span>
+                  <button
+                    onClick={handleCopyId}
+                    className="text-amber-200 hover:text-white p-1 transition"
+                    title="Copy Member ID"
+                  >
+                    {copiedId ? <CheckCircle2 className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+              <button
+                onClick={handleCheckStatus}
+                disabled={isCheckingStatus}
+                className="px-4 py-2.5 bg-white hover:bg-slate-50 text-amber-900 font-bold text-xs rounded-lg shadow-md flex items-center justify-center gap-2 transition disabled:opacity-75"
+              >
+                <RefreshCw className={`w-4 h-4 ${isCheckingStatus ? 'animate-spin text-amber-700' : ''}`} />
+                <span>{isCheckingStatus ? 'जांच हो रही है...' : '🔄 स्थिति चेक करें'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {statusCheckMsg && (
+          <div className="p-3.5 bg-blue-50 border border-blue-200 text-[#2874f0] text-xs font-bold rounded-xl flex items-center gap-2 animate-fadeIn shadow-xs">
+            <Clock className="w-4 h-4 shrink-0" />
+            <span>{statusCheckMsg}</span>
+          </div>
+        )}
+
+        {/* 4-Step Verification Timeline */}
+        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xs space-y-4">
+          <h3 className="text-sm font-black text-slate-900 flex items-center gap-2 border-b border-gray-100 pb-3">
+            <ShieldCheck className="w-4 h-4 text-[#2874f0]" />
+            <span>खाता सक्रियता व सत्यापन प्रगति (Account Verification Flow)</span>
+          </h3>
+
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1">
+              <div className="flex items-center gap-1.5 text-emerald-700 font-bold text-xs">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>चरण 1: रजिस्ट्रेशन</span>
+              </div>
+              <p className="text-[11px] text-slate-600">व्यक्तिगत जानकारी पूर्ण</p>
+            </div>
+
+            <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1">
+              <div className="flex items-center gap-1.5 text-emerald-700 font-bold text-xs">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>चरण 2: ₹249 भुगतान</span>
+              </div>
+              <p className="text-[11px] text-slate-600">UTR: {currentUser.utrNumber}</p>
+            </div>
+
+            <div className="p-3.5 bg-amber-50 border-2 border-amber-400 rounded-xl space-y-1 shadow-xs animate-pulse">
+              <div className="flex items-center gap-1.5 text-amber-800 font-black text-xs">
+                <Clock className="w-4 h-4 shrink-0" />
+                <span>चरण 3: एडमिन सत्यापन</span>
+              </div>
+              <p className="text-[11px] text-amber-900 font-semibold">स्क्रीनशॉट जांच जारी ⏳</p>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 border border-gray-200 rounded-xl space-y-1 opacity-75">
+              <div className="flex items-center gap-1.5 text-slate-500 font-bold text-xs">
+                <Lock className="w-4 h-4 shrink-0" />
+                <span>चरण 4: पूर्ण एक्सेस</span>
+              </div>
+              <p className="text-[11px] text-slate-500">डैशबोर्ड, किट व Real App</p>
+            </div>
+          </div>
+
+          <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-4 text-xs text-slate-700 space-y-2">
+            <p className="font-semibold text-amber-950">
+              📌 महत्वपूर्ण सूचना (Security Notice):
+            </p>
+            <p className="leading-relaxed">
+              अचीवर्स क्लब कम्युनिटी में उच्च सुरक्षा बनाए रखने के लिए, जब तक एडमिन द्वारा आपके <strong>₹249 One-Time Joining Charge</strong> और <strong>12-अंकों के UTR नंबर</strong> का मिलान बैंक स्टेटमेंट से नहीं हो जाता, आपका डैशबोर्ड सुरक्षित रूप से लॉक रहेगा।
+            </p>
+            <p className="leading-relaxed text-slate-600">
+              जैसे ही एडमिन पैनल से आपका खाता स्वीकृत होगा, आपका यह डैशबोर्ड अपने आप अनलॉक हो जाएगा और आपको Real App Link व डिजिटल आईडी कार्ड डाउनलोड की पूरी सुविधा मिल जाएगी।
+            </p>
+          </div>
+        </div>
+
+        {/* Registered Details & Uploaded Screenshot Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* User Details */}
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4 shadow-xs">
+            <h4 className="text-sm font-black text-slate-900 flex items-center gap-2 border-b border-gray-100 pb-3">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span>आपके द्वारा सबमिट किया गया विवरण</span>
+            </h4>
+
+            <div className="space-y-2.5 text-xs">
+              <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg">
+                <span className="text-slate-500">सदस्य का नाम:</span>
+                <span className="font-bold text-slate-900">{currentUser.fullName}</span>
+              </div>
+
+              <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg">
+                <span className="text-slate-500">पंजीकृत मोबाइल:</span>
+                <span className="font-mono-acc font-bold text-slate-900">{currentUser.mobile}</span>
+              </div>
+
+              <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg">
+                <span className="text-slate-500">सिस्टम प्लान:</span>
+                <span className="font-bold text-emerald-700">{currentUser.plan} Plan</span>
+              </div>
+
+              <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg">
+                <span className="text-slate-500">Sponsor ID:</span>
+                <span className="font-mono-acc font-semibold text-slate-800">{currentUser.sponsorId}</span>
+              </div>
+
+              <div className="flex items-center justify-between p-2.5 bg-blue-50 border border-blue-200 rounded-lg">
+                <span className="text-[#2874f0] font-semibold">UPI UTR नंबर:</span>
+                <span className="font-mono-acc font-black text-[#2874f0]">{currentUser.utrNumber}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Screenshot Preview */}
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4 shadow-xs flex flex-col justify-between">
+            <div>
+              <h4 className="text-sm font-black text-slate-900 flex items-center gap-2 border-b border-gray-100 pb-3">
+                <CreditCard className="w-4 h-4 text-[#2874f0]" />
+                <span>अपलोड की गई पेमेंट रसीद (Payment Receipt)</span>
+              </h4>
+
+              {currentUser.paymentScreenshotUrl ? (
+                <div className="mt-3 text-center space-y-2">
+                  <div className="max-h-56 overflow-hidden rounded-xl border border-gray-200 bg-slate-50 p-2 inline-block shadow-xs">
+                    <img
+                      src={currentUser.paymentScreenshotUrl}
+                      alt="Uploaded Payment Receipt"
+                      className="max-h-48 rounded object-contain mx-auto"
+                    />
+                  </div>
+                  <span className="text-[11px] text-emerald-700 font-bold block flex items-center justify-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> स्क्रीनशॉट सुरक्षित रूप से जमा है
+                  </span>
+                </div>
+              ) : (
+                <div className="p-6 text-center text-xs text-amber-700 bg-amber-50 rounded-xl mt-3">
+                  रसीद लोड हो रही है...
+                </div>
+              )}
+            </div>
+
+            {/* Fast Track WhatsApp Button */}
+            <div className="pt-4 border-t border-gray-100">
+              <a
+                href={`https://api.whatsapp.com/send?phone=918877490845&text=${encodeURIComponent(
+                  `नमस्ते एडमिन! मैंने Achievers Club Community में ₹249 का रजिस्ट्रेशन किया है।\n\n🆔 Member ID: ${currentUser.accId}\n👤 Name: ${currentUser.fullName}\n📱 Mobile: ${currentUser.mobile}\n💼 Plan: ${currentUser.plan}\n💳 UTR Number: ${currentUser.utrNumber}\n\nकृपया मेरा खाता वेरीफाई करके Real App Link व डैशबोर्ड अनलॉक करें। धन्यवाद!`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 shadow-md transition"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>WhatsApp पर तुरंत वेरीफाई करवाएं (+91 8877490845)</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // VIEW 2: REJECTED SCREEN
+  // =========================================================================
+  if (currentUser.status === 'rejected') {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6 animate-fadeIn py-6">
+        <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-6 sm:p-8 text-center space-y-4 shadow-sm">
+          <div className="w-16 h-16 rounded-full bg-red-100 text-red-600 mx-auto flex items-center justify-center border-2 border-red-300">
+            <AlertCircle className="w-8 h-8" />
+          </div>
+
+          <div>
+            <span className="text-xs font-bold text-red-700 uppercase tracking-widest bg-red-100 px-3 py-1 rounded-full">
+              सत्यापन अस्वीकृत (Verification Rejected)
+            </span>
+            <h2 className="text-xl font-black font-display text-slate-900 mt-2">
+              आपके आवेदन को अस्वीकृत किया गया है
+            </h2>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-red-200 text-left space-y-1.5 shadow-xs">
+            <span className="text-xs font-bold text-red-800 block">एडमिन द्वारा दिया गया कारण:</span>
+            <p className="text-xs text-slate-800 font-semibold leading-relaxed">
+              {currentUser.rejectionReason || 'अमान्य UTR नंबर अथवा भुगतान स्क्रीनशॉट की पुष्टि नहीं हो सकी।'}
+            </p>
+          </div>
+
+          <p className="text-xs text-slate-600 leading-relaxed max-w-md mx-auto">
+            यदि आपने सही ₹249 का भुगतान किया है, तो कृपया नीचे दिए गए व्हाट्सएप लिंक पर अपनी पेमेंट रसीद पुनः भेजें ताकि एडमिन मैन्युअल रूप से जांच करके आपका खाता सक्रिय कर सकें।
+          </p>
+
+          <a
+            href={`https://api.whatsapp.com/send?phone=918877490845&text=${encodeURIComponent(
+              `नमस्ते एडमिन, मेरी 🆔 ${currentUser.accId} (UTR: ${currentUser.utrNumber}) का सत्यापन अस्वीकृत हुआ है। कृपया मेरी पेमेंट रसीद की पुनः जांच करें।`
+            )}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition"
+          >
+            <MessageCircle className="w-4 h-4" />
+            <span>WhatsApp सहायता (+91 8877490845)</span>
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // VIEW 3: FULL VERIFIED OPERATIONAL DASHBOARD
+  // Only accessible when status === 'verified'
+  // =========================================================================
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6 animate-fadeIn">
       {/* Top Welcome Bar - Flipkart Style Blue Banner */}
       <div className="bg-gradient-to-r from-[#2874f0] via-[#1c52b8] to-[#124296] text-white rounded-xl p-5 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm border border-blue-400/20">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-full bg-[#ffe500] text-[#2874f0] flex items-center justify-center font-black text-xl shadow-sm shrink-0">
-            {currentUser.fullName.substring(0, 2).toUpperCase()}
+          <div className="relative shrink-0">
+            {currentUser.avatarUrl ? (
+              <img
+                src={currentUser.avatarUrl}
+                alt={currentUser.fullName}
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-white shadow-sm"
+              />
+            ) : (
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#ffe500] text-[#2874f0] flex items-center justify-center font-black text-xl shadow-sm border-2 border-white">
+                {currentUser.fullName.substring(0, 2).toUpperCase()}
+              </div>
+            )}
+            <button
+              onClick={() => setActiveTab('profile')}
+              className="absolute -bottom-1 -right-1 bg-white hover:bg-slate-100 text-[#2874f0] p-1.5 rounded-full shadow-md border border-gray-200 transition"
+              title="प्रोफाइल फोटो व सेटिंग्स बदलें"
+            >
+              <Camera className="w-3.5 h-3.5" />
+            </button>
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -146,10 +568,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
                 {copiedId ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
               </button>
               <span className="text-blue-300">·</span>
-              <span className={`text-[11px] font-bold ${
-                currentUser.status === 'verified' ? 'text-emerald-300' : 'text-[#ffe500]'
-              }`}>
-                {currentUser.status === 'verified' ? '✓ वेरिफाइड 🆔' : '⏳ सत्यापन प्रक्रियाधीन'}
+              <span className="text-[11px] font-bold text-emerald-300 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> वेरिफाइड 🆔 ({currentUser.plan})
               </span>
             </div>
           </div>
@@ -157,19 +577,13 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
 
         {/* Real App Status Card */}
         <div className="bg-blue-900/60 border border-blue-400/30 rounded-lg p-3 w-full md:w-auto flex items-center justify-between md:justify-start gap-3">
-          <div className={`w-9 h-9 rounded-md flex items-center justify-center shrink-0 ${
-            currentUser.realAppLinkApproved
-              ? 'bg-emerald-500 text-white'
-              : 'bg-[#ffe500] text-[#2874f0]'
-          }`}>
-            {currentUser.realAppLinkApproved ? <CheckCircle2 className="w-5 h-5" /> : <ShieldCheck className="w-5 h-5" />}
+          <div className="w-9 h-9 rounded-md flex items-center justify-center shrink-0 bg-emerald-500 text-white">
+            <CheckCircle2 className="w-5 h-5" />
           </div>
           <div>
             <span className="text-[10px] text-blue-200 uppercase font-semibold block">Real App स्थिति</span>
-            <span className={`text-xs font-bold ${
-              currentUser.realAppLinkApproved ? 'text-emerald-300' : 'text-[#ffe500]'
-            }`}>
-              {currentUser.realAppLinkApproved ? 'Real App Link सक्रिय' : 'एडमिन सत्यापन के बाद लिंक मिलेगा'}
+            <span className="text-xs font-bold text-emerald-300">
+              Real App Link सक्रिय (Verified)
             </span>
           </div>
         </div>
@@ -201,7 +615,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
           <span className="font-mono-acc font-black text-xl text-emerald-600 block mt-1 tabular-nums">
             ₹{currentUser.walletBalance.toFixed(2)}
           </span>
-          <span className="text-[10px] text-slate-500 block mt-1">UPI द्वारा सीधे खाते में ट्रांसफर</span>
+          <span className="text-[10px] text-slate-500 block mt-1">UPI द्वारा सीधे बैंक खाते में ट्रांसफर</span>
         </div>
 
         <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
@@ -223,7 +637,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
         </div>
       </div>
 
-      {/* Tabs Navigation - Flipkart White & Blue Style */}
+      {/* Tabs Navigation */}
       <div className="flex bg-white border border-gray-200 rounded-xl p-1 gap-1 overflow-x-auto no-scrollbar shadow-xs">
         <button
           onClick={() => setActiveTab('applink')}
@@ -234,7 +648,19 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
           }`}
         >
           <Smartphone className="w-4 h-4 text-[#2874f0]" />
-          <span>Real App विवरण व स्थिति</span>
+          <span>Real App डिलीवरी लिंक</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('kit')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold whitespace-nowrap rounded-lg transition ${
+            activeTab === 'kit'
+              ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+              : 'text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          <BookOpen className="w-4 h-4 text-indigo-600" />
+          <span>📚 मेरी {currentUser.plan} किट व प्रशिक्षण</span>
         </button>
 
         <button
@@ -284,6 +710,18 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
           <GraduationCap className="w-4 h-4 text-purple-600" />
           <span>स्टूडेंट अकेडमी कोर्सेज</span>
         </button>
+
+        <button
+          onClick={() => setActiveTab('profile')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold whitespace-nowrap rounded-lg transition ${
+            activeTab === 'profile'
+              ? 'bg-amber-50 text-amber-900 border border-amber-300 shadow-xs'
+              : 'text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          <Camera className="w-4 h-4 text-amber-600" />
+          <span>👤 प्रोफाइल फोटो व 🆔 लिंक</span>
+        </button>
       </div>
 
       {/* TAB 1: Real App Link Section */}
@@ -296,111 +734,57 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
                 <span>Real Application डिलीवरी पोर्टल</span>
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                रजिस्ट्रेशन के बाद एडमिन द्वारा वेरिफिकेशन होने पर आपको आधिकारिक रियल ऐप लिंक प्रदान किया जाता है।
+                आपका खाता सत्यापित है। नीचे दिए गए लिंक से आधिकारिक ACC Android ऐप डाउनलोड करें।
               </p>
             </div>
 
-            {currentUser.status === 'verified' && currentUser.realAppLinkApproved && currentUser.realAppLink ? (
-              <div className="space-y-4">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-xs space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-emerald-800 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" /> आपका Real App Link तैयार है:
-                    </span>
-                    <span className="text-[10px] bg-green-200 text-emerald-900 font-mono-acc px-2 py-0.5 rounded font-bold">
-                      VERIFIED BY ADMIN
-                    </span>
-                  </div>
-
-                  <div className="p-3 bg-white rounded border border-green-200 font-mono-acc text-[#2874f0] break-all text-xs font-semibold">
-                    {currentUser.realAppLink}
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                    <a
-                      href={currentUser.realAppLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-sm text-center flex items-center justify-center gap-2 transition shadow-sm"
-                    >
-                      <Download className="w-4 h-4" />
-                      <span>सीधे डाउनलोड करें (APK Download)</span>
-                    </a>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(currentUser.realAppLink || '');
-                        alert('Real App Link क्लिपबोर्ड में कॉपी हो गया!');
-                      }}
-                      className="px-4 py-2.5 bg-white border border-gray-300 hover:bg-slate-50 text-slate-700 font-bold rounded-sm flex items-center justify-center gap-1.5 transition"
-                    >
-                      <Copy className="w-4 h-4" />
-                      <span>Copy Link</span>
-                    </button>
-                  </div>
+            <div className="space-y-4">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-emerald-800 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" /> आपका Real App Link सक्रिय है:
+                  </span>
+                  <span className="text-[10px] bg-green-200 text-emerald-900 font-mono-acc px-2 py-0.5 rounded font-bold">
+                    VERIFIED BY ADMIN
+                  </span>
                 </div>
 
-                <div className="bg-slate-50 border border-gray-200 p-4 rounded-lg text-xs space-y-2">
-                  <span className="font-bold text-slate-800 block">ऐप में उपलब्ध सेवाएं:</span>
-                  <ul className="space-y-1.5 text-slate-600 list-disc list-inside">
-                    <li>SWIS डायरेक्ट मोबाइल रिचार्ज एवं डीटीएच सेवाएं (3.30% फिक्स्ड कमीशन)</li>
-                    <li>बिजली, गैस सिलेंडर, पानी एवं फास्टैग बिल भुगतान</li>
-                    <li>TWIS टीम नेटवर्क ट्रैकिंग एवं दैनिक पेआउट रिकॉर्ड</li>
-                  </ul>
+                <div className="p-3 bg-white rounded border border-green-200 font-mono-acc text-[#2874f0] break-all text-xs font-semibold">
+                  {currentUser.realAppLink || 'https://achieversclub.in/download/acc-official-v2.apk'}
                 </div>
-              </div>
-            ) : currentUser.status === 'rejected' ? (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center space-y-3">
-                <div className="w-12 h-12 rounded-full bg-red-100 text-red-700 mx-auto flex items-center justify-center border border-red-200">
-                  <AlertCircle className="w-6 h-6" />
-                </div>
-                <h4 className="text-sm font-bold text-red-900">
-                  सत्यापन अस्वीकृत किया गया (Verification Rejected)
-                </h4>
-                <div className="bg-white p-3 rounded-lg border border-red-200 text-xs text-left max-w-md mx-auto space-y-1">
-                  <span className="font-bold text-red-800 block">एडमिन द्वारा दिया गया कारण:</span>
-                  <p className="text-slate-800 font-medium">
-                    {currentUser.rejectionReason || 'अमान्य UTR नंबर अथवा भुगतान रसीद की पुष्टि नहीं हो सकी।'}
-                  </p>
-                </div>
-                <p className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
-                  यदि आपने सही भुगतान किया है, तो कृपया नीचे दिए गए व्हाट्सएप लिंक पर अपनी पेमेंट रसीद पुनः भेजें ताकि एडमिन जांच कर सकें।
-                </p>
-                <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3 text-xs">
+
+                <div className="flex flex-col sm:flex-row gap-2 pt-1">
                   <a
-                    href={`https://api.whatsapp.com/send?phone=918877490845&text=${encodeURIComponent(`नमस्ते एडमिन, मेरी 🆔 ${currentUser.accId} (UTR: ${currentUser.utrNumber}) का सत्यापन अस्वीकृत हुआ है। कृपया मेरी रसीद दोबारा देखकर सहायता करें।`)}`}
+                    href={currentUser.realAppLink || 'https://achieversclub.in/download/acc-official-v2.apk'}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-sm font-bold text-xs shadow-sm transition"
+                    className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-sm text-center flex items-center justify-center gap-2 transition shadow-sm"
                   >
-                    <span>WhatsApp पर रसीद भेजें (+91 8877490845)</span>
+                    <Download className="w-4 h-4" />
+                    <span>सीधे डाउनलोड करें (APK Download)</span>
                   </a>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(currentUser.realAppLink || 'https://achieversclub.in/download/acc-official-v2.apk');
+                      alert('Real App Link क्लिपबोर्ड में कॉपी हो गया!');
+                    }}
+                    className="px-4 py-2.5 bg-white border border-gray-300 hover:bg-slate-50 text-slate-700 font-bold rounded-sm flex items-center justify-center gap-1.5 transition"
+                  >
+                    <Copy className="w-4 h-4" />
+                    <span>Copy Link</span>
+                  </button>
                 </div>
               </div>
-            ) : (
-              <div className="bg-amber-50/60 border border-amber-200 rounded-lg p-6 text-center space-y-3">
-                <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-700 mx-auto flex items-center justify-center border border-amber-200">
-                  <ShieldCheck className="w-6 h-6" />
-                </div>
-                <h4 className="text-sm font-bold text-slate-900">
-                  सत्यापन प्रक्रियाधीन है (Verification Pending)
-                </h4>
-                <p className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
-                  एडमिन द्वारा आपके ₹249 One-Time Joining Charge (UTR: <strong className="text-slate-900 font-mono-acc">{currentUser.utrNumber}</strong>) का सत्यापन किया जा रहा है।
-                  जैसे ही एडमिन अप्रूव करेंगे, आपको Real App Link आपके <strong>Email ({currentUser.email})</strong> और <strong>WhatsApp ({currentUser.mobile})</strong> पर तुरंत मिल जाएगा।
-                </p>
-                <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-3 text-xs">
-                  <span className="text-slate-500 text-[11px]">औसत सत्यापन समय: 10 से 30 मिनट</span>
-                  <a
-                    href={`https://api.whatsapp.com/send?phone=918877490845&text=${encodeURIComponent(`नमस्ते एडमिन, मैंने Achievers Club Community में ₹249 का रजिस्ट्रेशन किया है (ID: ${currentUser.accId}, UTR: ${currentUser.utrNumber})। कृपया मेरा खाता वेरीफाई करके Real App Link जारी करें।`)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-sm font-bold text-xs shadow-sm transition"
-                  >
-                    <span>WhatsApp सत्यापन सहायता: +91 8877490845</span>
-                  </a>
-                </div>
+
+              <div className="bg-slate-50 border border-gray-200 p-4 rounded-lg text-xs space-y-2">
+                <span className="font-bold text-slate-800 block">ऐप में उपलब्ध मुख्य सेवाएं:</span>
+                <ul className="space-y-1.5 text-slate-600 list-disc list-inside">
+                  <li>SWIS डायरेक्ट मोबाइल रिचार्ज एवं डीटीएच सेवाएं (3.30% फिक्स्ड कमीशन)</li>
+                  <li>बिजली, गैस सिलेंडर, पानी एवं फास्टैग बिल भुगतान</li>
+                  <li>TWIS टीम नेटवर्क ट्रैकिंग एवं दैनिक पेआउट रिकॉर्ड</li>
+                </ul>
               </div>
-            )}
+            </div>
           </div>
 
           <div className="lg:col-span-5 bg-white border border-gray-200 rounded-xl p-5 sm:p-6 space-y-4 shadow-xs">
@@ -426,27 +810,172 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
                 <span className="text-[10px] text-slate-500 block mt-0.5">UPI ID: 8877490845@spicepay (Vikas Kumar)</span>
               </div>
 
-              {currentUser.paymentScreenshotUrl && (
-                <div className="bg-white p-3 rounded-lg border border-gray-200 space-y-1.5">
-                  <span className="text-[10px] text-slate-500 block font-semibold">आपकी संलग्न रसीद (Attached Screenshot):</span>
-                  <img
-                    src={currentUser.paymentScreenshotUrl}
-                    alt="Payment receipt"
-                    className="max-h-36 rounded border border-gray-200 object-contain mx-auto shadow-xs"
-                  />
-                </div>
-              )}
-
               <div className="bg-[#f1f2f4] p-3 rounded-lg border border-gray-200">
                 <span className="text-slate-500 block">सिस्टम प्लान:</span>
-                <span className="text-emerald-700 font-bold">{currentUser.plan} System</span>
+                <span className="text-emerald-700 font-bold">{currentUser.plan} System (Verified)</span>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* TAB 2: TWIS Refer & Earn Portal */}
+      {/* TAB 2: MY PLAN KIT (Customized based on SWIS vs TWIS) */}
+      {activeTab === 'kit' && (
+        <div className="space-y-6">
+          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-6 sm:p-8 shadow-md border border-indigo-500/20">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <span className="text-xs font-black uppercase tracking-widest bg-indigo-500/30 text-indigo-300 px-3 py-1 rounded-full border border-indigo-400/30 inline-block mb-2">
+                  आधिकारिक किट व रिसोर्स हब • {currentUser.plan} PLAN
+                </span>
+                <h3 className="text-2xl font-black font-display text-white">
+                  {currentUser.plan === 'SWIS'
+                    ? 'SWIS सेल्फ रिचार्ज एवं डेली वर्क स्टार्टर किट'
+                    : 'TWIS टीम लीडरशिप एवं सोशल मीडिया प्रो किट'}
+                </h3>
+                <p className="text-xs text-indigo-200 mt-1 max-w-xl leading-relaxed">
+                  {currentUser.plan === 'SWIS'
+                    ? 'अपनी 3.30% फिक्स्ड कमीशन इनकम शुरू करने के लिए संपूर्ण ऑपरेटर गाइड, डेली टास्क मैनुअल और कमीशन चार्ट।'
+                    : '100 छात्रों की टीम बनाने और हर रेफरल पर ₹150 डायरेक्ट अर्निंग के लिए रेडी-टू-यूज़ पोस्टर्स, स्टेटस किट और प्रेजेंटेशन।'}
+                </p>
+              </div>
+
+              <div className="bg-indigo-900/60 p-4 rounded-xl border border-indigo-400/30 text-center shrink-0 w-full sm:w-auto">
+                <span className="text-[10px] text-indigo-300 block font-semibold">एक्सेस स्थिति</span>
+                <span className="font-mono-acc font-black text-xl text-emerald-400">UNLOCKED ✓</span>
+                <span className="text-[10px] text-slate-300 block mt-0.5">लाइफटाइम फ्री अपडेट्स</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Plan Specific Kit Cards */}
+          {currentUser.plan === 'SWIS' ? (
+            /* SWIS KIT */
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="w-10 h-10 rounded-lg bg-green-50 text-emerald-600 flex items-center justify-center font-bold mb-3 border border-green-200">
+                    <Zap className="w-5 h-5" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-900">3.30% रिचार्ज कमीशन गाइड</h4>
+                  <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                    Jio, Airtel, Vi, BSNL एवं DTH रिचार्ज पर सीधा 3.30% कमीशन प्राप्त करने की विस्तृत विधि।
+                  </p>
+                </div>
+                <button
+                  onClick={() => alert('SWIS रिचार्ज कमीशन चार्ट (PDF) डाउनलोड हो रहा है...')}
+                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-sm flex items-center justify-center gap-1.5 transition shadow-xs"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>कमीशन गाइड डाउनलोड करें</span>
+                </button>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="w-10 h-10 rounded-lg bg-blue-50 text-[#2874f0] flex items-center justify-center font-bold mb-3 border border-blue-200">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-900">डेली सेल्फ वर्क मैनुअल</h4>
+                  <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                    रोजाना 15-30 मिनट मोबाइल वर्क करके अतिरिक्त दैनिक आय अर्जित करने का व्यवस्थित ब्लूप्रिंट।
+                  </p>
+                </div>
+                <button
+                  onClick={() => alert('डेली वर्क मैनुअल डाउनलोड हो रहा है...')}
+                  className="w-full py-2 bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold text-xs rounded-sm flex items-center justify-center gap-1.5 transition shadow-xs"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>वर्क मैनुअल डाउनलोड</span>
+                </button>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="w-10 h-10 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center font-bold mb-3 border border-purple-200">
+                    <MessageCircle className="w-5 h-5" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-900">SWIS मेंटरशिप व हेल्पलाइन</h4>
+                  <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                    रिचार्ज फेल्योर, ऑपरेटर पेंडिंग या कमीशन संबंधी प्रश्नों के लिए आधिकारिक WhatsApp हेल्पडेस्क।
+                  </p>
+                </div>
+                <a
+                  href="https://api.whatsapp.com/send?phone=918877490845&text=Namaste%20ACC%20Support%2C%20mujhe%20SWIS%20Recharge%20kit%20me%20help%20chahiye."
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-sm flex items-center justify-center gap-1.5 transition text-center shadow-xs"
+                >
+                  <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>हेल्पलाइन से जुड़ें</span>
+                </a>
+              </div>
+            </div>
+          ) : (
+            /* TWIS KIT */
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="w-10 h-10 rounded-lg bg-blue-50 text-[#2874f0] flex items-center justify-center font-bold mb-3 border border-blue-200">
+                    <TrendingUp className="w-5 h-5" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-900">₹150 डायरेक्ट इनकम रोडमैप</h4>
+                  <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                    अपने कॉलेज व सर्किल के 10-50 दोस्तों को जोड़कर रोजाना ₹500 - ₹1500 कमाने की सिद्ध तकनीक।
+                  </p>
+                </div>
+                <button
+                  onClick={() => alert('TWIS लीडरशिप रोडमैप डाउनलोड हो रहा है...')}
+                  className="w-full py-2 bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold text-xs rounded-sm flex items-center justify-center gap-1.5 transition shadow-xs"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>लीडरशिप गाइड डाउनलोड</span>
+                </button>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold mb-3 border border-emerald-200">
+                    <Share2 className="w-5 h-5" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-900">WhatsApp स्टेटस व प्रमोशन किट</h4>
+                  <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                    बने-बनाए हिंदी एवं अंग्रेजी स्टेटस पोस्टर्स, अर्निंग प्रूफ टेक्स्ट और स्टोरी टेम्प्लेट्स।
+                  </p>
+                </div>
+                <button
+                  onClick={handleShareWhatsApp}
+                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-sm flex items-center justify-center gap-1.5 transition shadow-xs"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>WhatsApp पर शेयर करें</span>
+                </button>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold mb-3 border border-amber-200">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-900">डाउनलाइन मैनेजमेंट टूल्स</h4>
+                  <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                    अपनी टीम के सभी छात्रों का संपर्क, एक्टिवेशन स्थिति और दैनिक पेआउट ट्रैक करने के लिए डैशबोर्ड।
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('twis')}
+                  className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-sm flex items-center justify-center gap-1.5 transition shadow-xs"
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>टीम हब खोलें</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: TWIS Refer & Earn Portal */}
       {activeTab === 'twis' && (
         <div className="space-y-6">
           {/* Referral Banner */}
@@ -545,7 +1074,187 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
         </div>
       )}
 
-      {/* TAB 3: SWIS Recharge Details & Bill Hub */}
+      {/* TAB 6: Profile Photo & ID Card Customization */}
+      {activeTab === 'profile' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-7 bg-white border border-gray-200 rounded-xl p-5 sm:p-6 space-y-5 shadow-xs">
+            <div className="border-b border-gray-100 pb-3">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Camera className="w-5 h-5 text-[#2874f0]" />
+                <span>डिजिटल 🆔 कार्ड प्रोफाइल फोटो व कस्टमाइज़ेशन</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                अपनी आकर्षक पासपोर्ट फोटो लगाएं, पर्सनल वेबसाइट / सोशल मीडिया लिंक जोड़ें और अपना पर्सनल QR कोड सेट करें।
+              </p>
+            </div>
+
+            {profileSaveSuccess && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-sm flex items-center gap-2 animate-fadeIn shadow-xs font-semibold">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{profileSaveSuccess}</span>
+              </div>
+            )}
+
+            {profileSaveError && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-sm flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                <span>{profileSaveError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveProfileSettings} className="space-y-4">
+              {/* Profile Photo Uploader */}
+              <div className="p-4 bg-slate-50 border border-gray-200 rounded-xl flex flex-col sm:flex-row items-center gap-4">
+                <div className="relative shrink-0">
+                  <div className="w-24 h-24 rounded-full bg-slate-200 border-3 border-[#2874f0] flex items-center justify-center overflow-hidden shadow-sm">
+                    {profileAvatar ? (
+                      <img src={profileAvatar} alt="Profile preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="w-12 h-12 text-slate-400" />
+                    )}
+                  </div>
+                  {profileAvatar && (
+                    <button
+                      type="button"
+                      onClick={() => setProfileAvatar('')}
+                      className="absolute -top-1 -right-1 bg-red-600 hover:bg-red-700 text-white p-1 rounded-full shadow-xs"
+                      title="फोटो हटाएं"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="text-center sm:text-left flex-1 space-y-1">
+                  <label className="block text-xs font-bold text-slate-900">
+                    डिजिटल ID कार्ड प्रोफाइल फोटो (Passport Photo)
+                  </label>
+                  <p className="text-[11px] text-slate-500">
+                    यह फोटो आपके ऑफिशियल ACC डिजिटल आईडी कार्ड और डैशबोर्ड हेडर पर लाइव दिखेगी।
+                  </p>
+                  <div className="pt-1.5 flex flex-wrap gap-2 justify-center sm:justify-start">
+                    <label className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold text-xs rounded-sm cursor-pointer shadow-xs transition">
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>{profileAvatar ? 'फोटो बदलें (Change Photo)' : '📷 फोटो अपलोड करें (Upload Photo)'}</span>
+                      <input type="file" accept="image/*" onChange={handleUpdateProfileAvatar} className="hidden" />
+                    </label>
+                    {profileAvatar && (
+                      <button
+                        type="button"
+                        onClick={() => setProfileAvatar('')}
+                        className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-sm border border-red-200 transition"
+                      >
+                        फोटो हटाएं
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Profile Address / Link */}
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  पर्सनल प्रोफाइल लिंक / सोशल मीडिया URL (Profile Address / Link)
+                </label>
+                <div className="relative">
+                  <Globe className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                  <input
+                    type="url"
+                    value={profileLinkInput}
+                    onChange={(e) => setProfileLinkInput(e.target.value)}
+                    placeholder="उदा. https://instagram.com/your_username या https://myportfolio.com"
+                    className="w-full bg-white border border-gray-300 rounded-sm pl-9 pr-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0]"
+                  />
+                </div>
+                <span className="text-[11px] text-slate-500 mt-1 block">
+                  यह लिंक आपके डिजिटल आईडी कार्ड पर एक क्लिक करने योग्य बटन की तरह प्रदर्शित होगा।
+                </span>
+              </div>
+
+              {/* Personal QR Code Uploader */}
+              <div className="p-4 bg-purple-50/50 border border-purple-200 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-purple-900">
+                    पर्सनल QR कोड इमेज (UPI पेमेंट QR या WhatsApp डायरेक्ट QR)
+                  </label>
+                  {personalQrInput && (
+                    <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-bold">
+                      QR सेट है ✓
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-600">
+                  यदि आप आईडी कार्ड पर अपना व्यक्तिगत QR कोड (जैसे PhonePe/GPay QR या WhatsApp QR) दिखाना चाहते हैं तो यहाँ अपलोड करें।
+                </p>
+
+                <div className="flex items-center gap-3 pt-1">
+                  {personalQrInput && (
+                    <img
+                      src={personalQrInput}
+                      alt="Personal QR preview"
+                      className="w-14 h-14 object-contain rounded bg-white p-1 border border-purple-300 shadow-xs shrink-0"
+                    />
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-purple-300 hover:border-purple-500 text-purple-800 font-bold text-xs rounded-sm cursor-pointer shadow-xs transition">
+                      <QrCode className="w-3.5 h-3.5 text-purple-600" />
+                      <span>{personalQrInput ? 'QR बदलें' : 'QR कोड अपलोड करें'}</span>
+                      <input type="file" accept="image/*" onChange={handleUpdatePersonalQr} className="hidden" />
+                    </label>
+                    {personalQrInput && (
+                      <button
+                        type="button"
+                        onClick={() => setPersonalQrInput('')}
+                        className="px-2.5 py-1.5 bg-red-50 text-red-600 font-bold text-xs rounded-sm border border-red-200"
+                      >
+                        हटाएं
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Save Button */}
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={isSavingProfile}
+                  className="w-full py-3 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold text-xs rounded-sm shadow-md flex items-center justify-center gap-2 transition disabled:opacity-50"
+                >
+                  {isSavingProfile ? (
+                    <span>सहेज रहे हैं...</span>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      <span>💾 प्रोफाइल फोटो एवं आईडी कार्ड अपडेट सहेजें (Save Changes)</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* RIGHT: Live ID Card Preview with Photo & Link */}
+          <div className="lg:col-span-5 space-y-3">
+            <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
+              <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-2">
+                लाइव डिजिटल 🆔 कार्ड प्रिव्यू (Live Preview)
+              </span>
+              <p className="text-[11px] text-slate-500 mb-3">
+                आपकी अपलोड की गई फोटो और लिंक नीचे दिए गए स्टूडेंट आईडी कार्ड पर तुरंत लाइव दिखाई देगी:
+              </p>
+              <DigitalIdCard
+                member={{
+                  ...currentUser,
+                  avatarUrl: profileAvatar || currentUser.avatarUrl,
+                  profileLink: profileLinkInput || currentUser.profileLink,
+                  personalQrUrl: personalQrInput || currentUser.personalQrUrl,
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
       {activeTab === 'swis' && (
         <div className="space-y-6">
           <div className="bg-white border border-gray-200 rounded-xl p-6 sm:p-7 shadow-xs space-y-4">
@@ -589,12 +1298,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
         </div>
       )}
 
-      {/* TAB 4: Digital ACC ID Card */}
+      {/* TAB 5: Digital ACC ID Card */}
       {activeTab === 'idcard' && (
         <DigitalIdCard member={currentUser} />
       )}
 
-      {/* TAB 5: Courses */}
+      {/* TAB 6: Courses */}
       {activeTab === 'courses' && (
         <div className="space-y-4">
           <div className="bg-white border border-gray-200 rounded-xl p-5 sm:p-6 shadow-xs">

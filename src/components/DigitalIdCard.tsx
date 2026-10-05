@@ -13,6 +13,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { Member } from '../types';
+import { downloadPremiumIdCard } from '../utils/idCardGenerator';
 
 interface DigitalIdCardProps {
   member: Member;
@@ -90,7 +91,16 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => downloadPremiumIdCard(member)}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-600 hover:to-yellow-500 text-slate-950 text-xs font-black rounded-sm shadow-sm transition"
+            title="Download HD Printable ID Card Image"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>प्रीमियम ID कार्ड डाउनलोड (HD PNG)</span>
+          </button>
+
           <button
             onClick={handleCopyId}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-sm border border-gray-200 transition"
@@ -104,7 +114,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
             className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-sm shadow-xs transition"
           >
             <Share2 className="w-3.5 h-3.5" />
-            <span>WhatsApp शेयर</span>
+            <span>WhatsApp</span>
           </button>
 
           <button
@@ -112,7 +122,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
             className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2874f0] hover:bg-[#1258c7] text-white text-xs font-bold rounded-sm shadow-xs transition"
           >
             <Printer className="w-3.5 h-3.5" />
-            <span>प्रिंट / सेव</span>
+            <span>प्रिंट</span>
           </button>
         </div>
       </div>
@@ -217,6 +227,20 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
                     +91 {member.mobile ? `${member.mobile.slice(0, 3)}****${member.mobile.slice(-3)}` : '9876****10'}
                   </span>
                 </div>
+                {member.profileLink && (
+                  <div className="pt-0.5">
+                    <a
+                      href={member.profileLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[10px] text-amber-300 hover:text-amber-200 bg-amber-950/60 hover:bg-amber-900/60 px-2 py-0.5 rounded border border-amber-500/30 transition truncate max-w-[210px]"
+                      title="सदस्य प्रोफाइल लिंक खोलें"
+                    >
+                      <ExternalLink className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+                      <span className="truncate">{member.profileLink.replace(/^https?:\/\//, '')}</span>
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -234,10 +258,11 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
               </div>
               <button
                 onClick={handleCopyId}
-                className="p-2 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-lg border border-amber-500/30 transition"
-                title="Copy ACC ID"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-lg border border-amber-500/40 text-xs font-bold transition shadow-xs shrink-0"
+                title="Copy Member ID to clipboard"
               >
                 {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                <span>{copied ? 'कॉपी हो गया' : 'Copy ID'}</span>
               </button>
             </div>
             <div className="mt-1 flex items-center justify-between text-[10px] text-slate-400 font-mono-acc border-t border-slate-800 pt-1">
@@ -278,11 +303,21 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
           {/* Footer Security Stamp & QR Code representation */}
           <div className="border-t border-slate-800 pt-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-12 h-12 bg-white rounded-lg p-1 flex items-center justify-center">
-                <QrCode className="w-full h-full text-slate-950" />
+              <div className="w-13 h-13 bg-white rounded-lg p-1 flex items-center justify-center overflow-hidden border border-amber-400/40 shrink-0">
+                {member.personalQrUrl ? (
+                  <img
+                    src={member.personalQrUrl}
+                    alt="Personal QR"
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <QrCode className="w-full h-full text-slate-950" />
+                )}
               </div>
               <div className="text-[9px] text-slate-400 leading-tight">
-                <p className="font-bold text-slate-300">Scan to Verify 🆔</p>
+                <p className="font-bold text-slate-300">
+                  {member.personalQrUrl ? 'Personal Member QR' : 'Scan to Verify 🆔'}
+                </p>
                 <p>Digital Security Seal</p>
                 <p className="text-amber-400 font-semibold">achieversclub.in</p>
               </div>

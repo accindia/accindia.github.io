@@ -13,6 +13,7 @@ import { LegalPages } from './components/LegalPages';
 import { StudentPortalGate } from './components/StudentPortalGate';
 import { ActiveWindow, Member } from './types';
 import { StorageService, subscribeToSync } from './services/storage';
+import { FirestoreService } from './services/firestore';
 import {
   FileText,
   Video,
@@ -29,20 +30,39 @@ export default function App() {
   const [activeWindow, setActiveWindow] = useState<ActiveWindow>('home');
   const [currentUser, setCurrentUser] = useState<Member | null>(null);
 
-  // Load initial user & subscribe to sync across tabs/windows
+  // Load initial user & subscribe to sync across tabs/windows & Firestore multi-device
   useEffect(() => {
+    // 1. Initial background sync with Firestore
+    StorageService.initFirestoreSync().then(() => {
+      const user = StorageService.getCurrentUser();
+      if (user && user.id !== 'mem-001' && user.id !== 'mem-002' && user.id !== 'mem-003') {
+        setCurrentUser(user);
+      }
+    });
+
     const user = StorageService.getCurrentUser();
     // Do NOT auto-login as fake/dummy seed users (mem-001 / mem-002 / mem-003)
     if (user && user.id !== 'mem-001' && user.id !== 'mem-002' && user.id !== 'mem-003') {
       setCurrentUser(user);
     } else {
-      // Clear any cached dummy user so real students have a clean experience
       StorageService.setCurrentUser(null);
       setCurrentUser(null);
     }
 
-    // Real-time synchronization
-    const unsubscribe = subscribeToSync(() => {
+    // 2. Real-time multi-device Firestore synchronization
+    const unsubscribeFirestore = FirestoreService.subscribeToMembers((cloudMembers) => {
+      const current = StorageService.getCurrentUser();
+      if (current) {
+        const found = cloudMembers.find((m) => m.accId.toUpperCase() === current.accId.toUpperCase());
+        if (found) {
+          StorageService.setCurrentUser(found);
+          setCurrentUser(found);
+        }
+      }
+    });
+
+    // 3. Tab-level synchronization
+    const unsubscribeSync = subscribeToSync(() => {
       const refreshedUser = StorageService.getCurrentUser();
       if (refreshedUser && refreshedUser.id !== 'mem-001' && refreshedUser.id !== 'mem-002') {
         setCurrentUser(refreshedUser);
@@ -51,7 +71,10 @@ export default function App() {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeFirestore();
+      unsubscribeSync();
+    };
   }, []);
 
   const handleLogout = () => {

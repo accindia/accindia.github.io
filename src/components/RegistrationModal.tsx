@@ -12,15 +12,21 @@ import {
   ArrowRight,
   ArrowLeft,
   Sparkles,
-  QrCode,
   CreditCard,
   ShieldCheck,
   Upload,
   ExternalLink,
   Share2,
+  Camera,
+  Globe,
+  QrCode,
+  Trash2,
 } from 'lucide-react';
 import { Member, PlanType } from '../types';
 import { StorageService, generateAccId } from '../services/storage';
+import { FirestoreService } from '../services/firestore';
+import { compressImage } from '../utils/imageCompressor';
+import { UpiQrCode } from './UpiQrCode';
 
 interface RegistrationModalProps {
   onSuccess: (newMember: Member) => void;
@@ -51,6 +57,11 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
   const [address, setAddress] = useState('');
   const [accountPassword, setAccountPassword] = useState('');
   const [securityAnswer, setSecurityAnswer] = useState('');
+
+  // Digital ID Card Profile Photo, Link & Personal QR
+  const [avatarUrl, setAvatarUrl] = useState<string>('');
+  const [profileLink, setProfileLink] = useState('');
+  const [personalQrUrl, setPersonalQrUrl] = useState<string>('');
 
   // Plan Selection
   const [plan, setPlan] = useState<PlanType>('SWIS');
@@ -103,14 +114,48 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPaymentScreenshotUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      try {
+        // Compress image before saving to prevent Firestore 1MB document limit error
+        const compressed = await compressImage(file, 900, 900, 0.72);
+        setPaymentScreenshotUrl(compressed);
+        setErrorMessage('');
+      } catch (err) {
+        console.warn('Compression fallback to base64 reader:', err);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setPaymentScreenshotUrl(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const compressed = await compressImage(file, 280, 280, 0.7);
+        setAvatarUrl(compressed);
+        setErrorMessage('');
+      } catch (err) {
+        console.warn('Avatar compression fallback:', err);
+      }
+    }
+  };
+
+  const handlePersonalQrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const compressed = await compressImage(file, 280, 280, 0.7);
+        setPersonalQrUrl(compressed);
+        setErrorMessage('');
+      } catch (err) {
+        console.warn('Personal QR compression fallback:', err);
+      }
     }
   };
 
@@ -139,6 +184,18 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
       setErrorMessage('पासवर्ड रिकवरी के लिए सुरक्षा उत्तर (पसंदीदा शहर / स्कूल) दर्ज करें');
       return false;
     }
+
+    // Pre-check duplicate in local storage
+    const local = StorageService.getMembers();
+    if (local.some((m) => m.mobile.trim() === mobile.trim())) {
+      setErrorMessage(`⚠️ यह मोबाइल नंबर (${mobile}) पहले से पंजीकृत है! कृपया लॉगिन करें।`);
+      return false;
+    }
+    if (local.some((m) => m.email.trim().toLowerCase() === email.trim().toLowerCase())) {
+      setErrorMessage(`⚠️ यह ईमेल आईडी (${email}) पहले से पंजीकृत है! कृपया दूसरा ईमेल दर्ज करें।`);
+      return false;
+    }
+
     setErrorMessage('');
     return true;
   };
@@ -146,6 +203,10 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
   const validateStep3 = () => {
     if (!utrNumber.trim() || utrNumber.trim().length < 6) {
       setErrorMessage('कृपया 12 अंकों का UPI UTR / Transaction ID दर्ज करें');
+      return false;
+    }
+    if (!paymentScreenshotUrl) {
+      setErrorMessage('⚠️ भुगतान का स्क्रीनशॉट रसीद (Payment Screenshot) अपलोड करना अनिवार्य है! इसके बिना एडमिन सत्यापन नहीं हो सकता।');
       return false;
     }
     setErrorMessage('');
@@ -158,25 +219,43 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
     setStep(step + 1);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateStep3()) return;
 
     setIsSubmitting(true);
     setErrorMessage('');
 
-    setTimeout(() => {
+    try {
       const existingMembers = StorageService.getMembers();
-      
-      // Real-world check: check duplicate mobile
-      const duplicateMobile = existingMembers.find(m => m.mobile === mobile.trim());
-      if (duplicateMobile) {
-        setErrorMessage(`यह मोबाइल नंबर (${mobile}) पहले से पंजीकृत है! कृपया अपने 🆔 (${duplicateMobile.accId}) से लॉगिन करें।`);
+
+      // 1. High-Security Check: Duplicate Mobile, Email & UTR in Firestore and Local
+      const dupCheck = await FirestoreService.checkDuplicate(mobile, email, utrNumber);
+      if (dupCheck.isDuplicate) {
+        setErrorMessage(dupCheck.reason || 'यह विवरण पहले से पंजीकृत है!');
         setIsSubmitting(false);
         return;
       }
 
-      // Generate Unique ACC ID
+      // Also check local storage duplicates
+      if (existingMembers.some((m) => m.mobile.trim() === mobile.trim())) {
+        setErrorMessage(`⚠️ यह मोबाइल नंबर (${mobile}) पहले से पंजीकृत है!`);
+        setIsSubmitting(false);
+        return;
+      }
+      if (existingMembers.some((m) => m.email.trim().toLowerCase() === email.trim().toLowerCase())) {
+        setErrorMessage(`⚠️ यह ईमेल (${email}) पहले से पंजीकृत है!`);
+        setIsSubmitting(false);
+        return;
+      }
+      if (existingMembers.some((m) => m.utrNumber.trim() === utrNumber.trim())) {
+        setErrorMessage(`⚠️ यह 12-अंकों का UPI UTR (${utrNumber}) पहले से उपयोग किया जा चुका है!`);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 2. Generate Unique ACC ID according to user's exact specification
+      // e.g. Rahul Kumar for TWIS -> TWACCRK01
       const newAccId = generateAccId(fullName, plan, existingMembers);
 
       const newMember: Member = {
@@ -196,9 +275,9 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
         sponsorId: sponsorId.trim() || 'ACC249SWISRK01',
         activationCharge: 249,
         utrNumber: utrNumber.trim(),
-        paymentScreenshotUrl: paymentScreenshotUrl || undefined,
+        paymentScreenshotUrl: paymentScreenshotUrl,
         paymentDate: new Date().toISOString().split('T')[0],
-        status: 'pending', // Starts pending until admin verifies
+        status: 'pending', // Pending until admin verifies ₹249 & screenshot
         isActive: true,
         role: 'member',
         walletBalance: 0,
@@ -208,14 +287,19 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
         rechargesCount: 0,
         referralsCount: 0,
         createdAt: new Date().toISOString(),
+        avatarUrl: avatarUrl || undefined,
+        profileLink: profileLink.trim() || undefined,
+        personalQrUrl: personalQrUrl || undefined,
         password: accountPassword.trim(),
         securityQuestion: 'आपकी पहली स्कूल या पसंदीदा शहर क्या है?',
         securityAnswer: securityAnswer.trim().toLowerCase(),
         realAppLinkApproved: false,
       };
 
-      // Save new member
-      StorageService.addMember(newMember);
+      // 3. Save new member directly to Firestore & local storage
+      console.log('Saving new member to Firestore and local storage...', newMember.accId);
+      await FirestoreService.saveMember(newMember);
+      await StorageService.addMemberAsync(newMember);
       StorageService.setCurrentUser(newMember);
       setCreatedMember(newMember);
       setIsSubmitting(false);
@@ -224,12 +308,16 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
         confetti({
           particleCount: 100,
           spread: 70,
-          origin: { y: 0.6 }
+          origin: { y: 0.6 },
         });
       } catch (err) {
         // confetti fallback
       }
-    }, 600);
+    } catch (error) {
+      console.error('Registration submission error:', error);
+      setErrorMessage('पंजीकरण सबमिट करने में समस्या आई। कृपया पुनः प्रयास करें।');
+      setIsSubmitting(false);
+    }
   };
 
   const handleCopyId = () => {
@@ -374,6 +462,45 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
         {/* STEP 1: Personal Details */}
         {step === 1 && (
           <div className="space-y-4 animate-fadeIn">
+            {/* Profile Picture Uploader for Digital ID Card */}
+            <div className="bg-slate-50 border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row items-center gap-4">
+              <div className="relative">
+                <div className="w-20 h-20 rounded-full bg-slate-200 border-2 border-[#2874f0] flex items-center justify-center overflow-hidden shadow-xs shrink-0">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="w-10 h-10 text-slate-400" />
+                  )}
+                </div>
+                {avatarUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setAvatarUrl('')}
+                    className="absolute -top-1 -right-1 bg-red-600 hover:bg-red-700 text-white p-1 rounded-full shadow-xs"
+                    title="फोटो हटाएं"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+
+              <div className="text-center sm:text-left flex-1 space-y-1">
+                <label className="block text-xs font-bold text-slate-900">
+                  डिजिटल ID कार्ड हेतु प्रोफाइल फोटो (Passport Photo) - वैकल्पिक
+                </label>
+                <p className="text-[11px] text-slate-500">
+                  अपनी पासपोर्ट या आकर्षक फोटो अपलोड करें। यह आपके स्टूडेंट ID कार्ड पर लाइव दिखेगी।
+                </p>
+                <div className="pt-1">
+                  <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 hover:border-[#2874f0] text-[#2874f0] font-bold text-xs rounded-sm cursor-pointer shadow-xs transition">
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>{avatarUrl ? 'फोटो बदलें (Change Photo)' : '📷 फोटो चुनें (Upload Photo)'}</span>
+                    <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
+                  </label>
+                </div>
+              </div>
+            </div>
+
             <div>
               <label className="block text-xs font-bold text-slate-800 mb-1">
                 पूरा नाम (Full Name) <span className="text-red-500">*</span>
@@ -502,6 +629,57 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                   className="w-full bg-white border border-gray-300 rounded-sm px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0]"
                   required
                 />
+              </div>
+            </div>
+
+            {/* Optional Personal Profile Link & Personal QR */}
+            <div className="p-3.5 bg-slate-50 rounded-xl border border-gray-200 space-y-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[#2874f0]" />
+                <span className="text-xs font-bold text-slate-900">
+                  ID कार्ड पर पर्सनल लिंक व QR कोड (वैकल्पिक / Optional)
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">
+                    पर्सनल प्रोफाइल लिंक (Website / Instagram / Portfolio)
+                  </label>
+                  <div className="relative">
+                    <Globe className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                    <input
+                      type="url"
+                      value={profileLink}
+                      onChange={(e) => setProfileLink(e.target.value)}
+                      placeholder="https://instagram.com/yourname"
+                      className="w-full bg-white border border-gray-300 rounded-sm pl-8 pr-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">
+                    पर्सनल QR कोड इमेज (UPI / WhatsApp QR)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <label className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-white border border-gray-300 hover:border-[#2874f0] text-slate-700 font-bold text-xs rounded-sm cursor-pointer shadow-xs transition">
+                      <QrCode className="w-3.5 h-3.5 text-[#2874f0]" />
+                      <span className="truncate">{personalQrUrl ? 'QR अपलोड हुआ ✓' : 'QR इमेज चुनें'}</span>
+                      <input type="file" accept="image/*" onChange={handlePersonalQrUpload} className="hidden" />
+                    </label>
+                    {personalQrUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setPersonalQrUrl('')}
+                        className="p-2 bg-red-50 text-red-600 rounded border border-red-200"
+                        title="हटाएं"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -701,14 +879,9 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                   </p>
                 </div>
 
-                {/* QR Code representation */}
-                <div className="text-center shrink-0">
-                  <div className="w-28 h-28 bg-white rounded-lg p-2 mx-auto flex items-center justify-center shadow-xs border border-gray-200">
-                    <QrCode className="w-full h-full text-slate-900" />
-                  </div>
-                  <span className="text-[10px] text-[#2874f0] font-bold mt-1 block">
-                    Scan & Pay ₹249
-                  </span>
+                {/* Authentic Scannable UPI QR Code */}
+                <div className="shrink-0 my-1">
+                  <UpiQrCode upiId="8877490845@spicepay" payeeName="Vikas Kumar" amount={249} size={150} />
                 </div>
               </div>
 
@@ -760,7 +933,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                 {/* Screenshot Upload */}
                 <div>
                   <label className="block text-xs font-bold text-slate-800 mb-1">
-                    भुगतान स्क्रीनशॉट रसीद (Payment Screenshot / Receipt)
+                    भुगतान स्क्रीनशॉट रसीद (Payment Screenshot / Receipt) <span className="text-red-500 font-bold">* अनिवार्य</span>
                   </label>
                   {!paymentScreenshotUrl ? (
                     <div className="flex items-center gap-3">

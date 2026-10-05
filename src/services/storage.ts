@@ -18,15 +18,19 @@ export function getInitials(name: string): string {
   return 'MB';
 }
 
-// Generate Unique ACC ID according to the explicit rule:
-// e.g. ACC249 + SWIS + RK + 01 -> ACC249SWISRK01
+// Generate Unique ACC ID according to the user's explicit rule:
+// For TWIS: TWACCRK01 (TWACC + initials + 2-digit index e.g. Rahul Kumar joining TWIS first is TWACCRK01)
+// For SWIS: SWACCRK01 (SWACC + initials + 2-digit index)
 export function generateAccId(fullName: string, plan: PlanType, existingMembers: Member[]): string {
-  const planTag = plan === 'SWIS' ? 'SWIS' : plan === 'TWIS' ? 'TWIS' : 'SWIS';
+  const planTag = plan === 'TWIS' ? 'TWACC' : plan === 'SWIS' ? 'SWACC' : 'ACC';
   const initials = getInitials(fullName);
-  const prefix = `ACC249${planTag}${initials}`;
+  const prefix = `${planTag}${initials}`;
 
-  // Count existing matching IDs
-  const matching = existingMembers.filter(m => m.accId.startsWith(prefix));
+  // Count existing matching IDs (including old format or new format)
+  const matching = existingMembers.filter(m => 
+    m.accId.toUpperCase().startsWith(prefix.toUpperCase()) ||
+    m.accId.toUpperCase().includes(`${planTag}${initials}`.toUpperCase())
+  );
   const nextSeq = (matching.length + 1).toString().padStart(2, '0');
   
   return `${prefix}${nextSeq}`;
@@ -70,8 +74,8 @@ export const SEED_MEMBERS: Member[] = [
     id: 'mem-002',
     accId: 'ACC249TWISSP01',
     fullName: 'Santosh Patidar',
-    mobile: '8877490845',
-    whatsapp: '8877490845',
+    mobile: '9826012345',
+    whatsapp: '9826012345',
     email: 'santosh09patidar@gmail.com',
     qualification: 'Post Graduate',
     state: 'Madhya Pradesh',
@@ -319,9 +323,19 @@ export const StorageService = {
         // Merge or populate local cache
         const local = this.getMembers();
         const map = new Map<string, Member>();
-        local.forEach(m => map.set(m.accId.toUpperCase(), m));
-        cloudMembers.forEach(m => map.set(m.accId.toUpperCase(), m));
+        local.forEach(m => {
+          if (m && (m.accId || m.id)) {
+            map.set((m.accId || m.id).toUpperCase(), m);
+          }
+        });
+        cloudMembers.forEach(m => {
+          if (m && (m.accId || m.id)) {
+            map.set((m.accId || m.id).toUpperCase(), m);
+          }
+        });
         const merged = Array.from(map.values());
+        // Sort newest members first so admin immediately sees new registrations!
+        merged.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         localStorage.setItem(MEMBERS_KEY, JSON.stringify(merged));
         notifySync();
       }
@@ -361,23 +375,39 @@ export const StorageService = {
   },
 
   addMember(newMember: Member): Member {
+    this.addMemberAsync(newMember).catch(e => console.warn(e));
+    return newMember;
+  },
+
+  async addMemberAsync(newMember: Member): Promise<Member> {
     const members = this.getMembers();
-    members.unshift(newMember);
+    const cleanNewId = (newMember.accId || '').toUpperCase();
+    const existingIdx = members.findIndex(m => (m.accId || '').toUpperCase() === cleanNewId);
+    if (existingIdx >= 0) {
+      members[existingIdx] = newMember;
+    } else {
+      members.unshift(newMember);
+    }
     this.saveMembers(members);
 
-    // Save to Firestore in background
-    FirestoreService.saveMember(newMember).catch(e => console.warn('Firestore saveMember err:', e));
+    // Save to Firestore with confirmation
+    try {
+      await FirestoreService.saveMember(newMember);
+    } catch (e) {
+      console.warn('Firestore saveMember err:', e);
+    }
 
     // If member has sponsor, credit referral bonus ₹150 for TWIS sponsor
     if (newMember.sponsorId) {
-      const sponsor = members.find(m => m.accId.toUpperCase() === newMember.sponsorId.toUpperCase());
+      const cleanSponsor = (newMember.sponsorId || '').toUpperCase();
+      const sponsor = members.find(m => (m.accId || '').toUpperCase() === cleanSponsor);
       if (sponsor) {
         sponsor.referralsCount += 1;
         sponsor.walletBalance = Number((sponsor.walletBalance + 150).toFixed(2));
         sponsor.totalEarnings = Number((sponsor.totalEarnings + 150).toFixed(2));
         sponsor.twisEarnings = Number((sponsor.twisEarnings + 150).toFixed(2));
         this.saveMembers(members);
-        FirestoreService.updateMember(sponsor.accId, sponsor).catch(e => console.warn(e));
+        await FirestoreService.updateMember(sponsor.accId, sponsor);
 
         const referrals = this.getReferrals();
         const refRecord: ReferralRecord = {
@@ -392,7 +422,7 @@ export const StorageService = {
         };
         referrals.unshift(refRecord);
         this.saveReferrals(referrals);
-        FirestoreService.saveReferral(refRecord).catch(e => console.warn(e));
+        await FirestoreService.saveReferral(refRecord);
       }
     }
 

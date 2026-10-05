@@ -34,6 +34,8 @@ export interface Member {
   referralsCount: number;
   createdAt: string;
   avatarUrl?: string;
+  profileLink?: string;
+  personalQrUrl?: string;
   password?: string;
   securityQuestion?: string;
   securityAnswer?: string;
