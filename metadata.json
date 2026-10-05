@@ -1,0 +1,6 @@
+{
+  "name": "Achievers Club Community (ACC)",
+  "description": "Official ACC portal for Self Working Income System (SWIS) & Team Working Income System (TWIS), recharge commission, member registration, and digital ID cards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
