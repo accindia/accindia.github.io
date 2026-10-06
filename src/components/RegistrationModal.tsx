@@ -21,12 +21,14 @@ import {
   Globe,
   QrCode,
   Trash2,
+  Crop,
 } from 'lucide-react';
 import { Member, PlanType } from '../types';
 import { StorageService, generateAccId } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
 import { compressImage } from '../utils/imageCompressor';
 import { UpiQrCode } from './UpiQrCode';
+import { ImageCropperModal, CropShape } from './ImageCropperModal';
 
 interface RegistrationModalProps {
   onSuccess: (newMember: Member) => void;
@@ -62,6 +64,12 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
   const [avatarUrl, setAvatarUrl] = useState<string>('');
   const [profileLink, setProfileLink] = useState('');
   const [personalQrUrl, setPersonalQrUrl] = useState<string>('');
+
+  // Image Cropper Modal State (WhatsApp DP & QR crop/customizer)
+  const [cropperSrc, setCropperSrc] = useState<string | null>(null);
+  const [cropperShape, setCropperShape] = useState<CropShape>('circle');
+  const [cropperTarget, setCropperTarget] = useState<'avatar' | 'personalQr'>('avatar');
+  const [cropperTitle, setCropperTitle] = useState<string>('WhatsApp DP क्रॉप व कस्टमाइज़ करें');
 
   // Plan Selection
   const [plan, setPlan] = useState<PlanType>('SWIS');
@@ -133,30 +141,62 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
     }
   };
 
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      try {
-        const compressed = await compressImage(file, 280, 280, 0.7);
-        setAvatarUrl(compressed);
-        setErrorMessage('');
-      } catch (err) {
-        console.warn('Avatar compression fallback:', err);
-      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCropperSrc(reader.result as string);
+        setCropperShape('circle');
+        setCropperTarget('avatar');
+        setCropperTitle('व्हाट्सएप स्टाइल प्रोफाइल DP क्रॉप व एडजस्ट करें');
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
     }
   };
 
-  const handlePersonalQrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePersonalQrFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      try {
-        const compressed = await compressImage(file, 280, 280, 0.7);
-        setPersonalQrUrl(compressed);
-        setErrorMessage('');
-      } catch (err) {
-        console.warn('Personal QR compression fallback:', err);
-      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCropperSrc(reader.result as string);
+        setCropperShape('square');
+        setCropperTarget('personalQr');
+        setCropperTitle('पर्सनल QR कोड को चौकोर फ्रेम में सही सेट करें');
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
     }
+  };
+
+  const handleReopenAvatarCropper = () => {
+    if (avatarUrl) {
+      setCropperSrc(avatarUrl);
+      setCropperShape('circle');
+      setCropperTarget('avatar');
+      setCropperTitle('प्रोफाइल DP पुनः एडजस्ट / क्रॉप करें');
+    }
+  };
+
+  const handleReopenQrCropper = () => {
+    if (personalQrUrl) {
+      setCropperSrc(personalQrUrl);
+      setCropperShape('square');
+      setCropperTarget('personalQr');
+      setCropperTitle('पर्सनल QR कोड पुनः एडजस्ट / क्रॉप करें');
+    }
+  };
+
+  const handleCropperComplete = (croppedBase64: string) => {
+    if (cropperTarget === 'avatar') {
+      setAvatarUrl(croppedBase64);
+    } else if (cropperTarget === 'personalQr') {
+      setPersonalQrUrl(croppedBase64);
+    }
+    setCropperSrc(null);
+    setErrorMessage('');
   };
 
   const validateStep1 = () => {
@@ -489,14 +529,25 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                   डिजिटल ID कार्ड हेतु प्रोफाइल फोटो (Passport Photo) - वैकल्पिक
                 </label>
                 <p className="text-[11px] text-slate-500">
-                  अपनी पासपोर्ट या आकर्षक फोटो अपलोड करें। यह आपके स्टूडेंट ID कार्ड पर लाइव दिखेगी।
+                  अपनी पासपोर्ट या आकर्षक फोटो अपलोड करें। WhatsApp की तरह मनपसंद साइज व फ्रेम में एडजस्ट कर सकते हैं।
                 </p>
-                <div className="pt-1">
+                <div className="pt-1 flex flex-wrap gap-2 justify-center sm:justify-start">
                   <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 hover:border-[#2874f0] text-[#2874f0] font-bold text-xs rounded-sm cursor-pointer shadow-xs transition">
                     <Camera className="w-3.5 h-3.5" />
-                    <span>{avatarUrl ? 'फोटो बदलें (Change Photo)' : '📷 फोटो चुनें (Upload Photo)'}</span>
-                    <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
+                    <span>{avatarUrl ? 'फोटो बदलें' : '📷 फोटो चुनें (Upload Photo)'}</span>
+                    <input type="file" accept="image/*" onChange={handleAvatarFileSelected} className="hidden" />
                   </label>
+                  {avatarUrl && (
+                    <button
+                      type="button"
+                      onClick={handleReopenAvatarCropper}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-sm border border-emerald-300 shadow-xs transition"
+                      title="WhatsApp DP की तरह फोटो को ज़ूम और ड्रैग करके एडजस्ट करें"
+                    >
+                      <Crop className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>✂️ DP क्रॉप / एडजस्ट करें</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -662,21 +713,32 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                   <label className="block text-slate-700 font-semibold mb-1">
                     पर्सनल QR कोड इमेज (UPI / WhatsApp QR)
                   </label>
-                  <div className="flex items-center gap-2">
-                    <label className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-white border border-gray-300 hover:border-[#2874f0] text-slate-700 font-bold text-xs rounded-sm cursor-pointer shadow-xs transition">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="flex-1 min-w-[140px] flex items-center justify-center gap-1.5 px-3 py-2 bg-white border border-gray-300 hover:border-[#2874f0] text-slate-700 font-bold text-xs rounded-sm cursor-pointer shadow-xs transition">
                       <QrCode className="w-3.5 h-3.5 text-[#2874f0]" />
-                      <span className="truncate">{personalQrUrl ? 'QR अपलोड हुआ ✓' : 'QR इमेज चुनें'}</span>
-                      <input type="file" accept="image/*" onChange={handlePersonalQrUpload} className="hidden" />
+                      <span className="truncate">{personalQrUrl ? 'QR बदलें' : 'QR इमेज चुनें'}</span>
+                      <input type="file" accept="image/*" onChange={handlePersonalQrFileSelected} className="hidden" />
                     </label>
                     {personalQrUrl && (
-                      <button
-                        type="button"
-                        onClick={() => setPersonalQrUrl('')}
-                        className="p-2 bg-red-50 text-red-600 rounded border border-red-200"
-                        title="हटाएं"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleReopenQrCropper}
+                          className="px-2.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-sm border border-emerald-300 transition flex items-center gap-1"
+                          title="QR कोड को चौकोर फ्रेम में सही सेट करें"
+                        >
+                          <Crop className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>✂️ क्रॉप करें</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPersonalQrUrl('')}
+                          className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded border border-red-200 transition"
+                          title="हटाएं"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -1021,6 +1083,22 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
           </button>
         </p>
       </div>
+
+      {/* WhatsApp Style DP / QR Image Cropper Modal */}
+      {cropperSrc && (
+        <ImageCropperModal
+          imageSrc={cropperSrc}
+          initialShape={cropperShape}
+          title={cropperTitle}
+          subtitle={
+            cropperShape === 'circle'
+              ? 'WhatsApp DP की तरह फोटो को ड्रैग, ज़ूम और रोटेट करके सही फ्रेम में सेट करें'
+              : 'QR कोड को सही चौकोर फ्रेम में ड्रैग और ज़ूम करके एडजस्ट करें ताकि आसानी से स्कैन हो सके'
+          }
+          onCropComplete={handleCropperComplete}
+          onCancel={() => setCropperSrc(null)}
+        />
+      )}
     </div>
   );
 };

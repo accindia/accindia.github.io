@@ -31,12 +31,14 @@ import {
   Trash2,
   User,
   Upload,
+  Crop,
 } from 'lucide-react';
 import { Member, WithdrawalRequest } from '../types';
 import { StorageService } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
 import { compressImage } from '../utils/imageCompressor';
 import { DigitalIdCard } from './DigitalIdCard';
+import { ImageCropperModal, CropShape } from './ImageCropperModal';
 
 interface UserDashboardProps {
   currentUser: Member;
@@ -58,6 +60,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
   const [profileSaveSuccess, setProfileSaveSuccess] = useState('');
   const [profileSaveError, setProfileSaveError] = useState('');
 
+  // Image Cropper Modal State (WhatsApp DP & QR Customizer)
+  const [cropperSrc, setCropperSrc] = useState<string | null>(null);
+  const [cropperShape, setCropperShape] = useState<CropShape>('circle');
+  const [cropperTarget, setCropperTarget] = useState<'avatar' | 'personalQr'>('avatar');
+  const [cropperTitle, setCropperTitle] = useState<string>('WhatsApp DP क्रॉप व कस्टमाइज़ करें');
+
   // Keep state synced with currentUser updates
   useEffect(() => {
     if (currentUser.avatarUrl) setProfileAvatar(currentUser.avatarUrl);
@@ -65,34 +73,91 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
     if (currentUser.personalQrUrl) setPersonalQrInput(currentUser.personalQrUrl);
   }, [currentUser.avatarUrl, currentUser.profileLink, currentUser.personalQrUrl]);
 
-  const handleUpdateProfileAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      try {
-        const compressed = await compressImage(file, 300, 300, 0.7);
-        setProfileAvatar(compressed);
-        // Also auto-save avatar to profile
-        const updated = StorageService.updateMember(currentUser.accId, { avatarUrl: compressed });
-        await FirestoreService.updateMember(currentUser.accId, { avatarUrl: compressed });
-        if (updated) onUpdateUser(updated);
-        setProfileSaveSuccess('प्रोफाइल फोटो सफलतापूर्वक अपडेट हो गई!');
-        setTimeout(() => setProfileSaveSuccess(''), 3000);
-      } catch (err) {
-        console.warn('Avatar compression err:', err);
-      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCropperSrc(reader.result as string);
+        setCropperShape('circle');
+        setCropperTarget('avatar');
+        setCropperTitle('व्हाट्सएप स्टाइल प्रोफाइल DP क्रॉप व एडजस्ट करें');
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
     }
   };
 
-  const handleUpdatePersonalQr = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePersonalQrFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCropperSrc(reader.result as string);
+        setCropperShape('square');
+        setCropperTarget('personalQr');
+        setCropperTitle('पर्सनल QR कोड को चौकोर फ्रेम में सही सेट करें');
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
+    }
+  };
+
+  const handleReopenAvatarCropper = () => {
+    const current = profileAvatar || currentUser.avatarUrl;
+    if (current) {
+      setCropperSrc(current);
+      setCropperShape('circle');
+      setCropperTarget('avatar');
+      setCropperTitle('प्रोफाइल DP पुनः एडजस्ट / क्रॉप करें');
+    }
+  };
+
+  const handleReopenQrCropper = () => {
+    const current = personalQrInput || currentUser.personalQrUrl;
+    if (current) {
+      setCropperSrc(current);
+      setCropperShape('square');
+      setCropperTarget('personalQr');
+      setCropperTitle('पर्सनल QR कोड पुनः एडजस्ट / क्रॉप करें');
+    }
+  };
+
+  const handleCropperComplete = async (croppedBase64: string) => {
+    if (cropperTarget === 'avatar') {
+      setProfileAvatar(croppedBase64);
+      // Auto-save avatar directly to Firestore & local storage
       try {
-        const compressed = await compressImage(file, 300, 300, 0.7);
-        setPersonalQrInput(compressed);
+        const updated = StorageService.updateMember(currentUser.accId, { avatarUrl: croppedBase64 });
+        await FirestoreService.updateMember(currentUser.accId, { avatarUrl: croppedBase64 });
+        if (updated) onUpdateUser(updated);
+        setProfileSaveSuccess('✓ प्रोफाइल DP सफलतापूर्वक WhatsApp स्टाइल में सेट हो गई!');
+        setTimeout(() => setProfileSaveSuccess(''), 3500);
       } catch (err) {
-        console.warn('Personal QR compression err:', err);
+        console.warn('Error saving avatar:', err);
+      }
+    } else if (cropperTarget === 'personalQr') {
+      setPersonalQrInput(croppedBase64);
+      // Auto-save personal QR as well
+      try {
+        const updated = StorageService.updateMember(currentUser.accId, { personalQrUrl: croppedBase64 });
+        await FirestoreService.updateMember(currentUser.accId, { personalQrUrl: croppedBase64 });
+        if (updated) onUpdateUser(updated);
+        setProfileSaveSuccess('✓ पर्सनल QR कोड सफलतापूर्वक सेट हो गया!');
+        setTimeout(() => setProfileSaveSuccess(''), 3500);
+      } catch (err) {
+        console.warn('Error saving personal QR:', err);
       }
     }
+    setCropperSrc(null);
+  };
+
+  const handleUpdateProfileAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleAvatarFileSelected(e);
+  };
+
+  const handleUpdatePersonalQr = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    handlePersonalQrFileSelected(e);
   };
 
   const handleSaveProfileSettings = async (e: React.FormEvent) => {
@@ -466,6 +531,22 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
             </div>
           </div>
         </div>
+
+        {/* WhatsApp Style DP / QR Image Cropper Modal */}
+        {cropperSrc && (
+          <ImageCropperModal
+            imageSrc={cropperSrc}
+            initialShape={cropperShape}
+            title={cropperTitle}
+            subtitle={
+              cropperShape === 'circle'
+                ? 'WhatsApp DP की तरह फोटो को ड्रैग, ज़ूम और रोटेट करके सही फ्रेम में सेट करें'
+                : 'QR कोड को सही चौकोर फ्रेम में ड्रैग और ज़ूम करके एडजस्ट करें'
+            }
+            onCropComplete={handleCropperComplete}
+            onCancel={() => setCropperSrc(null)}
+          />
+        )}
       </div>
     );
   }
@@ -538,13 +619,13 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
                 {currentUser.fullName.substring(0, 2).toUpperCase()}
               </div>
             )}
-            <button
-              onClick={() => setActiveTab('profile')}
-              className="absolute -bottom-1 -right-1 bg-white hover:bg-slate-100 text-[#2874f0] p-1.5 rounded-full shadow-md border border-gray-200 transition"
-              title="प्रोफाइल फोटो व सेटिंग्स बदलें"
+            <label
+              className="absolute -bottom-1 -right-1 bg-white hover:bg-slate-100 text-[#2874f0] p-1.5 rounded-full shadow-md border border-gray-200 transition cursor-pointer"
+              title="प्रोफाइल DP बदलें व क्रॉप करें"
             >
               <Camera className="w-3.5 h-3.5" />
-            </button>
+              <input type="file" accept="image/*" onChange={handleAvatarFileSelected} className="hidden" />
+            </label>
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -1135,17 +1216,28 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
                   <div className="pt-1.5 flex flex-wrap gap-2 justify-center sm:justify-start">
                     <label className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold text-xs rounded-sm cursor-pointer shadow-xs transition">
                       <Camera className="w-3.5 h-3.5" />
-                      <span>{profileAvatar ? 'फोटो बदलें (Change Photo)' : '📷 फोटो अपलोड करें (Upload Photo)'}</span>
-                      <input type="file" accept="image/*" onChange={handleUpdateProfileAvatar} className="hidden" />
+                      <span>{profileAvatar ? 'फोटो बदलें' : '📷 फोटो अपलोड करें'}</span>
+                      <input type="file" accept="image/*" onChange={handleAvatarFileSelected} className="hidden" />
                     </label>
                     {profileAvatar && (
-                      <button
-                        type="button"
-                        onClick={() => setProfileAvatar('')}
-                        className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-sm border border-red-200 transition"
-                      >
-                        फोटो हटाएं
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleReopenAvatarCropper}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-sm border border-emerald-300 shadow-xs transition"
+                          title="WhatsApp DP की तरह फोटो को ज़ूम और ड्रैग करके एडजस्ट करें"
+                        >
+                          <Crop className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>✂️ DP क्रॉप / एडजस्ट करें</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setProfileAvatar('')}
+                          className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-sm border border-red-200 transition"
+                        >
+                          फोटो हटाएं
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -1199,16 +1291,27 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
                     <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-purple-300 hover:border-purple-500 text-purple-800 font-bold text-xs rounded-sm cursor-pointer shadow-xs transition">
                       <QrCode className="w-3.5 h-3.5 text-purple-600" />
                       <span>{personalQrInput ? 'QR बदलें' : 'QR कोड अपलोड करें'}</span>
-                      <input type="file" accept="image/*" onChange={handleUpdatePersonalQr} className="hidden" />
+                      <input type="file" accept="image/*" onChange={handlePersonalQrFileSelected} className="hidden" />
                     </label>
                     {personalQrInput && (
-                      <button
-                        type="button"
-                        onClick={() => setPersonalQrInput('')}
-                        className="px-2.5 py-1.5 bg-red-50 text-red-600 font-bold text-xs rounded-sm border border-red-200"
-                      >
-                        हटाएं
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleReopenQrCropper}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-sm border border-emerald-300 shadow-xs transition"
+                          title="QR कोड को चौकोर फ्रेम में सही सेट करें"
+                        >
+                          <Crop className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>✂️ QR क्रॉप करें</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPersonalQrInput('')}
+                          className="px-2.5 py-1.5 bg-red-50 text-red-600 font-bold text-xs rounded-sm border border-red-200"
+                        >
+                          हटाएं
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -1442,6 +1545,22 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
             </form>
           </div>
         </div>
+      )}
+
+      {/* WhatsApp Style DP / QR Image Cropper Modal */}
+      {cropperSrc && (
+        <ImageCropperModal
+          imageSrc={cropperSrc}
+          initialShape={cropperShape}
+          title={cropperTitle}
+          subtitle={
+            cropperShape === 'circle'
+              ? 'WhatsApp DP की तरह फोटो को ड्रैग, ज़ूम और रोटेट करके सही फ्रेम में सेट करें'
+              : 'QR कोड को सही चौकोर फ्रेम में ड्रैग और ज़ूम करके एडजस्ट करें'
+          }
+          onCropComplete={handleCropperComplete}
+          onCancel={() => setCropperSrc(null)}
+        />
       )}
     </div>
   );
