@@ -124,3 +124,50 @@ export type ActiveWindow =
   | 'disclaimer'
   | 'terms'
   | 'contact';
+
+export interface AppServiceItem {
+  id: string;
+  title: string;
+  category: 'RECHARGE' | 'REFERRAL' | 'COMMUNITY' | 'UTILITY' | 'EXTRA';
+  description: string;
+  commissionOrEarning: string; // e.g. "3.30% Fixed" or "₹150 Instant"
+  badgeText?: string; // e.g. "HOT", "ACTIVE", "NEW"
+  iconName?: string; // e.g. "Zap", "Users", "Phone", "Shield", "CreditCard", "Wallet", "Sparkles", "Gift", "Award"
+  actionText: string; // e.g. "ज्वाइन करें", "रिचार्ज करें"
+  actionLink?: string; // e.g. "register" | "calculator" | external URL
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface PromotionalPoster {
+  id: string;
+  title: string;
+  subtitle?: string;
+  imageUrl?: string;
+  ctaText?: string;
+  ctaLink?: string;
+  badge?: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface SiteConfig {
+  helplinePhone: string; // e.g. "+91 8877490845"
+  whatsappNumber: string; // e.g. "+91 8877490845"
+  officialEmail: string; // e.g. "santosh09patidar@gmail.com"
+  officialAddress: string; // e.g. "Indore, Madhya Pradesh (452001)"
+  websiteUrl: string; // e.g. "www.achieversclub.in"
+  telegramLink?: string;
+  adminSignatoryName: string; // e.g. "Vikas Kumar"
+  adminSignatoryTitle: string; // e.g. "Chief Community Administrator"
+  activationFee: number; // 249
+  upiId: string; // e.g. "8877490845@spicepay"
+  upiReceiverName: string; // e.g. "Vikas Kumar"
+  announcementMarquee: string; // Scrolling ticker
+  showHelplineCallButton: boolean;
+  showHelplineWhatsAppButton: boolean;
+  showCallButton?: boolean;
+  showWhatsAppButton?: boolean;
+  services: AppServiceItem[];
+  promotionalPosters: PromotionalPoster[];
+}

@@ -78,6 +78,7 @@ export const VideoTrainingModal: React.FC<VideoTrainingModalProps> = ({
             onClick={onGoToRegister}
             className="w-full sm:w-auto px-6 py-2.5 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold rounded-sm text-xs shadow-sm transition flex items-center justify-center gap-2"
           >
+            <Sparkles className="w-4 h-4 text-yellow-300" />
             <span>JOIN NOW (₹249)</span>
           </button>
         </div>

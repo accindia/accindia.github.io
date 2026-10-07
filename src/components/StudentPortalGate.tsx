@@ -12,8 +12,10 @@ import {
   ArrowRight,
   CreditCard,
   Download,
+  MessageCircle,
 } from 'lucide-react';
 import { Member } from '../types';
+import { StorageService } from '../services/storage';
 import { LoginModal } from './LoginModal';
 
 interface StudentPortalGateProps {
@@ -28,6 +30,7 @@ export const StudentPortalGate: React.FC<StudentPortalGateProps> = ({
   onCancel,
 }) => {
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const siteConfig = StorageService.getSiteConfig();
 
   if (showLoginModal) {
     return (
@@ -75,8 +78,8 @@ export const StudentPortalGate: React.FC<StudentPortalGateProps> = ({
             onClick={onGoToRegister}
             className="w-full sm:w-auto px-6 py-3 bg-[#fb641b] hover:bg-[#e85a14] text-white font-black rounded-sm text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition"
           >
-            <FileText className="w-4 h-4" />
-            <span>नया रजिस्ट्रेशन करें (₹249 One-Time)</span>
+            <Sparkles className="w-4 h-4 text-[#ffe500]" />
+            <span>नया रजिस्ट्रेशन करें (₹{siteConfig.activationFee || 249} One-Time)</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
@@ -135,13 +138,13 @@ export const StudentPortalGate: React.FC<StudentPortalGateProps> = ({
         </div>
 
         <a
-          href="https://api.whatsapp.com/send?phone=918877490845&text=Namaste%20ACC%20Support%2C%20mujhe%20Student%20Portal%20me%20help%20chahiye."
+          href={`https://api.whatsapp.com/send?phone=${(siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '')}&text=Namaste%20ACC%20Support%2C%20mujhe%20Student%20Portal%20me%20help%20chahiye.`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-sm font-bold transition shrink-0"
         >
-          <Phone className="w-3.5 h-3.5" />
-          <span>WhatsApp सहायता: +91 8877490845</span>
+          <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+          <span>WhatsApp सहायता: {siteConfig.whatsappNumber || '+91 8877490845'}</span>
         </a>
       </div>
     </div>

@@ -22,8 +22,11 @@ import {
   QrCode,
   Trash2,
   Crop,
+  LogIn,
+  MessageCircle,
+  LayoutDashboard,
 } from 'lucide-react';
-import { Member, PlanType } from '../types';
+import { Member, PlanType, SiteConfig } from '../types';
 import { StorageService, generateAccId } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
 import { compressImage } from '../utils/imageCompressor';
@@ -45,6 +48,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdMember, setCreatedMember] = useState<Member | null>(null);
   const [copiedId, setCopiedId] = useState(false);
+  const siteConfig: SiteConfig = StorageService.getSiteConfig();
 
   // Form State
   const [fullName, setFullName] = useState('');
@@ -442,17 +446,19 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
             onClick={() => onSuccess(createdMember)}
             className="w-full sm:w-auto px-6 py-3 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold rounded-sm shadow-md flex items-center justify-center gap-2 transition"
           >
+            <LayoutDashboard className="w-4 h-4" />
             <span>डैशबोर्ड एवं डिजिटल ID कार्ड खोलें</span>
             <ArrowRight className="w-4 h-4" />
           </button>
 
           <a
-            href={`https://api.whatsapp.com/send?phone=918877490845&text=Namaste%20Admin%2C%20maine%20Achievers%20Club%20Community%20me%20register%20kiya%20hai.%20Meri%20ACC%20ID%3A%20${encodeURIComponent(createdMember.accId)}%2C%20Name%3A%20${encodeURIComponent(createdMember.fullName)}%2C%20UTR%3A%20${encodeURIComponent(createdMember.utrNumber)}.%20Kripya%20verify%20karke%20Real%20App%20Link%20send%20karein.`}
+            href={`https://api.whatsapp.com/send?phone=${(siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '')}&text=Namaste%20Admin%2C%20maine%20Achievers%20Club%20Community%20me%20register%20kiya%20hai.%20Meri%20ACC%20ID%3A%20${encodeURIComponent(createdMember.accId)}%2C%20Name%3A%20${encodeURIComponent(createdMember.fullName)}%2C%20UTR%3A%20${encodeURIComponent(createdMember.utrNumber)}.%20Kripya%20verify%20karke%20Real%20App%20Link%20send%20karein.`}
             target="_blank"
             rel="noopener noreferrer"
             className="w-full sm:w-auto px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-sm shadow flex items-center justify-center gap-2 transition text-xs"
           >
-            <span>WhatsApp पर UTR भेजें (+91 8877490845)</span>
+            <MessageCircle className="w-4 h-4" />
+            <span>WhatsApp पर UTR भेजें ({siteConfig.whatsappNumber || '+91 8877490845'})</span>
           </a>
         </div>
       </div>
@@ -471,12 +477,12 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
           Start Young, Retire Young • ₹249 One-Time Joining Fee (Zero Investment Work)
         </p>
 
-        {/* Step Indicator - Flipkart Style */}
-        <div className="flex items-center justify-center gap-2 mt-4">
+        {/* Step Indicator - Flipkart Style Responsive */}
+        <div className="flex items-center justify-start sm:justify-center gap-1.5 sm:gap-2 mt-4 overflow-x-auto no-scrollbar pb-1">
           {[1, 2, 3].map((s) => (
             <div
               key={s}
-              className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded transition ${
+              className={`flex items-center gap-1 text-[11px] sm:text-xs font-bold px-2 sm:px-3 py-1 rounded transition shrink-0 ${
                 step === s
                   ? 'bg-[#2874f0] text-white shadow-xs'
                   : step > s
@@ -485,7 +491,8 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
               }`}
             >
               <span>{s}.</span>
-              <span>{s === 1 ? 'व्यक्तिगत जानकारी' : s === 2 ? 'सिस्टम व स्पॉन्सर' : '₹249 भुगतान एवं UTR'}</span>
+              <span className="sm:hidden">{s === 1 ? 'विवरण' : s === 2 ? 'सिस्टम' : 'पेमेंट'}</span>
+              <span className="hidden sm:inline">{s === 1 ? 'व्यक्तिगत जानकारी' : s === 2 ? 'सिस्टम व स्पॉन्सर' : '₹249 भुगतान एवं UTR'}</span>
             </div>
           ))}
         </div>
@@ -879,9 +886,10 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                     <button
                       type="button"
                       onClick={handleVerifySponsor}
-                      className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold rounded-sm shrink-0"
+                      className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold rounded-sm shrink-0 flex items-center gap-1"
                     >
-                      सत्यापित
+                      <ShieldCheck className="w-3.5 h-3.5 text-[#2874f0]" />
+                      <span>सत्यापित</span>
                     </button>
                   </div>
                 </div>
@@ -916,6 +924,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                 onClick={handleNext}
                 className="px-6 py-2.5 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold rounded-sm flex items-center gap-2 shadow-sm transition"
               >
+                <CreditCard className="w-4 h-4" />
                 <span>भुगतान विवरण पर जाएं</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
@@ -934,7 +943,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                     आधिकारिक एक्टिवेशन चार्ज (One-Time Activation)
                   </span>
                   <h3 className="text-xl font-black text-slate-900 font-display">
-                    ₹249 One-Time Joining Fee
+                    ₹{siteConfig.activationFee || 249} One-Time Joining Fee
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
                     नो इन्वेस्टमेंट | सिर्फ लाइफटाइम 🆔 एक्टिवेशन और 3.30% कमीशन पोर्टल के लिए
@@ -943,7 +952,12 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
 
                 {/* Authentic Scannable UPI QR Code */}
                 <div className="shrink-0 my-1">
-                  <UpiQrCode upiId="8877490845@spicepay" payeeName="Vikas Kumar" amount={249} size={150} />
+                  <UpiQrCode
+                    upiId={siteConfig.upiId || '8877490845@spicepay'}
+                    payeeName={siteConfig.upiReceiverName || 'Vikas Kumar'}
+                    amount={siteConfig.activationFee || 249}
+                    size={150}
+                  />
                 </div>
               </div>
 
@@ -955,21 +969,22 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                   </span>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="font-mono-acc font-black text-base text-[#2874f0]">
-                      8877490845@spicepay
+                      {siteConfig.upiId || '8877490845@spicepay'}
                     </span>
                     <span className="text-xs bg-white text-slate-700 px-2 py-0.5 rounded border border-gray-200 font-bold">
-                      Name: Vikas Kumar
+                      Name: {siteConfig.upiReceiverName || 'Vikas Kumar'}
                     </span>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => {
-                    navigator.clipboard.writeText('8877490845@spicepay');
+                    navigator.clipboard.writeText(siteConfig.upiId || '8877490845@spicepay');
                   }}
-                  className="px-3.5 py-1.5 bg-[#2874f0] hover:bg-[#1258c7] text-white text-xs font-bold rounded-sm shadow-xs shrink-0"
+                  className="px-3.5 py-1.5 bg-[#2874f0] hover:bg-[#1258c7] text-white text-xs font-bold rounded-sm shadow-xs shrink-0 flex items-center gap-1.5"
                 >
-                  Copy UPI ID
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Copy UPI ID</span>
                 </button>
               </div>
 
@@ -1073,13 +1088,14 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
 
       {/* Already Registered helper */}
       <div className="mt-6 text-center border-t border-gray-200 pt-4">
-        <p className="text-xs text-slate-600">
-          पहले से पंजीकृत हैं?{' '}
+        <p className="text-xs text-slate-600 flex items-center justify-center gap-1 flex-wrap">
+          <span>पहले से पंजीकृत हैं?</span>
           <button
             onClick={onGoToLogin}
-            className="text-[#2874f0] font-bold hover:underline ml-1"
+            className="text-[#2874f0] font-bold hover:underline inline-flex items-center gap-1"
           >
-            यहां क्लिक करके लॉगिन करें
+            <LogIn className="w-3.5 h-3.5" />
+            <span>यहां क्लिक करके लॉगिन करें</span>
           </button>
         </p>
       </div>

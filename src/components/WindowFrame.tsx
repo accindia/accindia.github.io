@@ -32,20 +32,20 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
       }`}
     >
       {/* Window Title Bar - Flipkart Royal Blue */}
-      <div className="bg-[#2874f0] px-4 py-3 border-b border-blue-600 flex items-center justify-between select-none">
-        <div className="flex items-center gap-2.5 min-w-0">
+      <div className="bg-[#2874f0] px-3 sm:px-4 py-2.5 sm:py-3 border-b border-blue-600 flex items-center justify-between select-none">
+        <div className="flex items-center gap-2 min-w-0 pr-1">
           {icon && <div className="text-yellow-300 shrink-0">{icon}</div>}
           <div className="min-w-0">
-            <h3 className="text-sm font-bold text-white tracking-wide truncate flex items-center gap-2">
+            <h3 className="text-xs sm:text-sm font-bold text-white tracking-wide truncate flex items-center gap-2">
               {title}
             </h3>
             {subtitle && (
-              <p className="text-[11px] text-blue-100 truncate">{subtitle}</p>
+              <p className="text-[10px] sm:text-[11px] text-blue-100 truncate">{subtitle}</p>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 ml-auto">
           {headerAction}
           
           {allowMinimize && (
@@ -71,7 +71,7 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
           {onClose && (
             <button
               onClick={onClose}
-              className="w-6 h-6 rounded flex items-center justify-center text-blue-100 hover:text-white hover:bg-red-500/80 transition-colors ml-1"
+              className="w-6 h-6 rounded flex items-center justify-center text-blue-100 hover:text-white hover:bg-red-500/80 transition-colors ml-0.5"
               title="Close window"
               type="button"
             >
@@ -83,7 +83,7 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
 
       {/* Window Body - Clean White */}
       {!isMinimized && (
-        <div className="flex-1 overflow-auto bg-white p-4 sm:p-6 text-slate-800">
+        <div className="flex-1 overflow-auto bg-white p-2.5 sm:p-5 md:p-6 text-slate-800">
           {children}
         </div>
       )}

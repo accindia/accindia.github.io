@@ -1,4 +1,4 @@
-import { Member, PlanType, RechargeTransaction, ReferralRecord, WithdrawalRequest } from '../types';
+import { Member, PlanType, RechargeTransaction, ReferralRecord, WithdrawalRequest, AppServiceItem, PromotionalPoster, SiteConfig } from '../types';
 import { FirestoreService } from './firestore';
 
 const MEMBERS_KEY = 'acc_members_data_v2';
@@ -6,6 +6,117 @@ const TRANSACTIONS_KEY = 'acc_transactions_data_v2';
 const REFERRALS_KEY = 'acc_referrals_data_v2';
 const WITHDRAWALS_KEY = 'acc_withdrawals_data_v2';
 const CURRENT_USER_KEY = 'acc_current_user_v2';
+const SITE_CONFIG_KEY = 'acc_site_config_v2';
+
+export const DEFAULT_SERVICES: AppServiceItem[] = [
+  {
+    id: 'srv-swis-recharge',
+    title: 'SWIS मोबाइल व DTH रिचार्ज',
+    category: 'RECHARGE',
+    description: 'सभी प्रीपेड/पोस्टपेड रिचार्ज व DTH पर 3.30% फिक्स्ड लाइफटाइम कमीशन।',
+    commissionOrEarning: '3.30% फिक्स्ड कमीशन',
+    badgeText: 'POPULAR',
+    iconName: 'Zap',
+    actionText: 'रिचार्ज कैलकुलेटर',
+    actionLink: 'calculator',
+    isActive: true,
+    createdAt: '2026-08-01',
+  },
+  {
+    id: 'srv-twis-referral',
+    title: 'TWIS टीम रेफरल हब',
+    category: 'REFERRAL',
+    description: 'प्रत्येक नए एक्टिवेटेड साथी पर ₹150 सीधी रेफरल इनकम (Daily Direct UPI बैंक ट्रांसफर)।',
+    commissionOrEarning: '₹150 प्रति रेफरल',
+    badgeText: 'HIGH EARNING',
+    iconName: 'Users',
+    actionText: 'जॉइन करें (₹249)',
+    actionLink: 'register',
+    isActive: true,
+    createdAt: '2026-08-01',
+  },
+  {
+    id: 'srv-utility-bill',
+    title: 'बिजली, पानी व गैस बिल भुगतान',
+    category: 'UTILITY',
+    description: 'बिजली, पानी, नगर निगम व गैस सिलेंडर बिलों पर तुरंत कमीशन व नो-एक्स्ट्रा चार्ज।',
+    commissionOrEarning: 'कैशबैक व छूट',
+    badgeText: 'UTILITY',
+    iconName: 'CreditCard',
+    actionText: 'बिल भरें',
+    actionLink: 'dashboard',
+    isActive: true,
+    createdAt: '2026-08-01',
+  },
+  {
+    id: 'srv-skill-academy',
+    title: 'स्टूडेंट डिजिटल स्किल अकेडमी',
+    category: 'COMMUNITY',
+    description: 'सेल्स, सोशल मीडिया और ऑनलाइन कम्युनिकेशन के लिए लाइफटाइम फ्री वीडियो किट।',
+    commissionOrEarning: '100% फ्री ट्रेनिंग',
+    badgeText: 'STUDENT SPECIAL',
+    iconName: 'BookOpen',
+    actionText: 'वीडियो देखें',
+    actionLink: 'video',
+    isActive: true,
+    createdAt: '2026-08-01',
+  },
+  {
+    id: 'srv-real-apk',
+    title: 'Real Android App APK डिलीवरी',
+    category: 'COMMUNITY',
+    description: 'वेरिफाइड सदस्यों को सीधे अधिकृत Android APK डाउनलोड लिंक व दैनिक सहायता।',
+    commissionOrEarning: 'वेरिफाइड एक्सेस',
+    badgeText: 'EXCLUSIVE',
+    iconName: 'Smartphone',
+    actionText: 'डैशबोर्ड में देखें',
+    actionLink: 'dashboard',
+    isActive: true,
+    createdAt: '2026-08-01',
+  },
+];
+
+export const DEFAULT_PROMOTIONAL_POSTERS: PromotionalPoster[] = [
+  {
+    id: 'banner-01',
+    title: '🔥 ZERO INVESTMENT WORK | ONE TIME 🆔 ACTIVATION CHARGE ₹249 ONLY',
+    subtitle: 'SWIS 3.30% फिक्स्ड रिचार्ज कमीशन + TWIS ₹150 डायरेक्ट रेफरल इनकम। Start Young, Retire Young!',
+    ctaText: 'अभी रजिस्टर करें (₹249)',
+    ctaLink: 'register',
+    badge: 'SPECIAL OFFER',
+    isActive: true,
+    createdAt: '2026-08-01',
+  },
+  {
+    id: 'banner-02',
+    title: '🎓 कॉलेज व पढ़ाई के साथ अपनी पॉकेट मनी खुद कमाएं',
+    subtitle: '10 दोस्तों को जोड़ें और सीधा ₹1500 अपने बैंक में पाएं। कोई लैपटॉप नहीं, केवल आपका स्मार्टफोन!',
+    ctaText: 'ट्रेनिंग वीडियो देखें',
+    ctaLink: 'video',
+    badge: 'FOR STUDENTS',
+    isActive: true,
+    createdAt: '2026-08-01',
+  },
+];
+
+export const DEFAULT_SITE_CONFIG: SiteConfig = {
+  helplinePhone: '+91 8877490845',
+  whatsappNumber: '+91 8877490845',
+  officialEmail: 'santosh09patidar@gmail.com',
+  officialAddress: 'Indore, Madhya Pradesh (452001)',
+  websiteUrl: 'www.achieversclub.in',
+  telegramLink: 'https://t.me/achieversclub',
+  adminSignatoryName: 'Vikas Kumar',
+  adminSignatoryTitle: 'Chief Community Administrator',
+  activationFee: 249,
+  upiId: '8877490845@spicepay',
+  upiReceiverName: 'Vikas Kumar',
+  announcementMarquee: '🔥 ZERO INVESTMENT WORK | ONE TIME 🆔 ACTIVATION CHARGE ₹249 ONLY | SWIS: 3.30% FIXED COMMISSION ON RECHARGES & BILLS | TWIS: ₹150 DIRECT REFERRAL INCOME | START YOUNG, RETIRE YOUNG | WHATSAPP SUPPORT: +91 8877490845 | EMAIL: santosh09patidar@gmail.com',
+  showHelplineCallButton: true,
+  showHelplineWhatsAppButton: true,
+  services: DEFAULT_SERVICES,
+  promotionalPosters: DEFAULT_PROMOTIONAL_POSTERS,
+};
 
 // Helper to extract uppercase initials
 export function getInitials(name: string): string {
@@ -351,6 +462,15 @@ export const StorageService = {
         localStorage.setItem(WITHDRAWALS_KEY, JSON.stringify(cloudWithdrawals));
         notifySync();
       }
+
+      // Sync site configuration
+      const cloudConfig = await FirestoreService.getSiteConfig();
+      if (cloudConfig) {
+        localStorage.setItem(SITE_CONFIG_KEY, JSON.stringify(cloudConfig));
+        notifySync();
+      } else {
+        await FirestoreService.saveSiteConfig(DEFAULT_SITE_CONFIG);
+      }
     } catch (err) {
       console.warn('Firestore initial sync skipped or offline:', err);
     }
@@ -691,5 +811,76 @@ export const StorageService = {
       rejectionReason: reason.trim() || 'एडमिन द्वारा अस्वीकृत: अमान्य UTR या भुगतान रसीद',
     });
     return updated;
-  }
+  },
+
+  getSiteConfig(): SiteConfig {
+    try {
+      const data = localStorage.getItem(SITE_CONFIG_KEY);
+      if (!data) {
+        localStorage.setItem(SITE_CONFIG_KEY, JSON.stringify(DEFAULT_SITE_CONFIG));
+        return DEFAULT_SITE_CONFIG;
+      }
+      const parsed = JSON.parse(data);
+      // Merge with defaults in case of missing keys
+      return {
+        ...DEFAULT_SITE_CONFIG,
+        ...parsed,
+        services: Array.isArray(parsed.services) ? parsed.services : DEFAULT_SERVICES,
+        promotionalPosters: Array.isArray(parsed.promotionalPosters) ? parsed.promotionalPosters : DEFAULT_PROMOTIONAL_POSTERS,
+      };
+    } catch {
+      return DEFAULT_SITE_CONFIG;
+    }
+  },
+
+  saveSiteConfig(config: SiteConfig): void {
+    localStorage.setItem(SITE_CONFIG_KEY, JSON.stringify(config));
+    notifySync();
+    FirestoreService.saveSiteConfig(config).catch((e) => console.warn('Firestore saveSiteConfig error:', e));
+  },
+
+  updateSiteConfig(updates: Partial<SiteConfig>): SiteConfig {
+    const current = this.getSiteConfig();
+    const updated: SiteConfig = {
+      ...current,
+      ...updates,
+    };
+    this.saveSiteConfig(updated);
+    return updated;
+  },
+
+  addService(service: AppServiceItem): SiteConfig {
+    const config = this.getSiteConfig();
+    const services = [service, ...config.services.filter((s) => s.id !== service.id)];
+    return this.updateSiteConfig({ services });
+  },
+
+  removeService(serviceId: string): SiteConfig {
+    const config = this.getSiteConfig();
+    const services = config.services.filter((s) => s.id !== serviceId);
+    return this.updateSiteConfig({ services });
+  },
+
+  updateService(serviceId: string, updates: Partial<AppServiceItem>): SiteConfig {
+    const config = this.getSiteConfig();
+    const services = config.services.map((s) => {
+      if (s.id === serviceId) {
+        return { ...s, ...updates };
+      }
+      return s;
+    });
+    return this.updateSiteConfig({ services });
+  },
+
+  addPoster(poster: PromotionalPoster): SiteConfig {
+    const config = this.getSiteConfig();
+    const posters = [poster, ...config.promotionalPosters.filter((p) => p.id !== poster.id)];
+    return this.updateSiteConfig({ promotionalPosters: posters });
+  },
+
+  removePoster(posterId: string): SiteConfig {
+    const config = this.getSiteConfig();
+    const posters = config.promotionalPosters.filter((p) => p.id !== posterId);
+    return this.updateSiteConfig({ promotionalPosters: posters });
+  },
 };

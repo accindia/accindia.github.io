@@ -10,7 +10,7 @@ import {
   onSnapshot,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { Member, RechargeTransaction, ReferralRecord, WithdrawalRequest } from '../types';
+import { Member, RechargeTransaction, ReferralRecord, WithdrawalRequest, SiteConfig } from '../types';
 import { ensureSafeFirestoreSize } from '../utils/imageCompressor';
 
 // Collections
@@ -18,6 +18,8 @@ const MEMBERS_COL = 'members';
 const TRANSACTIONS_COL = 'transactions';
 const REFERRALS_COL = 'referrals';
 const WITHDRAWALS_COL = 'withdrawals';
+const SETTINGS_COL = 'settings';
+const SITE_CONFIG_DOC = 'site_config';
 
 export const FirestoreService = {
   // Sync seed member or check if exists
@@ -427,6 +429,52 @@ export const FirestoreService = {
       );
     } catch (e) {
       console.warn('Could not subscribe to withdrawals collection:', e);
+      return () => {};
+    }
+  },
+
+  // Get dynamic site config from Firestore
+  async getSiteConfig(): Promise<SiteConfig | null> {
+    try {
+      const snap = await getDoc(doc(db, SETTINGS_COL, SITE_CONFIG_DOC));
+      if (snap.exists()) {
+        return snap.data() as SiteConfig;
+      }
+      return null;
+    } catch (err) {
+      console.warn('Firestore getSiteConfig error:', err);
+      return null;
+    }
+  },
+
+  // Save dynamic site config to Firestore
+  async saveSiteConfig(config: SiteConfig): Promise<boolean> {
+    try {
+      const clean = JSON.parse(JSON.stringify(config));
+      await setDoc(doc(db, SETTINGS_COL, SITE_CONFIG_DOC), clean, { merge: true });
+      return true;
+    } catch (err) {
+      console.warn('Firestore saveSiteConfig error:', err);
+      return false;
+    }
+  },
+
+  // Subscribe to real-time site config updates across all browsers & devices
+  subscribeToSiteConfig(onUpdate: (config: SiteConfig) => void): () => void {
+    try {
+      return onSnapshot(
+        doc(db, SETTINGS_COL, SITE_CONFIG_DOC),
+        (snapshot) => {
+          if (snapshot.exists()) {
+            onUpdate(snapshot.data() as SiteConfig);
+          }
+        },
+        (error) => {
+          console.warn('Firestore subscribeToSiteConfig error:', error);
+        }
+      );
+    } catch (e) {
+      console.warn('Could not subscribe to site config:', e);
       return () => {};
     }
   },

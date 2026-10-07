@@ -605,17 +605,17 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fadeIn">
       {/* Top Welcome Bar - Flipkart Style Blue Banner */}
-      <div className="bg-gradient-to-r from-[#2874f0] via-[#1c52b8] to-[#124296] text-white rounded-xl p-5 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm border border-blue-400/20">
-        <div className="flex items-center gap-4">
+      <div className="bg-gradient-to-r from-[#2874f0] via-[#1c52b8] to-[#124296] text-white rounded-xl p-4 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4 shadow-sm border border-blue-400/20">
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0 w-full md:w-auto">
           <div className="relative shrink-0">
             {currentUser.avatarUrl ? (
               <img
                 src={currentUser.avatarUrl}
                 alt={currentUser.fullName}
-                className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-white shadow-sm"
+                className="w-13 h-13 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-white shadow-sm"
               />
             ) : (
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#ffe500] text-[#2874f0] flex items-center justify-center font-black text-xl shadow-sm border-2 border-white">
+              <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-full bg-[#ffe500] text-[#2874f0] flex items-center justify-center font-black text-lg sm:text-xl shadow-sm border-2 border-white">
                 {currentUser.fullName.substring(0, 2).toUpperCase()}
               </div>
             )}
@@ -627,30 +627,30 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
               <input type="file" accept="image/*" onChange={handleAvatarFileSelected} className="hidden" />
             </label>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold text-white tracking-wide">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+              <h2 className="text-base sm:text-xl font-bold text-white tracking-wide truncate">
                 {currentUser.fullName}
               </h2>
-              <span className="text-xs text-blue-200 font-medium">
+              <span className="text-[11px] sm:text-xs text-blue-200 font-medium">
                 · {currentUser.qualification || 'छात्र सदस्य'}
               </span>
             </div>
-            <div className="flex flex-wrap items-center gap-2 mt-1">
-              <span className="text-xs text-blue-200">आपकी विद्यार्थी 🆔:</span>
-              <span className="font-mono-acc font-bold text-[#ffe500] text-xs bg-blue-900/60 px-2 py-0.5 rounded border border-blue-400/30">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-1">
+              <span className="text-[11px] sm:text-xs text-blue-200">🆔:</span>
+              <span className="font-mono-acc font-bold text-[#ffe500] text-[11px] sm:text-xs bg-blue-900/60 px-1.5 py-0.5 rounded border border-blue-400/30">
                 {currentUser.accId}
               </span>
               <button
                 onClick={handleCopyId}
-                className="text-blue-200 hover:text-white p-1"
+                className="text-blue-200 hover:text-white p-0.5 sm:p-1"
                 title="Copy ID"
               >
                 {copiedId ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
               </button>
               <span className="text-blue-300">·</span>
-              <span className="text-[11px] font-bold text-emerald-300 flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" /> वेरिफाइड 🆔 ({currentUser.plan})
+              <span className="text-[10px] sm:text-[11px] font-bold text-emerald-300 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> {currentUser.plan} Plan
               </span>
             </div>
           </div>

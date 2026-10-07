@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Sparkles,
   Play,
@@ -20,8 +20,13 @@ import {
   Wallet,
   BookOpen,
   Check,
+  MessageCircle,
+  Tag,
+  Gift,
 } from 'lucide-react';
-import { ActiveWindow, Member } from '../types';
+import { ActiveWindow, Member, SiteConfig, AppServiceItem, PromotionalPoster } from '../types';
+import { StorageService, subscribeToSync } from '../services/storage';
+import { FirestoreService } from '../services/firestore';
 
 interface HomeViewProps {
   onNavigate: (view: ActiveWindow) => void;
@@ -29,6 +34,52 @@ interface HomeViewProps {
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, currentUser }) => {
+  // Dynamic Site Config with Real-time Sync
+  const [siteConfig, setSiteConfig] = useState<SiteConfig>(() => StorageService.getSiteConfig());
+
+  useEffect(() => {
+    const unsubscribeSync = subscribeToSync(() => {
+      setSiteConfig(StorageService.getSiteConfig());
+    });
+    const unsubscribeFirestore = FirestoreService.subscribeToSiteConfig((cloudConfig) => {
+      if (cloudConfig) {
+        setSiteConfig(cloudConfig);
+        StorageService.saveSiteConfig(cloudConfig);
+      }
+    });
+
+    return () => {
+      unsubscribeSync();
+      unsubscribeFirestore();
+    };
+  }, []);
+
+  // Helper for service icons
+  const renderServiceIcon = (iconName?: string) => {
+    switch (iconName) {
+      case 'Zap':
+        return <Zap className="w-5 h-5 text-emerald-600 fill-emerald-600" />;
+      case 'Users':
+        return <Users className="w-5 h-5 text-[#2874f0]" />;
+      case 'CreditCard':
+        return <CreditCard className="w-5 h-5 text-amber-600" />;
+      case 'BookOpen':
+        return <BookOpen className="w-5 h-5 text-indigo-600" />;
+      case 'Smartphone':
+        return <Smartphone className="w-5 h-5 text-cyan-600" />;
+      case 'Shield':
+        return <ShieldCheck className="w-5 h-5 text-red-600" />;
+      case 'Wallet':
+        return <Wallet className="w-5 h-5 text-emerald-600" />;
+      case 'Award':
+        return <Award className="w-5 h-5 text-purple-600" />;
+      case 'Phone':
+        return <Phone className="w-5 h-5 text-blue-600" />;
+      default:
+        return <Sparkles className="w-5 h-5 text-[#fb641b]" />;
+    }
+  };
+
   // Interactive Student Pocket Money Calculator
   const [studentFriendsCount, setStudentFriendsCount] = useState<number>(10);
   const [avgRechargeAmount, setAvgRechargeAmount] = useState<number>(299);
@@ -37,19 +88,21 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, currentUser }) =
   const rechargeCommission = (studentFriendsCount * avgRechargeAmount * 0.033);
   const totalStudentMonthlyEarnings = referralIncome + rechargeCommission;
 
+  const cleanWhatsApp = (siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '');
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Hero Showcase Section - Flipkart Royal Blue & Yellow Style */}
-      <div className="relative rounded-xl overflow-hidden bg-gradient-to-r from-[#2874f0] via-[#1c52b8] to-[#124296] text-white p-6 sm:p-10 shadow-sm border border-blue-400/20">
-        <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8">
+      <div className="relative rounded-xl overflow-hidden bg-gradient-to-r from-[#2874f0] via-[#1c52b8] to-[#124296] text-white p-4 sm:p-7 md:p-10 shadow-sm border border-blue-400/20">
+        <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-6 sm:gap-8">
           {/* Left Hero Text */}
-          <div className="space-y-4 max-w-2xl text-center lg:text-left">
-            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#ffe500] bg-blue-900/50 px-3 py-1 rounded-sm border border-blue-400/30">
+          <div className="space-y-3.5 sm:space-y-4 max-w-2xl text-center lg:text-left">
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#ffe500] bg-blue-900/50 px-2.5 py-1 rounded-sm border border-blue-400/30">
               <Zap className="w-3.5 h-3.5 fill-[#ffe500] text-[#ffe500]" />
-              <span>SPECIAL STUDENT & YOUTH EARNING PROGRAM · ACC ASSURED ✓</span>
+              <span className="text-[11px] sm:text-xs">SPECIAL STUDENT & YOUTH EARNING PROGRAM · ACC ASSURED ✓</span>
             </div>
 
-            <h1 className="font-display font-black text-3xl sm:text-5xl text-white tracking-tight leading-tight">
+            <h1 className="font-display font-black text-2xl sm:text-4xl lg:text-5xl text-white tracking-tight leading-tight">
               कॉलेज व पढ़ाई के साथ{' '}
               <span className="text-[#ffe500]">
                 पॉकेट मनी व पक्की कमाई
@@ -62,27 +115,27 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, currentUser }) =
 
             <p className="text-sm sm:text-base text-blue-100 leading-relaxed font-normal">
               क्या आप बिना अपनी पढ़ाई प्रभावित किए अपने स्मार्टफोन से रोजाना 1-2 घंटे में अपनी पॉकेट मनी कमाना चाहते हैं? 
-              अचीवर्स क्लब कम्युनिटी (ACC) छात्रों और युवाओं को केवल <strong className="text-white">₹249 वन-टाइम 🆔 एक्टिवेशन</strong> में 
+              अचीवर्स क्लब कम्युनिटी (ACC) छात्रों और युवाओं को केवल <strong className="text-white">₹{siteConfig.activationFee || 249} वन-टाइम 🆔 एक्टिवेशन</strong> में 
               SWIS रिचार्ज कमीशन (3.30%) और TWIS रेफरल इनकम (₹150 प्रति दोस्त) का 100% वेरिफाइड अवसर देती है।
             </p>
 
             {/* Student Value Highlights - Flipkart Style Badges */}
             <div className="flex flex-wrap items-center justify-center lg:justify-start gap-x-4 gap-y-2 text-xs text-blue-100 pt-1">
-              <span className="font-bold text-[#ffe500]">0 इन्वेस्टमेंट · केवल ₹249 🆔 शुल्क</span>
+              <span className="font-bold text-[#ffe500]">0 इन्वेस्टमेंट · केवल ₹{siteConfig.activationFee || 249} 🆔 शुल्क</span>
               <span className="text-blue-300">·</span>
               <span className="font-bold text-white">3.30% फिक्स्ड रिचार्ज कमीशन</span>
               <span className="text-blue-300">·</span>
               <span className="font-bold text-[#ffe500]">₹150 प्रति रेफरल डायरेक्ट बैंक/UPI</span>
             </div>
 
-            {/* Action Buttons - Flipkart Orange & White Buttons */}
+            {/* Action Buttons with Symbolic Logos */}
             <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3 pt-2">
               <button
                 onClick={() => onNavigate('register')}
                 className="px-6 py-3.5 bg-[#fb641b] hover:bg-[#e85a14] text-white font-black rounded-sm text-sm shadow-md flex items-center gap-2 transition group"
               >
-                <FileText className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                <span>विद्यार्थी रजिस्ट्रेशन (₹249)</span>
+                <Sparkles className="w-4 h-4 text-yellow-300 group-hover:scale-110 transition-transform" />
+                <span>विद्यार्थी रजिस्ट्रेशन (₹{siteConfig.activationFee || 249})</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
 
@@ -159,6 +212,132 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, currentUser }) =
         </div>
       </div>
 
+      {/* PROMOTIONAL POSTERS / BANNERS SECTION (DYNAMICALLY MANAGED BY ADMIN) */}
+      {siteConfig.promotionalPosters && siteConfig.promotionalPosters.filter((p) => p.isActive).length > 0 && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {siteConfig.promotionalPosters
+              .filter((p) => p.isActive)
+              .map((poster) => (
+                <div
+                  key={poster.id}
+                  className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white rounded-xl p-5 shadow-sm border border-amber-400/40 flex flex-col justify-between"
+                >
+                  <div>
+                    {poster.badge && (
+                      <span className="inline-block text-[10px] bg-black/25 text-yellow-200 font-bold px-2.5 py-0.5 rounded uppercase tracking-wider mb-2">
+                        {poster.badge}
+                      </span>
+                    )}
+                    <h3 className="font-bold text-base sm:text-lg leading-snug drop-shadow-xs">
+                      {poster.title}
+                    </h3>
+                    {poster.subtitle && (
+                      <p className="text-xs text-amber-100 mt-1 leading-relaxed">
+                        {poster.subtitle}
+                      </p>
+                    )}
+                    {poster.imageUrl && (
+                      <div className="mt-3 h-32 rounded-lg overflow-hidden border border-white/20 bg-black/20">
+                        <img src={poster.imageUrl} alt={poster.title} className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-4 flex items-center justify-between">
+                    <button
+                      onClick={() => onNavigate((poster.ctaLink as any) || 'register')}
+                      className="px-4 py-2 bg-white hover:bg-slate-100 text-orange-700 font-black text-xs rounded-sm shadow-md flex items-center gap-1.5 transition"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-orange-600" />
+                      <span>{poster.ctaText || 'अभी देखें'}</span>
+                    </button>
+                    <span className="text-[11px] text-amber-100 font-bold">
+                      Start Young, Retire Young ✓
+                    </span>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* DYNAMIC SERVICES SECTION (ADD & REMOVE FULLY CONTROLLED BY ADMIN) */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 space-y-6 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-emerald-600" />
+              <h2 className="text-xl sm:text-2xl font-black font-display text-slate-900">
+                अधिकृत सर्विसेज व इनकम अवसर
+              </h2>
+            </div>
+            <p className="text-xs text-slate-600 mt-1">
+              ACC द्वारा छात्रों व सदस्यों को प्रदान की जाने वाली सक्रिय सेवाएं (एडमिन द्वारा लाइव प्रबंधित)
+            </p>
+          </div>
+          <span className="text-xs bg-blue-50 text-[#2874f0] border border-blue-200 px-3 py-1 rounded font-bold self-start sm:self-auto">
+            {siteConfig.services.filter((s) => s.isActive).length} लाइव सर्विसेज उपलब्ध
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {siteConfig.services
+            .filter((s) => s.isActive)
+            .map((svc) => (
+              <div
+                key={svc.id}
+                className="bg-slate-50 hover:bg-white border border-gray-200 hover:border-blue-400 rounded-xl p-5 flex flex-col justify-between transition-all hover:shadow-md group"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <div className="w-10 h-10 rounded-lg bg-white border border-gray-200 shadow-xs flex items-center justify-center">
+                      {renderServiceIcon(svc.iconName)}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] bg-blue-50 text-[#2874f0] border border-blue-200 px-2 py-0.5 rounded font-mono-acc font-bold">
+                        {svc.category}
+                      </span>
+                      {svc.badgeText && (
+                        <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded font-bold">
+                          {svc.badgeText}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <h3 className="font-bold text-slate-900 text-base leading-snug group-hover:text-[#2874f0] transition-colors">
+                    {svc.title}
+                  </h3>
+
+                  <div className="mt-1.5 mb-2.5">
+                    <span className="inline-block text-xs font-bold text-emerald-700 bg-green-50 px-2.5 py-0.5 rounded border border-green-200 font-mono-acc">
+                      {svc.commissionOrEarning}
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    {svc.description}
+                  </p>
+                </div>
+
+                <div className="pt-4 mt-3 border-t border-gray-200/60 flex items-center justify-between">
+                  <button
+                    onClick={() => onNavigate((svc.actionLink as any) || 'register')}
+                    className="px-4 py-2 bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold text-xs rounded-sm shadow-xs flex items-center gap-1.5 transition"
+                  >
+                    <span>{svc.actionText}</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="text-[10px] text-slate-400 font-semibold">
+                    100% वेरिफाइड
+                  </span>
+                </div>
+              </div>
+            ))}
+        </div>
+      </div>
+
       {/* Interactive Student Pocket Money Calculator - Clean White Card */}
       <div className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 space-y-5 shadow-sm">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
@@ -193,13 +372,14 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, currentUser }) =
                   key={num}
                   type="button"
                   onClick={() => setStudentFriendsCount(num)}
-                  className={`px-3.5 py-1.5 rounded-sm text-xs font-bold transition ${
+                  className={`px-3.5 py-1.5 rounded-sm text-xs font-bold transition flex items-center gap-1 ${
                     studentFriendsCount === num
                       ? 'bg-[#2874f0] text-white shadow-sm'
                       : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-gray-200'
                   }`}
                 >
-                  {num} दोस्त
+                  <Users className="w-3 h-3" />
+                  <span>{num} दोस्त</span>
                 </button>
               ))}
             </div>
@@ -241,7 +421,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, currentUser }) =
             <div className="w-9 h-9 rounded bg-[#2874f0] text-white flex items-center justify-center font-black text-sm font-mono-acc shadow-xs">
               01
             </div>
-            <h3 className="text-sm font-bold text-slate-900">रजिस्ट्रेशन और ₹249 भुगतान</h3>
+            <h3 className="text-sm font-bold text-slate-900">रजिस्ट्रेशन और ₹{siteConfig.activationFee || 249} भुगतान</h3>
             <p className="text-xs text-slate-600 leading-relaxed">
               Google Form शैली के आसान फॉर्म में अपना नाम, कॉलेज/डिग्री और UPI UTR संदर्भ नंबर दर्ज करें।
             </p>
@@ -318,7 +498,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, currentUser }) =
               onClick={() => onNavigate('register')}
               className="w-full py-3 bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold rounded-sm text-xs flex items-center justify-center gap-2 transition shadow-sm"
             >
-              <span>SWIS जॉइन करें (₹249 One-Time)</span>
+              <Zap className="w-4 h-4 text-emerald-300" />
+              <span>SWIS जॉइन करें (₹{siteConfig.activationFee || 249} One-Time)</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -357,7 +538,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, currentUser }) =
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-[#2874f0] shrink-0" />
-                <span>पर्सनल मेंटर व सपोर्ट सिस्टम (+91 8877490845)</span>
+                <span>पर्सनल मेंटर व सपोर्ट सिस्टम ({siteConfig.helplinePhone || '+91 8877490845'})</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-[#2874f0] shrink-0" />
@@ -371,7 +552,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, currentUser }) =
               onClick={() => onNavigate('register')}
               className="w-full py-3 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold rounded-sm text-xs flex items-center justify-center gap-2 transition shadow-sm"
             >
-              <span>TWIS जॉइन करें (₹249 One-Time)</span>
+              <Users className="w-4 h-4 text-yellow-300" />
+              <span>TWIS जॉइन करें (₹{siteConfig.activationFee || 249} One-Time)</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -389,7 +571,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, currentUser }) =
             बिजनेस प्लान व पूरा प्रोसेस वीडियो में देखें
           </h3>
           <p className="text-xs text-slate-600 max-w-xl">
-            वीडियो में स्टेप-बाय-स्टेप बताया गया है कि कैसे आप आज ही ₹249 देकर अपनी डिजिटल 🆔 एक्टिवेट करके SWIS और TWIS से अर्निंग शुरू कर सकते हैं।
+            वीडियो में स्टेप-बाय-स्टेप बताया गया है कि कैसे आप आज ही ₹{siteConfig.activationFee || 249} देकर अपनी डिजिटल 🆔 एक्टिवेट करके SWIS और TWIS से अर्निंग शुरू कर सकते हैं।
           </p>
         </div>
 
@@ -411,7 +593,10 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, currentUser }) =
               <span className="text-[#ffe500] font-semibold italic text-xs">· Start Young, Retire Young</span>
             </div>
             <p className="text-slate-400 mt-1">
-              Full Support Desk: <a href="mailto:santosh09patidar@gmail.com" className="text-blue-300 hover:underline">santosh09patidar@gmail.com</a> · WhatsApp: <a href="https://api.whatsapp.com/send?phone=918877490845&text=Namaste%20ACC%20Support" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline font-bold">+91 8877490845</a>
+              Full Support Desk: <a href={`mailto:${siteConfig.officialEmail || 'santosh09patidar@gmail.com'}`} className="text-blue-300 hover:underline">{siteConfig.officialEmail || 'santosh09patidar@gmail.com'}</a> · WhatsApp: <a href={`https://api.whatsapp.com/send?phone=${cleanWhatsApp}&text=Namaste%20ACC%20Support`} target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline font-bold">{siteConfig.whatsappNumber || '+91 8877490845'}</a>
+            </p>
+            <p className="text-slate-500 text-[11px] mt-0.5">
+              कार्यालय पता: {siteConfig.officialAddress || 'Scheme No. 54, Vijay Nagar, Indore, Madhya Pradesh - 452001'}
             </p>
           </div>
 
@@ -428,9 +613,10 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, currentUser }) =
 
         <div className="flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-400 pt-1">
           <span>© 2026 Achievers Club Community (ACC). सर्वाधिकार सुरक्षित।</span>
-          <span className="text-slate-400">Zero Investment Work · One-Time ₹249 Joining</span>
+          <span className="text-slate-400">Zero Investment Work · One-Time ₹{siteConfig.activationFee || 249} Joining</span>
         </div>
       </footer>
     </div>
   );
 };
+

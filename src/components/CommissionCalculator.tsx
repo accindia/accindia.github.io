@@ -212,6 +212,7 @@ export const CommissionCalculator: React.FC<CommissionCalculatorProps> = ({ onGo
             onClick={onGoToRegister}
             className="w-full py-3 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold rounded-sm text-sm shadow-md flex items-center justify-center gap-2 transition"
           >
+            <Sparkles className="w-4 h-4 text-yellow-300" />
             <span>आज ही एक्टिवेट करें (मात्र ₹249)</span>
             <ArrowRight className="w-4 h-4" />
           </button>

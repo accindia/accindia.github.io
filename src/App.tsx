@@ -11,7 +11,7 @@ import { CommissionCalculator } from './components/CommissionCalculator';
 import { AdminPanel } from './components/AdminPanel';
 import { LegalPages } from './components/LegalPages';
 import { StudentPortalGate } from './components/StudentPortalGate';
-import { ActiveWindow, Member } from './types';
+import { ActiveWindow, Member, SiteConfig } from './types';
 import { StorageService, subscribeToSync } from './services/storage';
 import { FirestoreService } from './services/firestore';
 import {
@@ -24,11 +24,16 @@ import {
   Phone,
   Sparkles,
   MessageCircle,
+  ExternalLink,
+  Info,
+  Building2,
+  Lock,
 } from 'lucide-react';
 
 export default function App() {
   const [activeWindow, setActiveWindow] = useState<ActiveWindow>('home');
   const [currentUser, setCurrentUser] = useState<Member | null>(null);
+  const [siteConfig, setSiteConfig] = useState<SiteConfig>(() => StorageService.getSiteConfig());
 
   // Load initial user & subscribe to sync across tabs/windows & Firestore multi-device
   useEffect(() => {
@@ -49,7 +54,7 @@ export default function App() {
       setCurrentUser(null);
     }
 
-    // 2. Real-time multi-device Firestore synchronization
+    // 2. Real-time multi-device Firestore synchronization for members
     const unsubscribeFirestore = FirestoreService.subscribeToMembers((cloudMembers) => {
       const current = StorageService.getCurrentUser();
       if (current) {
@@ -61,7 +66,15 @@ export default function App() {
       }
     });
 
-    // 3. Tab-level synchronization
+    // 3. Real-time multi-device Firestore synchronization for site config
+    const unsubscribeConfig = FirestoreService.subscribeToSiteConfig((cloudCfg) => {
+      if (cloudCfg) {
+        setSiteConfig(cloudCfg);
+        StorageService.saveSiteConfig(cloudCfg);
+      }
+    });
+
+    // 4. Tab-level synchronization
     const unsubscribeSync = subscribeToSync(() => {
       const refreshedUser = StorageService.getCurrentUser();
       if (refreshedUser && refreshedUser.id !== 'mem-001' && refreshedUser.id !== 'mem-002') {
@@ -69,10 +82,12 @@ export default function App() {
       } else {
         setCurrentUser(null);
       }
+      setSiteConfig(StorageService.getSiteConfig());
     });
 
     return () => {
       unsubscribeFirestore();
+      unsubscribeConfig();
       unsubscribeSync();
     };
   }, []);
@@ -97,7 +112,7 @@ export default function App() {
   const idCardMember = currentUser || StorageService.getMembers()[0];
 
   return (
-    <div className="min-h-screen bg-[#f1f2f4] text-slate-800 flex flex-col selection:bg-[#2874f0] selection:text-white font-sans">
+    <div className="min-h-screen bg-[#f1f2f4] text-slate-800 flex flex-col selection:bg-[#2874f0] selection:text-white font-sans w-full max-w-[100vw] overflow-x-hidden">
       {/* Official Top Bar & Live IOIS-Style Realtime Clock Header */}
       <Header
         activeWindow={activeWindow}
@@ -106,8 +121,8 @@ export default function App() {
         onLogout={handleLogout}
       />
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 pb-20">
+      {/* Main Container - 100% Mobile Fluid Fit */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-2 sm:p-4 md:p-6 pb-24 overflow-x-hidden">
         {/* VIEW: HOME */}
         {activeWindow === 'home' && (
           <HomeView
@@ -335,9 +350,27 @@ export default function App() {
           <div className="space-y-2">
             <h4 className="text-white font-bold text-xs uppercase tracking-wider text-slate-400">संपर्क व सहायता</h4>
             <div className="text-slate-400 text-[11px] space-y-1">
-              <p>हेल्पलाइन: <strong className="text-emerald-400">+91 8877490845</strong></p>
-              <p>ईमेल: <span className="text-slate-300">santosh09patidar@gmail.com</span></p>
-              <p>कार्यालय: Scheme No. 54, Vijay Nagar, Indore (M.P.) - 452001</p>
+              <p>
+                हेल्पलाइन:{' '}
+                <a
+                  href={`tel:${(siteConfig.helplinePhone || '+91 8877490845').replace(/[^0-9]/g, '')}`}
+                  className="text-emerald-400 font-bold hover:underline"
+                >
+                  {siteConfig.helplinePhone || '+91 8877490845'}
+                </a>
+              </p>
+              <p>
+                ईमेल:{' '}
+                <a
+                  href={`mailto:${siteConfig.officialEmail || 'santosh09patidar@gmail.com'}`}
+                  className="text-slate-300 hover:underline"
+                >
+                  {siteConfig.officialEmail || 'santosh09patidar@gmail.com'}
+                </a>
+              </p>
+              <p>
+                कार्यालय: {siteConfig.officialAddress || 'Scheme No. 54, Vijay Nagar, Indore (M.P.) - 452001'}
+              </p>
             </div>
           </div>
         </div>
@@ -345,30 +378,47 @@ export default function App() {
         <div className="bg-[#0f172a] py-3 px-4 border-t border-slate-800 text-center text-[11px] text-slate-500">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
             <span>© {new Date().getFullYear()} Achievers Club Community (ACC). All Rights Reserved.</span>
-            <span className="text-slate-400">Powered by SWIS (3.30% Commission) & TWIS (₹150 Refer & Earn)</span>
+            <span className="text-slate-400">
+              Powered by SWIS (3.30% Commission) & TWIS (₹150 Refer & Earn) · 🆔 ₹{siteConfig.activationFee || 249}
+            </span>
           </div>
         </div>
       </footer>
 
       {/* Floating Bottom Quick Bar for Mobile & WhatsApp quick support */}
       <div className="fixed bottom-3 right-3 z-30 flex items-center gap-2">
-        <a
-          href="https://api.whatsapp.com/send?phone=918877490845&text=Namaste%20ACC%20Support%2C%20mujhe%20Achievers%20Club%20Community%20ke%20SWIS%20TWIS%20system%20ke%20bare%20me%20jankari%20chahiye."
-          target="_blank"
-          rel="noopener noreferrer"
-          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2.5 rounded-full shadow-lg flex items-center gap-2 hover:scale-105 transition"
-        >
-          <MessageCircle className="w-4 h-4" />
-          <span className="hidden sm:inline">WhatsApp: +91 8877490845</span>
-          <span className="sm:hidden">WhatsApp</span>
-        </a>
+        {siteConfig.showHelplineCallButton !== false && (
+          <a
+            href={`tel:${(siteConfig.helplinePhone || '+91 8877490845').replace(/[^0-9]/g, '')}`}
+            className="bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold text-xs p-2.5 sm:px-3.5 sm:py-2.5 rounded-full shadow-lg flex items-center gap-1.5 hover:scale-105 transition"
+            title="हेल्पलाइन पर कॉल करें"
+          >
+            <Phone className="w-4 h-4 text-white" />
+            <span className="hidden sm:inline">कॉल: {siteConfig.helplinePhone || '+91 8877490845'}</span>
+          </a>
+        )}
+
+        {siteConfig.showHelplineWhatsAppButton !== false && (
+          <a
+            href={`https://api.whatsapp.com/send?phone=${(siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '')}&text=${encodeURIComponent(
+              'Namaste ACC Support, mujhe Achievers Club Community ke SWIS TWIS system ke bare me jankari chahiye.'
+            )}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs p-2.5 sm:px-3.5 sm:py-2.5 rounded-full shadow-lg flex items-center gap-1.5 hover:scale-105 transition"
+            title="WhatsApp चैट सपोर्ट"
+          >
+            <MessageCircle className="w-4 h-4 text-white" />
+            <span className="hidden sm:inline">WhatsApp</span>
+          </a>
+        )}
 
         <button
           onClick={() => setActiveWindow('register')}
-          className="bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold text-xs px-4 py-2.5 rounded-full shadow-lg flex items-center gap-1.5 hover:scale-105 transition"
+          className="bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold text-xs px-3.5 py-2.5 sm:px-4 sm:py-2.5 rounded-full shadow-lg flex items-center gap-1.5 hover:scale-105 transition"
         >
           <Sparkles className="w-3.5 h-3.5 text-[#ffe500]" />
-          <span>रजिस्टर ₹249</span>
+          <span>रजिस्टर ₹{siteConfig.activationFee || 249}</span>
         </button>
       </div>
     </div>

@@ -1,10 +1,24 @@
 @import "tailwindcss";
 
 @layer base {
+  *, ::before, ::after {
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100%;
+    -webkit-text-size-adjust: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
   body {
     font-family: 'Roboto', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background-color: #f1f2f4;
     color: #212121;
+    min-width: 280px;
   }
 
   h1, h2, h3, h4, .font-display {
@@ -30,6 +44,15 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #2874f0;
+}
+
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Print styles for ID card */

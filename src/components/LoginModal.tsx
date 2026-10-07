@@ -7,6 +7,8 @@ import {
   CheckCircle2,
   Lock,
   KeyRound,
+  MessageCircle,
+  Sparkles,
 } from 'lucide-react';
 import { Member } from '../types';
 import { StorageService } from '../services/storage';
@@ -180,6 +182,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             <span>सत्यापित हो रहा है...</span>
           ) : (
             <>
+              <LogIn className="w-4 h-4" />
               <span>पोर्टल में प्रवेश करें (Secure Login)</span>
               <ArrowRight className="w-4 h-4" />
             </>
@@ -198,23 +201,27 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           </span>
         </div>
         <a
-          href="https://api.whatsapp.com/send?phone=918877490845&text=Namaste%20ACC%20Support%2C%20mujhe%20Achievers%20Club%20Community%20portal%20me%20login%20me%20sahayata%20chahiye."
+          href={`https://api.whatsapp.com/send?phone=${(StorageService.getSiteConfig().whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '')}&text=${encodeURIComponent(
+            'Namaste ACC Support, mujhe Achievers Club Community portal me login me sahayata chahiye.'
+          )}`}
           target="_blank"
           rel="noopener noreferrer"
           className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-sm flex items-center gap-1.5 shrink-0 shadow-sm transition"
         >
-          <span>WhatsApp: +91 8877490845</span>
+          <MessageCircle className="w-3.5 h-3.5" />
+          <span>WhatsApp: {StorageService.getSiteConfig().whatsappNumber || '+91 8877490845'}</span>
         </a>
       </div>
 
       <div className="text-center pt-2 border-t border-gray-200">
-        <p className="text-xs text-slate-600">
-          क्या आप नए सदस्य हैं?{' '}
+        <p className="text-xs text-slate-600 flex items-center justify-center gap-1 flex-wrap">
+          <span>क्या आप नए सदस्य हैं?</span>
           <button
             onClick={onGoToRegister}
-            className="text-[#2874f0] font-bold hover:underline ml-1"
+            className="text-[#2874f0] font-bold hover:underline inline-flex items-center gap-1"
           >
-            नया रजिस्ट्रेशन करें (₹249 One-Time)
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            <span>नया रजिस्ट्रेशन करें (₹{StorageService.getSiteConfig().activationFee || 249})</span>
           </button>
         </p>
       </div>

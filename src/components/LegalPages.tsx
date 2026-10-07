@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShieldAlert,
   FileCheck,
@@ -11,7 +11,15 @@ import {
   Send,
   CheckCircle2,
   ExternalLink,
+  MessageCircle,
+  FileText,
+  Info,
+  Shield,
+  ArrowRight,
 } from 'lucide-react';
+import { SiteConfig } from '../types';
+import { StorageService, subscribeToSync } from '../services/storage';
+import { FirestoreService } from '../services/firestore';
 
 interface LegalPagesProps {
   initialTab?: 'privacy' | 'disclaimer' | 'terms' | 'about' | 'contact' | 'description';
@@ -23,6 +31,23 @@ export const LegalPages: React.FC<LegalPagesProps> = ({
   onGoToRegister,
 }) => {
   const [tab, setTab] = useState<'privacy' | 'disclaimer' | 'terms' | 'about' | 'contact' | 'description'>(initialTab);
+  const [siteConfig, setSiteConfig] = useState<SiteConfig>(() => StorageService.getSiteConfig());
+
+  useEffect(() => {
+    const unsubLocal = subscribeToSync(() => {
+      setSiteConfig(StorageService.getSiteConfig());
+    });
+    const unsubCloud = FirestoreService.subscribeToSiteConfig((cloudCfg) => {
+      if (cloudCfg) {
+        setSiteConfig(cloudCfg);
+        StorageService.saveSiteConfig(cloudCfg);
+      }
+    });
+    return () => {
+      unsubLocal();
+      unsubCloud();
+    };
+  }, []);
 
   // Contact Form State
   const [contactName, setContactName] = useState('');
@@ -42,6 +67,9 @@ export const LegalPages: React.FC<LegalPagesProps> = ({
       setContactMessage('');
     }, 4000);
   };
+
+  const cleanWhatsApp = (siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '');
+  const cleanPhone = (siteConfig.helplinePhone || '+91 8877490845').replace(/[^0-9]/g, '');
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -270,10 +298,10 @@ export const LegalPages: React.FC<LegalPagesProps> = ({
                 <div>
                   <span className="text-[11px] text-slate-500 block font-semibold">आधिकारिक ईमेल आईडी:</span>
                   <a
-                    href="mailto:santosh09patidar@gmail.com"
+                    href={`mailto:${siteConfig.officialEmail || 'santosh09patidar@gmail.com'}`}
                     className="font-bold text-[#2874f0] hover:underline"
                   >
-                    santosh09patidar@gmail.com
+                    {siteConfig.officialEmail || 'santosh09patidar@gmail.com'}
                   </a>
                 </div>
               </div>
@@ -281,14 +309,28 @@ export const LegalPages: React.FC<LegalPagesProps> = ({
               <div className="flex items-start gap-3 bg-[#f1f2f4] p-3.5 rounded-lg border border-gray-200">
                 <Phone className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                 <div>
-                  <span className="text-[11px] text-slate-500 block font-semibold">हेल्पलाइन एवं व्हाट्सएप:</span>
+                  <span className="text-[11px] text-slate-500 block font-semibold">कॉलिंग हेल्पलाइन:</span>
                   <a
-                    href="https://api.whatsapp.com/send?phone=918877490845&text=Namaste%20ACC%20Support%2C%20mujhe%20sahayata%20chahiye."
+                    href={`tel:${cleanPhone}`}
+                    className="font-bold text-slate-900 hover:underline"
+                  >
+                    {siteConfig.helplinePhone || '+91 8877490845'}
+                  </a>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 bg-[#f1f2f4] p-3.5 rounded-lg border border-gray-200">
+                <MessageCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-[11px] text-slate-500 block font-semibold">व्हाट्सएप सपोर्ट:</span>
+                  <a
+                    href={`https://api.whatsapp.com/send?phone=${cleanWhatsApp}&text=${encodeURIComponent('Namaste ACC Support, mujhe sahayata chahiye.')}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-bold text-emerald-700 hover:underline"
+                    className="font-bold text-emerald-700 hover:underline flex items-center gap-1 mt-0.5"
                   >
-                    +91 8877490845 (WhatsApp Support)
+                    <span>{siteConfig.whatsappNumber || '+91 8877490845'}</span>
+                    <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
               </div>
@@ -296,16 +338,20 @@ export const LegalPages: React.FC<LegalPagesProps> = ({
               <div className="flex items-start gap-3 bg-[#f1f2f4] p-3.5 rounded-lg border border-gray-200">
                 <Building2 className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
                 <div>
-                  <span className="text-[11px] text-slate-500 block font-semibold">फाउंडर व मेंटर:</span>
-                  <span className="font-bold text-slate-900">Rahul Kumar (ACC249SWISRK01)</span>
+                  <span className="text-[11px] text-slate-500 block font-semibold">अधिकृत हस्ताक्षरकर्ता:</span>
+                  <span className="font-bold text-slate-900">
+                    {siteConfig.adminSignatoryName || 'Vikas Kumar'} ({siteConfig.adminSignatoryTitle || 'Chief Administrator'})
+                  </span>
                 </div>
               </div>
 
               <div className="flex items-start gap-3 bg-[#f1f2f4] p-3.5 rounded-lg border border-gray-200">
                 <MapPin className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
                 <div>
-                  <span className="text-[11px] text-slate-500 block font-semibold">पंजीकृत कार्यालय:</span>
-                  <span className="text-slate-800">Scheme No. 54, Vijay Nagar, Indore, Madhya Pradesh - 452001</span>
+                  <span className="text-[11px] text-slate-500 block font-semibold">पंजीकृत कार्यालय पता:</span>
+                  <span className="text-slate-800 leading-relaxed">
+                    {siteConfig.officialAddress || 'Scheme No. 54, Vijay Nagar, Indore, Madhya Pradesh - 452001'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -322,7 +368,9 @@ export const LegalPages: React.FC<LegalPagesProps> = ({
               <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-xs text-center space-y-1">
                 <CheckCircle2 className="w-8 h-8 mx-auto text-emerald-600" />
                 <p className="font-bold">संदेश प्राप्त हुआ!</p>
-                <p className="text-slate-600">हमारी सपोर्ट टीम santosh09patidar@gmail.com से आपसे संपर्क करेगी।</p>
+                <p className="text-slate-600">
+                  हमारी सपोर्ट टीम {siteConfig.officialEmail || 'santosh09patidar@gmail.com'} से आपसे संपर्क करेगी।
+                </p>
               </div>
             ) : (
               <form onSubmit={handleSubmitContact} className="space-y-3">
@@ -377,9 +425,10 @@ export const LegalPages: React.FC<LegalPagesProps> = ({
 
                 <button
                   type="submit"
-                  className="w-full py-2.5 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold text-xs rounded-sm shadow-sm transition"
+                  className="w-full py-2.5 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold text-xs rounded-sm shadow-sm flex items-center justify-center gap-2 transition"
                 >
-                  संदेश भेजें
+                  <Send className="w-3.5 h-3.5" />
+                  <span>संदेश भेजें</span>
                 </button>
               </form>
             )}
