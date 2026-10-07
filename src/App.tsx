@@ -11,6 +11,7 @@ import { CommissionCalculator } from './components/CommissionCalculator';
 import { AdminPanel } from './components/AdminPanel';
 import { LegalPages } from './components/LegalPages';
 import { StudentPortalGate } from './components/StudentPortalGate';
+import { IdCardAccessGate } from './components/IdCardAccessGate';
 import { ActiveWindow, Member, SiteConfig } from './types';
 import { StorageService, subscribeToSync } from './services/storage';
 import { FirestoreService } from './services/firestore';
@@ -108,9 +109,6 @@ export default function App() {
     setActiveWindow('dashboard');
   };
 
-  // Get active member for ID card (either current user or default founder)
-  const idCardMember = currentUser || StorageService.getMembers()[0];
-
   return (
     <div className="min-h-screen bg-[#f1f2f4] text-slate-800 flex flex-col selection:bg-[#2874f0] selection:text-white font-sans w-full max-w-[100vw] overflow-x-hidden">
       {/* Official Top Bar & Live IOIS-Style Realtime Clock Header */}
@@ -195,15 +193,30 @@ export default function App() {
         {/* VIEW: DIGITAL ID CARD */}
         {activeWindow === 'idcard' && (
           <WindowFrame
-            title="डिजिटल ACC पहचान पत्र (Official Member ID Card)"
-            subtitle="Certified Lifetime Digital Identity • Achievers Club Community"
+            title={
+              currentUser
+                ? `डिजिटल ACC पहचान पत्र (${currentUser.fullName})`
+                : 'डिजिटल ACC पहचान पत्र (सुरक्षित गेटवे)'
+            }
+            subtitle={
+              currentUser
+                ? `Certified Lifetime Digital Identity • 🆔 ${currentUser.accId}`
+                : 'लॉगआउट सुरक्षा: कार्ड केवल अधिकृत लॉगिन पर ही प्रदर्शित होगा'
+            }
             icon={<CreditCard className="w-4 h-4 text-cyan-400" />}
             onClose={() => setActiveWindow('home')}
           >
-            <DigitalIdCard
-              member={idCardMember}
-              onClose={() => setActiveWindow('home')}
-            />
+            {currentUser ? (
+              <DigitalIdCard
+                member={currentUser}
+                onClose={() => setActiveWindow('home')}
+              />
+            ) : (
+              <IdCardAccessGate
+                onGoToLogin={() => setActiveWindow('login')}
+                onGoToRegister={() => setActiveWindow('register')}
+              />
+            )}
           </WindowFrame>
         )}
 

@@ -23,6 +23,7 @@ import {
   MessageCircle,
   Tag,
   Gift,
+  Lock,
 } from 'lucide-react';
 import { ActiveWindow, Member, SiteConfig, AppServiceItem, PromotionalPoster } from '../types';
 import { StorageService, subscribeToSync } from '../services/storage';
@@ -184,7 +185,10 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, currentUser }) =
                   {currentUser ? (
                     <>सक्रिय छात्र: <strong className="text-slate-900">{currentUser.fullName}</strong></>
                   ) : (
-                    <span>फॉर्मेट: <strong>ACC249 + PLAN + INITIALS + 01</strong></span>
+                    <span className="text-amber-700 font-semibold flex items-center gap-1">
+                      <Lock className="w-3 h-3 text-amber-600" />
+                      <span>लॉगआउट स्थिति: कार्ड सुरक्षित व लॉक है</span>
+                    </span>
                   )}
                 </p>
               </div>
@@ -204,8 +208,17 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate, currentUser }) =
                 onClick={() => onNavigate('idcard')}
                 className="w-full py-2.5 bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold text-xs rounded-sm shadow-sm flex items-center justify-center gap-1.5 transition"
               >
-                <CreditCard className="w-3.5 h-3.5" />
-                <span>डिजिटल 🆔 कार्ड खोलें</span>
+                {currentUser ? (
+                  <>
+                    <CreditCard className="w-3.5 h-3.5" />
+                    <span>मेरा डिजिटल 🆔 कार्ड खोलें</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-3.5 h-3.5 text-yellow-300" />
+                    <span>डिजिटल 🆔 कार्ड (लॉगिन करें)</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
