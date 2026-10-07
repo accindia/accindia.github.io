@@ -9,13 +9,21 @@ import {
   Tv,
   CheckCircle2,
   XCircle,
+  LayoutDashboard,
 } from 'lucide-react';
+import { Member } from '../types';
 
 interface CommissionCalculatorProps {
   onGoToRegister: () => void;
+  currentUser?: Member | null;
+  onGoToDashboard?: () => void;
 }
 
-export const CommissionCalculator: React.FC<CommissionCalculatorProps> = ({ onGoToRegister }) => {
+export const CommissionCalculator: React.FC<CommissionCalculatorProps> = ({
+  onGoToRegister,
+  currentUser,
+  onGoToDashboard,
+}) => {
   const [mobileExpense, setMobileExpense] = useState<number>(1500);
   const [electricityBill, setElectricityBill] = useState<number>(3000);
   const [dthExpense, setDthExpense] = useState<number>(500);
@@ -209,12 +217,29 @@ export const CommissionCalculator: React.FC<CommissionCalculatorProps> = ({ onGo
           </div>
 
           <button
-            onClick={onGoToRegister}
+            onClick={() => {
+              if (currentUser) {
+                if (onGoToDashboard) onGoToDashboard();
+                else onGoToRegister();
+              } else {
+                onGoToRegister();
+              }
+            }}
             className="w-full py-3 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold rounded-sm text-sm shadow-md flex items-center justify-center gap-2 transition"
           >
-            <Sparkles className="w-4 h-4 text-yellow-300" />
-            <span>आज ही एक्टिवेट करें (मात्र ₹249)</span>
-            <ArrowRight className="w-4 h-4" />
+            {currentUser ? (
+              <>
+                <LayoutDashboard className="w-4 h-4 text-yellow-300" />
+                <span>डैशबोर्ड में जाएं (Recharge Wallet & Bonus)</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 text-yellow-300" />
+                <span>आज ही एक्टिवेट करें (मात्र ₹249)</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
           </button>
         </div>
       </div>

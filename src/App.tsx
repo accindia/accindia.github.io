@@ -29,12 +29,48 @@ import {
   Info,
   Building2,
   Lock,
+  ArrowRight,
 } from 'lucide-react';
 
 export default function App() {
   const [activeWindow, setActiveWindow] = useState<ActiveWindow>('home');
   const [currentUser, setCurrentUser] = useState<Member | null>(null);
   const [siteConfig, setSiteConfig] = useState<SiteConfig>(() => StorageService.getSiteConfig());
+  const [referralSponsor, setReferralSponsor] = useState<Member | null>(null);
+
+  // Detect ?sponsor= or ?ref= parameter from URL or sessionStorage
+  useEffect(() => {
+    const detectSponsor = async () => {
+      try {
+        if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search);
+          let sId = params.get('sponsor') || params.get('ref');
+          if (sId && sId.trim()) {
+            sessionStorage.setItem('acc_active_sponsor_ref', sId.trim());
+          } else {
+            sId = sessionStorage.getItem('acc_active_sponsor_ref');
+          }
+
+          if (sId && sId.trim()) {
+            const cleanId = sId.trim().toUpperCase();
+            const members = StorageService.getMembers();
+            let found = members.find((m) => m.accId.toUpperCase() === cleanId);
+            if (!found) {
+              const cloudMembers = await FirestoreService.getMembers();
+              found = cloudMembers.find((m) => m.accId.toUpperCase() === cleanId);
+            }
+            if (found) {
+              setReferralSponsor(found);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Sponsor detection err:', err);
+      }
+    };
+
+    detectSponsor();
+  }, []);
 
   // Load initial user & subscribe to sync across tabs/windows & Firestore multi-device
   useEffect(() => {
@@ -63,6 +99,14 @@ export default function App() {
         if (found) {
           StorageService.setCurrentUser(found);
           setCurrentUser(found);
+        }
+      }
+      // Also sync referral sponsor if stored
+      const storedSponsorId = typeof window !== 'undefined' ? sessionStorage.getItem('acc_active_sponsor_ref') : null;
+      if (storedSponsorId) {
+        const sponsorFound = cloudMembers.find((m) => m.accId.toUpperCase() === storedSponsorId.trim().toUpperCase());
+        if (sponsorFound) {
+          setReferralSponsor(sponsorFound);
         }
       }
     });
@@ -109,6 +153,20 @@ export default function App() {
     setActiveWindow('dashboard');
   };
 
+  // Dedicated navigation for ID card:
+  // 1. If logged in -> show user's own card
+  // 2. If visited via sponsor link -> show sponsor's card
+  // 3. If normal visitor without sponsor -> open registration popup directly!
+  const handleNavigateToIdCard = () => {
+    if (currentUser) {
+      setActiveWindow('idcard');
+    } else if (referralSponsor) {
+      setActiveWindow('idcard');
+    } else {
+      setActiveWindow('register');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#f1f2f4] text-slate-800 flex flex-col selection:bg-[#2874f0] selection:text-white font-sans w-full max-w-[100vw] overflow-x-hidden">
       {/* Official Top Bar & Live IOIS-Style Realtime Clock Header */}
@@ -117,6 +175,8 @@ export default function App() {
         setActiveWindow={setActiveWindow}
         currentUser={currentUser}
         onLogout={handleLogout}
+        referralSponsor={referralSponsor}
+        onNavigateToIdCard={handleNavigateToIdCard}
       />
 
       {/* Main Container - 100% Mobile Fluid Fit */}
@@ -124,8 +184,16 @@ export default function App() {
         {/* VIEW: HOME */}
         {activeWindow === 'home' && (
           <HomeView
-            onNavigate={(view) => setActiveWindow(view)}
+            onNavigate={(view) => {
+              if (view === 'idcard') {
+                handleNavigateToIdCard();
+              } else {
+                setActiveWindow(view);
+              }
+            }}
             currentUser={currentUser}
+            referralSponsor={referralSponsor}
+            onNavigateToIdCard={handleNavigateToIdCard}
           />
         )}
 
@@ -140,6 +208,8 @@ export default function App() {
             <VideoTrainingModal
               onGoToRegister={() => setActiveWindow('register')}
               onGoToContact={() => setActiveWindow('contact')}
+              currentUser={currentUser}
+              onGoToDashboard={() => setActiveWindow('dashboard')}
             />
           </WindowFrame>
         )}
@@ -186,6 +256,8 @@ export default function App() {
           >
             <CommissionCalculator
               onGoToRegister={() => setActiveWindow('register')}
+              currentUser={currentUser}
+              onGoToDashboard={() => setActiveWindow('dashboard')}
             />
           </WindowFrame>
         )}
@@ -196,11 +268,15 @@ export default function App() {
             title={
               currentUser
                 ? `डिजिटल ACC पहचान पत्र (${currentUser.fullName})`
+                : referralSponsor
+                ? `स्पॉन्सर डिजिटल पहचान पत्र (${referralSponsor.fullName})`
                 : 'डिजिटल ACC पहचान पत्र (सुरक्षित गेटवे)'
             }
             subtitle={
               currentUser
-                ? `Certified Lifetime Digital Identity • 🆔 ${currentUser.accId}`
+                ? `यूनिक 🆔: ${currentUser.accId} • Certified Lifetime Digital Identity`
+                : referralSponsor
+                ? `रेफरल स्पॉन्सर 🆔: ${referralSponsor.accId} • इनके साथ जुड़ें और ₹150 रेफरल + 3.30% SWIS पाएं`
                 : 'लॉगआउट सुरक्षा: कार्ड केवल अधिकृत लॉगिन पर ही प्रदर्शित होगा'
             }
             icon={<CreditCard className="w-4 h-4 text-cyan-400" />}
@@ -211,6 +287,46 @@ export default function App() {
                 member={currentUser}
                 onClose={() => setActiveWindow('home')}
               />
+            ) : referralSponsor ? (
+              <div className="space-y-4">
+                {/* Prominent Referral Sponsor Banner */}
+                <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white p-4 sm:p-5 rounded-xl shadow-md border border-amber-400 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-white text-orange-600 flex items-center justify-center font-black text-sm shadow-xs shrink-0 border-2 border-white">
+                      ACC
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] uppercase font-black bg-black/25 px-2 py-0.5 rounded text-yellow-200">
+                          🌟 आपके रेफरल स्पॉन्सर (Invited By)
+                        </span>
+                        <span className="text-[10px] bg-emerald-700/80 text-white px-2 py-0.5 rounded font-bold">
+                          ✓ अधिकृत सदस्य
+                        </span>
+                      </div>
+                      <h3 className="font-bold text-base sm:text-lg mt-1 text-white">
+                        {referralSponsor.fullName} ({referralSponsor.accId})
+                      </h3>
+                      <p className="text-xs text-amber-100 mt-0.5">
+                        आप इनके अधिकृत इनविटेशन लिंक से जुड़े हैं। नीचे इनका प्रमाणित डिजिटल पहचान पत्र देखें और इनके साथ ज्वाइन करें।
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setActiveWindow('register')}
+                    className="w-full sm:w-auto px-6 py-3 bg-white hover:bg-slate-100 text-[#fb641b] font-black text-xs sm:text-sm rounded-sm shadow-md flex items-center justify-center gap-2 transition shrink-0 group"
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-500 group-hover:scale-110 transition-transform" />
+                    <span>इनके साथ ₹{siteConfig.activationFee || 249} में रजिस्ट्रेशन करें</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <DigitalIdCard
+                  member={referralSponsor}
+                  onClose={() => setActiveWindow('home')}
+                />
+              </div>
             ) : (
               <IdCardAccessGate
                 onGoToLogin={() => setActiveWindow('login')}
@@ -322,9 +438,15 @@ export default function App() {
                 </button>
               </li>
               <li>
-                <button onClick={() => setActiveWindow('register')} className="hover:text-[#ffe500] font-semibold transition">
-                  नया रजिस्ट्रेशन (₹249 One-Time)
-                </button>
+                {currentUser ? (
+                  <button onClick={() => setActiveWindow('idcard')} className="hover:text-white transition">
+                    मेरा डिजिटल 🆔 कार्ड
+                  </button>
+                ) : (
+                  <button onClick={() => setActiveWindow('register')} className="hover:text-[#ffe500] font-semibold transition">
+                    नया रजिस्ट्रेशन (₹{siteConfig.activationFee || 249} One-Time)
+                  </button>
+                )}
               </li>
             </ul>
           </div>
@@ -426,13 +548,23 @@ export default function App() {
           </a>
         )}
 
-        <button
-          onClick={() => setActiveWindow('register')}
-          className="bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold text-xs px-3.5 py-2.5 sm:px-4 sm:py-2.5 rounded-full shadow-lg flex items-center gap-1.5 hover:scale-105 transition"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-[#ffe500]" />
-          <span>रजिस्टर ₹{siteConfig.activationFee || 249}</span>
-        </button>
+        {currentUser ? (
+          <button
+            onClick={() => setActiveWindow('dashboard')}
+            className="bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold text-xs px-3.5 py-2.5 sm:px-4 sm:py-2.5 rounded-full shadow-lg flex items-center gap-1.5 hover:scale-105 transition"
+          >
+            <LayoutDashboard className="w-3.5 h-3.5 text-yellow-300" />
+            <span>मेरा डैशबोर्ड</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => setActiveWindow('register')}
+            className="bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold text-xs px-3.5 py-2.5 sm:px-4 sm:py-2.5 rounded-full shadow-lg flex items-center gap-1.5 hover:scale-105 transition"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-[#ffe500]" />
+            <span>रजिस्टर ₹{siteConfig.activationFee || 249}</span>
+          </button>
+        )}
       </div>
     </div>
   );

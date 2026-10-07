@@ -28,6 +28,8 @@ interface HeaderProps {
   setActiveWindow: (w: ActiveWindow) => void;
   currentUser: Member | null;
   onLogout: () => void;
+  referralSponsor?: Member | null;
+  onNavigateToIdCard?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -35,6 +37,8 @@ export const Header: React.FC<HeaderProps> = ({
   setActiveWindow,
   currentUser,
   onLogout,
+  referralSponsor,
+  onNavigateToIdCard,
 }) => {
   const [currentTime, setCurrentTime] = useState<string>('');
   const [currentDate, setCurrentDate] = useState<string>('');
@@ -80,13 +84,45 @@ export const Header: React.FC<HeaderProps> = ({
     };
   }, []);
 
+  const handleNavClick = (id: ActiveWindow) => {
+    if (id === 'idcard') {
+      if (onNavigateToIdCard) {
+        onNavigateToIdCard();
+      } else {
+        setActiveWindow('idcard');
+      }
+    } else {
+      setActiveWindow(id);
+    }
+  };
+
   const navItems = [
     { id: 'home' as ActiveWindow, label: 'होम', icon: <Sparkles className="w-3.5 h-3.5 text-yellow-300" /> },
     { id: 'video' as ActiveWindow, label: 'ट्रेनिंग वीडियो', icon: <Video className="w-3.5 h-3.5 text-rose-500" /> },
     { id: 'calculator' as ActiveWindow, label: 'पॉकेट मनी कैलकुलेटर', icon: <Calculator className="w-3.5 h-3.5 text-emerald-600" /> },
-    { id: 'register' as ActiveWindow, label: 'रजिस्ट्रेशन (₹249)', icon: <Sparkles className="w-3.5 h-3.5 text-amber-500" /> },
-    { id: 'idcard' as ActiveWindow, label: 'डिजिटल ID कार्ड', icon: <CreditCard className="w-3.5 h-3.5 text-cyan-600" /> },
-    { id: 'dashboard' as ActiveWindow, label: 'विद्यार्थी डैशबोर्ड', icon: <LayoutDashboard className="w-3.5 h-3.5 text-[#2874f0]" /> },
+    ...(!currentUser
+      ? [
+          {
+            id: 'register' as ActiveWindow,
+            label: `रजिस्ट्रेशन (₹${siteConfig.activationFee || 249})`,
+            icon: <Sparkles className="w-3.5 h-3.5 text-amber-500" />,
+          },
+        ]
+      : []),
+    {
+      id: 'idcard' as ActiveWindow,
+      label: currentUser
+        ? 'मेरा डिजिटल ID कार्ड'
+        : referralSponsor
+        ? 'स्पॉन्सर डिजिटल ID कार्ड'
+        : 'डिजिटल ID कार्ड',
+      icon: <CreditCard className="w-3.5 h-3.5 text-cyan-600" />,
+    },
+    {
+      id: 'dashboard' as ActiveWindow,
+      label: currentUser ? 'मेरा डैशबोर्ड' : 'विद्यार्थी डैशबोर्ड',
+      icon: <LayoutDashboard className="w-3.5 h-3.5 text-[#2874f0]" />,
+    },
     { id: 'admin' as ActiveWindow, label: 'एडमिन पैनल', icon: <ShieldCheck className="w-3.5 h-3.5 text-red-500" /> },
     { id: 'about' as ActiveWindow, label: 'हमारे बारे में', icon: <Award className="w-3.5 h-3.5 text-blue-500" /> },
     { id: 'contact' as ActiveWindow, label: 'सपोर्ट', icon: <Phone className="w-3.5 h-3.5 text-green-600" /> },
@@ -165,7 +201,7 @@ export const Header: React.FC<HeaderProps> = ({
               /* LOGGED IN USER ACTIONS WITH SYMBOLIC LOGOS */
               <div className="flex items-center gap-1 sm:gap-1.5 bg-[#1c52b8] border border-blue-400/30 rounded-md p-0.5 sm:p-1 pr-1 sm:pr-2 shrink-0">
                 <div 
-                  onClick={() => setActiveWindow('idcard')}
+                  onClick={() => handleNavClick('idcard')}
                   className="w-7 h-7 rounded-full bg-[#ffe500] text-[#2874f0] flex items-center justify-center font-bold text-xs cursor-pointer hover:ring-2 hover:ring-yellow-300 transition overflow-hidden shrink-0 border border-white/60"
                   title="डिजिटल ID कार्ड देखें"
                 >
@@ -235,7 +271,7 @@ export const Header: React.FC<HeaderProps> = ({
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveWindow(item.id)}
+                onClick={() => handleNavClick(item.id)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs whitespace-nowrap transition-all ${
                   isActive
                     ? 'text-[#2874f0] font-bold border-b-2 border-[#2874f0] bg-blue-50/50'
@@ -323,7 +359,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 key={item.id}
                 onClick={() => {
-                  setActiveWindow(item.id);
+                  handleNavClick(item.id);
                   setMobileMenuOpen(false);
                 }}
                 className={`flex items-center gap-2 p-2.5 rounded-lg text-left text-xs transition ${

@@ -88,12 +88,15 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
   const [paymentScreenshotUrl, setPaymentScreenshotUrl] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Automatically read ?sponsor parameter from URL
+  // Automatically read ?sponsor or ?ref parameter from URL or sessionStorage
   React.useEffect(() => {
     try {
       if (typeof window !== 'undefined') {
         const params = new URLSearchParams(window.location.search);
-        const urlSponsor = params.get('sponsor');
+        let urlSponsor = params.get('sponsor') || params.get('ref');
+        if (!urlSponsor || !urlSponsor.trim()) {
+          urlSponsor = sessionStorage.getItem('acc_active_sponsor_ref');
+        }
         if (urlSponsor && urlSponsor.trim()) {
           const clean = urlSponsor.trim();
           setSponsorId(clean);

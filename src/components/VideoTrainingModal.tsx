@@ -9,18 +9,33 @@ import {
   HelpCircle,
   ExternalLink,
   MessageCircle,
+  LayoutDashboard,
 } from 'lucide-react';
+import { Member } from '../types';
 
 interface VideoTrainingModalProps {
   onGoToRegister: () => void;
   onGoToContact: () => void;
+  currentUser?: Member | null;
+  onGoToDashboard?: () => void;
 }
 
 export const VideoTrainingModal: React.FC<VideoTrainingModalProps> = ({
   onGoToRegister,
   onGoToContact,
+  currentUser,
+  onGoToDashboard,
 }) => {
   const [videoWatched, setVideoWatched] = useState(false);
+
+  const handleActionClick = () => {
+    if (currentUser) {
+      if (onGoToDashboard) onGoToDashboard();
+      else onGoToRegister();
+    } else {
+      onGoToRegister();
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -40,11 +55,20 @@ export const VideoTrainingModal: React.FC<VideoTrainingModalProps> = ({
         </div>
 
         <button
-          onClick={onGoToRegister}
+          onClick={handleActionClick}
           className="px-5 py-2.5 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold rounded-sm text-xs shadow-sm shrink-0 flex items-center gap-2"
         >
-          <FileText className="w-4 h-4" />
-          <span>रजिस्ट्रेशन करें (₹249)</span>
+          {currentUser ? (
+            <>
+              <LayoutDashboard className="w-4 h-4" />
+              <span>मेरा डैशबोर्ड खोलें</span>
+            </>
+          ) : (
+            <>
+              <FileText className="w-4 h-4" />
+              <span>रजिस्ट्रेशन करें (₹249)</span>
+            </>
+          )}
         </button>
       </div>
 
@@ -75,11 +99,20 @@ export const VideoTrainingModal: React.FC<VideoTrainingModalProps> = ({
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
-            onClick={onGoToRegister}
+            onClick={handleActionClick}
             className="w-full sm:w-auto px-6 py-2.5 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold rounded-sm text-xs shadow-sm transition flex items-center justify-center gap-2"
           >
-            <Sparkles className="w-4 h-4 text-yellow-300" />
-            <span>JOIN NOW (₹249)</span>
+            {currentUser ? (
+              <>
+                <LayoutDashboard className="w-4 h-4 text-yellow-300" />
+                <span>डैशबोर्ड खोलें</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 text-yellow-300" />
+                <span>JOIN NOW (₹249)</span>
+              </>
+            )}
           </button>
         </div>
       </div>
