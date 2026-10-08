@@ -32,6 +32,7 @@ import {
   User,
   Upload,
   Crop,
+  Building2,
 } from 'lucide-react';
 import { Member, PrivacySettings, WithdrawalRequest } from '../types';
 import { StorageService } from '../services/storage';
@@ -51,6 +52,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
   const [copiedId, setCopiedId] = useState(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [statusCheckMsg, setStatusCheckMsg] = useState('');
+  const siteConfig = StorageService.getSiteConfig();
 
   // Profile Customization State (Photo, Link, Personal QR, Privacy)
   const [profileAvatar, setProfileAvatar] = useState<string>(currentUser.avatarUrl || '');
@@ -70,6 +72,21 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
   const [profileSaveSuccess, setProfileSaveSuccess] = useState('');
   const [profileSaveError, setProfileSaveError] = useState('');
 
+  // Payout Address State (Self or Parents)
+  const [payoutHolderRelation, setPayoutHolderRelation] = useState<'Self' | 'Father' | 'Mother' | 'Guardian'>(
+    (currentUser.payoutDetails?.holderRelation as any) || 'Self'
+  );
+  const [payoutHolderName, setPayoutHolderName] = useState<string>(
+    currentUser.payoutDetails?.holderName || currentUser.fullName || ''
+  );
+  const [payoutMethod, setPayoutMethod] = useState<'UPI' | 'BANK' | 'BOTH'>(
+    currentUser.payoutDetails?.payoutMethod || 'UPI'
+  );
+  const [payoutUpiId, setPayoutUpiId] = useState<string>(currentUser.payoutDetails?.upiId || '');
+  const [payoutBankName, setPayoutBankName] = useState<string>(currentUser.payoutDetails?.bankName || '');
+  const [payoutAccountNumber, setPayoutAccountNumber] = useState<string>(currentUser.payoutDetails?.accountNumber || '');
+  const [payoutIfsc, setPayoutIfsc] = useState<string>(currentUser.payoutDetails?.ifsc || '');
+
   // Image Cropper Modal State (WhatsApp DP & QR Customizer)
   const [cropperSrc, setCropperSrc] = useState<string | null>(null);
   const [cropperShape, setCropperShape] = useState<CropShape>('circle');
@@ -84,7 +101,30 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
     if (currentUser.privacySettings) {
       setPrivacySettings(currentUser.privacySettings);
     }
-  }, [currentUser.avatarUrl, currentUser.profileLink, currentUser.personalQrUrl, currentUser.privacySettings]);
+    if (currentUser.payoutDetails) {
+      if (currentUser.payoutDetails.holderRelation) {
+        setPayoutHolderRelation(currentUser.payoutDetails.holderRelation as any);
+      }
+      if (currentUser.payoutDetails.holderName) {
+        setPayoutHolderName(currentUser.payoutDetails.holderName);
+      }
+      if (currentUser.payoutDetails.payoutMethod) {
+        setPayoutMethod(currentUser.payoutDetails.payoutMethod);
+      }
+      if (currentUser.payoutDetails.upiId) {
+        setPayoutUpiId(currentUser.payoutDetails.upiId);
+      }
+      if (currentUser.payoutDetails.bankName) {
+        setPayoutBankName(currentUser.payoutDetails.bankName);
+      }
+      if (currentUser.payoutDetails.accountNumber) {
+        setPayoutAccountNumber(currentUser.payoutDetails.accountNumber);
+      }
+      if (currentUser.payoutDetails.ifsc) {
+        setPayoutIfsc(currentUser.payoutDetails.ifsc);
+      }
+    }
+  }, [currentUser.avatarUrl, currentUser.profileLink, currentUser.personalQrUrl, currentUser.privacySettings, currentUser.payoutDetails]);
 
   const handleAvatarFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -185,6 +225,16 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
         profileLink: profileLinkInput.trim() || undefined,
         personalQrUrl: personalQrInput || undefined,
         privacySettings: privacySettings,
+        payoutDetails: {
+          holderRelation: payoutHolderRelation,
+          holderName: payoutHolderName.trim() || currentUser.fullName,
+          payoutMethod: payoutMethod,
+          upiId: payoutUpiId.trim() || undefined,
+          bankName: payoutBankName.trim() || undefined,
+          accountNumber: payoutAccountNumber.trim() || undefined,
+          ifsc: payoutIfsc.trim().toUpperCase() || undefined,
+          updatedAt: new Date().toISOString(),
+        },
       };
 
       const updated = StorageService.updateMember(currentUser.accId, updates);
@@ -192,7 +242,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
 
       if (updated) {
         onUpdateUser(updated);
-        setProfileSaveSuccess('प्रोफाइल फोटो, लिंक, QR एवं प्राइवेसी सेटिंग्स डिजिटल 🆔 कार्ड में अपडेट हो गईं!');
+        setProfileSaveSuccess('प्रोफाइल फोटो, लिंक, QR, पेआउट बैंक खाता एवं प्राइवेसी सेटिंग्स सफलतापूर्वक अपडेट हो गईं!');
         setTimeout(() => setProfileSaveSuccess(''), 3500);
       }
     } catch (err) {
@@ -844,6 +894,28 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
                   </span>
                 </div>
 
+                {/* User's Sponsor ID Information Box inside Real App Box */}
+                <div className="bg-white/95 border border-green-300 rounded-lg p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shadow-xs">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1">
+                      <Users className="w-3.5 h-3.5 text-[#2874f0]" />
+                      <span>आपकी स्पॉन्सर 🆔 (Sponsor ID):</span>
+                    </span>
+                    <span className="font-mono-acc font-black text-xs text-[#2874f0] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                      {currentUser.sponsorId || 'ACC249SWISRK01'}
+                    </span>
+                    {currentUser.sponsorName && (
+                      <span className="text-slate-700 font-semibold text-[11px]">
+                        ({currentUser.sponsorName})
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[10px] text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-gray-200">
+                    आपकी 🆔: <strong className="font-mono-acc text-slate-800">{currentUser.accId}</strong>
+                  </div>
+                </div>
+
+                {/* Real App Download URL */}
                 <div className="p-3 bg-white rounded border border-green-200 font-mono-acc text-[#2874f0] break-all text-xs font-semibold">
                   {currentUser.realAppLink || 'https://achieversclub.in/download/acc-official-v2.apk'}
                 </div>
@@ -868,6 +940,24 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
                     <Copy className="w-4 h-4" />
                     <span>Copy Link</span>
                   </button>
+                </div>
+
+                {/* WhatsApp App Link Request Button right below the download box */}
+                <div className="pt-2 border-t border-green-200/80">
+                  <a
+                    href={`https://api.whatsapp.com/send?phone=${(siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '')}&text=${encodeURIComponent(
+                      `नमस्ते एडमिन! मुझे Achievers Club Community (ACC) की ऑफिशियल Real Android APK ऐप लिंक WhatsApp पर चाहिए।\n\n🆔 मेरी Member ID: ${currentUser.accId}\n👤 मेरा नाम: ${currentUser.fullName}\n📱 मोबाइल: ${currentUser.mobile}\n🤝 मेरी Sponsor ID: ${currentUser.sponsorId || 'ACC249SWISRK01'}\n💼 प्लान: ${currentUser.plan}\n💳 UTR Number: ${currentUser.utrNumber}\n\nकृपया मुझे ऑफिशियल Real App APK डाउनलोड लिंक WhatsApp पर भेजें। धन्यवाद!`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2.5 px-4 bg-[#25D366] hover:bg-[#20ba59] text-white font-bold rounded-sm text-center flex items-center justify-center gap-2 transition shadow-sm text-xs sm:text-sm group"
+                  >
+                    <MessageCircle className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                    <span>📲 WhatsApp पर Real App लिंक मंगाएं (Request Link on WhatsApp)</span>
+                  </a>
+                  <span className="text-[10px] text-emerald-800 block text-center mt-1">
+                    यदि डाउनलोड में कोई समस्या आ रही हो, तो WhatsApp पर एक क्लिक में सीधे APK लिंक प्राप्त करें।
+                  </span>
                 </div>
               </div>
 
@@ -1460,6 +1550,119 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
                 </div>
               </div>
 
+              {/* Payment Address & Bank/UPI Details (Self or Parents) */}
+              <div className="p-4 bg-emerald-50/50 border border-emerald-200 rounded-xl space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Wallet className="w-4 h-4 text-emerald-700" />
+                    <label className="block text-xs font-bold text-emerald-950">
+                      पेआउट बैंक व UPI पता (दैनिक कमाई निकासी हेतु - खुद का या माता/पिता का खाता)
+                    </label>
+                  </div>
+                  <span className="text-[10px] text-emerald-800 bg-white px-2 py-0.5 rounded border border-emerald-200 font-bold">
+                    पेआउट सुरक्षा
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600">
+                  आपकी दैनिक <strong>SWIS 3.30% रिचार्ज कमीशन</strong> एवं <strong>TWIS ₹150 रेफरल आय</strong> सीधे इसी पते/खाते में भेजी जाती है। यदि आपके पास खुद का बैंक या UPI नहीं है, तो माता-पिता का खाता उपयोग करें।
+                </p>
+
+                {/* Relation Selector */}
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold text-slate-800">
+                    खाता धारक का संबंध (Account Holder):
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    {[
+                      { id: 'Self', label: '👦 खुद का खाता' },
+                      { id: 'Father', label: '👨 पिताजी का खाता' },
+                      { id: 'Mother', label: '👩 माताजी का खाता' },
+                      { id: 'Guardian', label: '🛡️ अभिभावक / परिजन' },
+                    ].map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setPayoutHolderRelation(item.id as any)}
+                        className={`p-2 rounded-lg border text-center transition font-semibold ${
+                          payoutHolderRelation === item.id
+                            ? 'bg-emerald-100/70 border-emerald-600 text-emerald-900 font-bold shadow-xs'
+                            : 'bg-white border-gray-200 hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      खाता धारक का नाम (Beneficiary Name)
+                    </label>
+                    <input
+                      type="text"
+                      value={payoutHolderName}
+                      onChange={(e) => setPayoutHolderName(e.target.value)}
+                      placeholder="उदा. रमेश कुमार / आपका नाम"
+                      className="w-full bg-white border border-gray-300 rounded-sm px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      पेआउट UPI ID (Google Pay / PhonePe / Paytm)
+                    </label>
+                    <input
+                      type="text"
+                      value={payoutUpiId}
+                      onChange={(e) => setPayoutUpiId(e.target.value.replace(/\s/g, ''))}
+                      placeholder="उदा. 9876543210@paytm या name@oksbi"
+                      className="w-full bg-white border border-gray-300 rounded-sm px-3 py-2 text-xs font-mono-acc text-slate-900 focus:outline-none focus:border-emerald-600"
+                    />
+                  </div>
+                </div>
+
+                {/* Bank Account Details */}
+                <div className="bg-white p-3 rounded-lg border border-emerald-200/80 space-y-2">
+                  <span className="text-[11px] font-bold text-slate-800 flex items-center gap-1">
+                    <Building2 className="w-3.5 h-3.5 text-[#2874f0]" /> बैंक खाता विवरण (वैकल्पिक / Optional)
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <label className="block text-[10px] text-slate-500 mb-0.5">बैंक का नाम</label>
+                      <input
+                        type="text"
+                        value={payoutBankName}
+                        onChange={(e) => setPayoutBankName(e.target.value)}
+                        placeholder="उदा. SBI / PNB / HDFC"
+                        className="w-full bg-slate-50 border border-gray-200 rounded-sm px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-600"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-500 mb-0.5">खाता संख्या (A/C No.)</label>
+                      <input
+                        type="text"
+                        value={payoutAccountNumber}
+                        onChange={(e) => setPayoutAccountNumber(e.target.value.replace(/\s/g, ''))}
+                        placeholder="उदा. 39182910291"
+                        className="w-full bg-slate-50 border border-gray-200 rounded-sm px-2.5 py-1.5 text-xs font-mono-acc text-slate-900 focus:outline-none focus:border-emerald-600"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-500 mb-0.5">IFSC कोड</label>
+                      <input
+                        type="text"
+                        value={payoutIfsc}
+                        onChange={(e) => setPayoutIfsc(e.target.value.toUpperCase().replace(/\s/g, ''))}
+                        placeholder="उदा. SBIN0001234"
+                        className="w-full bg-slate-50 border border-gray-200 rounded-sm px-2.5 py-1.5 text-xs font-mono-acc text-slate-900 focus:outline-none focus:border-emerald-600"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Save Button */}
               <div className="pt-2">
                 <button
@@ -1627,6 +1830,43 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
                 </span>
                 <span className="text-[10px] text-slate-500 block mt-0.5">न्यूनतम निकासी: ₹100</span>
               </div>
+
+              {/* Registered Payout Account Badge */}
+              {currentUser.payoutDetails && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-emerald-950 flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>
+                        {currentUser.payoutDetails.holderRelation === 'Father'
+                          ? '👨 पंजीकृत खाता: पिताजी का खाता'
+                          : currentUser.payoutDetails.holderRelation === 'Mother'
+                          ? '👩 पंजीकृत खाता: माताजी का खाता'
+                          : currentUser.payoutDetails.holderRelation === 'Guardian'
+                          ? '🛡️ पंजीकृत खाता: अभिभावक का खाता'
+                          : '👦 पंजीकृत खाता: खुद का खाता'}
+                      </span>
+                    </span>
+                    {currentUser.payoutDetails.upiId && withdrawUpi !== currentUser.payoutDetails.upiId && (
+                      <button
+                        type="button"
+                        onClick={() => setWithdrawUpi(currentUser.payoutDetails!.upiId!)}
+                        className="text-[10px] bg-white border border-emerald-300 text-emerald-800 font-bold px-2 py-0.5 rounded shadow-xs"
+                      >
+                        पंजीकृत UPI भरें
+                      </button>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-slate-700">
+                    लाभार्थी: <strong>{currentUser.payoutDetails.holderName}</strong>
+                    {currentUser.payoutDetails.upiId && (
+                      <span className="font-mono-acc ml-1 text-emerald-800 font-semibold">
+                        ({currentUser.payoutDetails.upiId})
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-slate-800 font-semibold mb-1">

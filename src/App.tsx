@@ -270,14 +270,14 @@ export default function App() {
                 ? `डिजिटल ACC पहचान पत्र (${currentUser.fullName})`
                 : referralSponsor
                 ? `स्पॉन्सर डिजिटल पहचान पत्र (${referralSponsor.fullName})`
-                : 'डिजिटल ACC पहचान पत्र (सुरक्षित गेटवे)'
+                : 'ऑफिशियल डिजिटल ACC पहचान पत्र (Live Specimen Preview)'
             }
             subtitle={
               currentUser
                 ? `यूनिक 🆔: ${currentUser.accId} • Certified Lifetime Digital Identity`
                 : referralSponsor
                 ? `रेफरल स्पॉन्सर 🆔: ${referralSponsor.accId} • इनके साथ जुड़ें और ₹150 रेफरल + 3.30% SWIS पाएं`
-                : 'लॉगआउट सुरक्षा: कार्ड केवल अधिकृत लॉगिन पर ही प्रदर्शित होगा'
+                : 'देखें कि ₹249 रजिस्ट्रेशन के बाद आपका डिजिटल 🆔 कार्ड कैसा दिखेगा • लाइव प्रिव्यू व तुरंत रजिस्ट्रेशन'
             }
             icon={<CreditCard className="w-4 h-4 text-cyan-400" />}
             onClose={() => setActiveWindow('home')}

@@ -25,6 +25,10 @@ import {
   LogIn,
   MessageCircle,
   LayoutDashboard,
+  Wallet,
+  Building2,
+  Users,
+  Smartphone,
 } from 'lucide-react';
 import { Member, PlanType, SiteConfig } from '../types';
 import { StorageService, generateAccId } from '../services/storage';
@@ -87,6 +91,15 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
   const [utrNumber, setUtrNumber] = useState('');
   const [paymentScreenshotUrl, setPaymentScreenshotUrl] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Payment Address / Bank & UPI Details for Daily Payouts (Self or Parents)
+  const [payoutHolderRelation, setPayoutHolderRelation] = useState<'Self' | 'Father' | 'Mother' | 'Guardian'>('Self');
+  const [payoutHolderName, setPayoutHolderName] = useState('');
+  const [payoutMethod, setPayoutMethod] = useState<'UPI' | 'BANK' | 'BOTH'>('UPI');
+  const [payoutUpiId, setPayoutUpiId] = useState('');
+  const [payoutBankName, setPayoutBankName] = useState('');
+  const [payoutAccountNumber, setPayoutAccountNumber] = useState('');
+  const [payoutIfsc, setPayoutIfsc] = useState('');
 
   // Automatically read ?sponsor or ?ref parameter from URL or sessionStorage
   React.useEffect(() => {
@@ -247,7 +260,34 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
     return true;
   };
 
+  const validateStep2 = () => {
+    if (!sponsorId.trim() || sponsorId.trim().length < 4) {
+      setErrorMessage('कृपया मान्य Sponsor ID दर्ज करें');
+      return false;
+    }
+    setErrorMessage('');
+    return true;
+  };
+
   const validateStep3 = () => {
+    // Validate payout account address
+    if (payoutMethod === 'UPI' || payoutMethod === 'BOTH') {
+      if (payoutUpiId.trim() && !payoutUpiId.includes('@')) {
+        setErrorMessage('कृपया मान्य UPI ID दर्ज करें (उदा. mobile@paytm या name@oksbi)');
+        return false;
+      }
+    }
+    if (payoutMethod === 'BANK') {
+      if (!payoutAccountNumber.trim() || payoutAccountNumber.trim().length < 6) {
+        setErrorMessage('कृपया बैंक खाता संख्या (Account Number) दर्ज करें');
+        return false;
+      }
+    }
+    setErrorMessage('');
+    return true;
+  };
+
+  const validateStep4 = () => {
     if (!utrNumber.trim() || utrNumber.trim().length < 6) {
       setErrorMessage('कृपया 12 अंकों का UPI UTR / Transaction ID दर्ज करें');
       return false;
@@ -262,13 +302,15 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
 
   const handleNext = () => {
     if (step === 1 && !validateStep1()) return;
+    if (step === 2 && !validateStep2()) return;
+    if (step === 3 && !validateStep3()) return;
     setErrorMessage('');
     setStep(step + 1);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateStep3()) return;
+    if (!validateStep4()) return;
 
     setIsSubmitting(true);
     setErrorMessage('');
@@ -341,6 +383,16 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
         securityQuestion: 'आपकी पहली स्कूल या पसंदीदा शहर क्या है?',
         securityAnswer: securityAnswer.trim().toLowerCase(),
         realAppLinkApproved: false,
+        payoutDetails: {
+          holderRelation: payoutHolderRelation,
+          holderName: payoutHolderName.trim() || fullName.trim(),
+          payoutMethod: payoutMethod,
+          upiId: payoutUpiId.trim() || undefined,
+          bankName: payoutBankName.trim() || undefined,
+          accountNumber: payoutAccountNumber.trim() || undefined,
+          ifsc: payoutIfsc.trim().toUpperCase() || undefined,
+          updatedAt: new Date().toISOString(),
+        },
       };
 
       // 3. Save new member directly to Firestore & local storage
@@ -430,6 +482,21 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
               <span className="text-slate-500 text-[10px] block">Real App Link स्थिति</span>
               <span className="font-bold text-amber-700">वेरिफिकेशन के बाद</span>
             </div>
+            {createdMember.payoutDetails && (
+              <div className="bg-slate-50 p-2.5 rounded border border-gray-200 col-span-2 sm:col-span-3">
+                <span className="text-slate-500 text-[10px] block">पंजीकृत पेआउट खाता (Daily Payout Address):</span>
+                <span className="font-bold text-slate-800 text-xs">
+                  {createdMember.payoutDetails.holderRelation === 'Father'
+                    ? '👨 पिताजी का खाता: '
+                    : createdMember.payoutDetails.holderRelation === 'Mother'
+                    ? '👩 माताजी का खाता: '
+                    : createdMember.payoutDetails.holderRelation === 'Guardian'
+                    ? '🛡️ अभिभावक का खाता: '
+                    : '👦 खुद का खाता: '}
+                  {createdMember.payoutDetails.holderName} · {createdMember.payoutDetails.upiId || createdMember.payoutDetails.accountNumber || 'UPI / Bank पंजीकृत'}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200 text-xs text-slate-700 space-y-1">
@@ -480,9 +547,9 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
           Start Young, Retire Young • ₹249 One-Time Joining Fee (Zero Investment Work)
         </p>
 
-        {/* Step Indicator - Flipkart Style Responsive */}
+        {/* Step Indicator - Responsive 4 Steps */}
         <div className="flex items-center justify-start sm:justify-center gap-1.5 sm:gap-2 mt-4 overflow-x-auto no-scrollbar pb-1">
-          {[1, 2, 3].map((s) => (
+          {[1, 2, 3, 4].map((s) => (
             <div
               key={s}
               className={`flex items-center gap-1 text-[11px] sm:text-xs font-bold px-2 sm:px-3 py-1 rounded transition shrink-0 ${
@@ -494,8 +561,8 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
               }`}
             >
               <span>{s}.</span>
-              <span className="sm:hidden">{s === 1 ? 'विवरण' : s === 2 ? 'सिस्टम' : 'पेमेंट'}</span>
-              <span className="hidden sm:inline">{s === 1 ? 'व्यक्तिगत जानकारी' : s === 2 ? 'सिस्टम व स्पॉन्सर' : '₹249 भुगतान एवं UTR'}</span>
+              <span className="sm:hidden">{s === 1 ? 'विवरण' : s === 2 ? 'सिस्टम' : s === 3 ? 'पेआउट' : 'पेमेंट'}</span>
+              <span className="hidden sm:inline">{s === 1 ? 'व्यक्तिगत जानकारी' : s === 2 ? 'सिस्टम व स्पॉन्सर' : s === 3 ? 'पेआउट खाता (UPI / Bank)' : '₹249 भुगतान एवं UTR'}</span>
             </div>
           ))}
         </div>
@@ -927,16 +994,218 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                 onClick={handleNext}
                 className="px-6 py-2.5 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold rounded-sm flex items-center gap-2 shadow-sm transition"
               >
-                <CreditCard className="w-4 h-4" />
-                <span>भुगतान विवरण पर जाएं</span>
+                <Wallet className="w-4 h-4" />
+                <span>पेआउट खाता विवरण पर जाएं (Next)</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </div>
         )}
 
-        {/* STEP 3: ₹249 Payment & UTR Proof */}
+        {/* STEP 3: Payment Address / Bank & UPI Details (Self or Parents) */}
         {step === 3 && (
+          <div className="space-y-4 animate-fadeIn">
+            {/* Student & Parents Assurance Banner */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 space-y-2">
+              <div className="flex items-center gap-2 text-indigo-950 font-bold text-xs sm:text-sm">
+                <Wallet className="w-4 h-4 text-[#2874f0]" />
+                <span>पेआउट प्राप्ति हेतु बैंक खाता अथवा UPI विवरण (Payment Address)</span>
+              </div>
+              <p className="text-xs text-slate-700 leading-relaxed">
+                दैनिक <strong>SWIS 3.30% रिचार्ज कमीशन</strong> और <strong>TWIS ₹150 डायरेक्ट रेफरल इनकम</strong> सीधा इसी पते/खाते में भेजी जाएगी।
+              </p>
+              <div className="bg-white/95 border border-blue-300 rounded-lg p-2.5 flex items-start gap-2.5 text-[11px] text-blue-900 font-medium">
+                <span className="text-lg leading-none shrink-0">👨‍👩‍👦</span>
+                <div>
+                  <strong className="text-indigo-900 block font-bold">माता-पिता का अकाउंट उपयोग करने की विशेष सुविधा:</strong>
+                  यदि विद्यार्थी के पास अपना खुद का बैंक खाता या UPI नहीं है, तो वे निसंकोच अपने <strong>माताजी या पिताजी का बैंक खाता या UPI</strong> दर्ज कर सकते हैं। यह 100% मान्य और सुरक्षित है।
+                </div>
+              </div>
+            </div>
+
+            {/* Account Relation Selector */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-800">
+                खाता किसके नाम पर है? (Account Holder Relation) <span className="text-red-500">*</span>
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { id: 'Self', label: '👦 खुद का खाता', sub: 'Self Account' },
+                  { id: 'Father', label: '👨 पिताजी का खाता', sub: 'Father Account' },
+                  { id: 'Mother', label: '👩 माताजी का खाता', sub: 'Mother Account' },
+                  { id: 'Guardian', label: '🛡️ अभिभावक / परिजन', sub: 'Guardian' },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setPayoutHolderRelation(item.id as any)}
+                    className={`p-2.5 rounded-lg border text-left transition flex flex-col justify-between ${
+                      payoutHolderRelation === item.id
+                        ? 'bg-blue-50 border-[#2874f0] text-[#2874f0] font-bold shadow-xs'
+                        : 'bg-white border-gray-200 hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <span className="text-xs font-bold">{item.label}</span>
+                    <span className="text-[10px] text-slate-500">{item.sub}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Beneficiary Name */}
+            <div>
+              <label className="block text-xs font-bold text-slate-800 mb-1">
+                खाता धारक का पूरा नाम (Beneficiary Name as per Bank/UPI)
+              </label>
+              <div className="relative">
+                <User className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                <input
+                  type="text"
+                  value={payoutHolderName}
+                  onChange={(e) => setPayoutHolderName(e.target.value)}
+                  placeholder={
+                    payoutHolderRelation === 'Father'
+                      ? 'पिताजी का नाम (उदा. रमेश कुमार)'
+                      : payoutHolderRelation === 'Mother'
+                      ? 'माताजी का नाम (उदा. सुनीता देवी)'
+                      : 'खाता धारक का नाम (उदा. राहुल कुमार)'
+                  }
+                  className="w-full bg-white border border-gray-300 rounded-sm pl-9 pr-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0]"
+                />
+              </div>
+              <span className="text-[11px] text-slate-500 mt-1 block">
+                खाली छोड़ने पर आपका पंजीकृत नाम ({fullName || 'विद्यार्थी'}) उपयोग किया जाएगा।
+              </span>
+            </div>
+
+            {/* Payout Method Selector */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-800">
+                पेआउट प्राप्ति का माध्यम चुनें (Preferred Payment Option) <span className="text-red-500">*</span>
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'UPI', label: '📱 UPI ID', sub: 'GPay/PhonePe/Paytm' },
+                  { id: 'BANK', label: '🏦 बैंक खाता', sub: 'A/C Number & IFSC' },
+                  { id: 'BOTH', label: '⚡ दोनों (Both)', sub: 'UPI व बैंक दोनों' },
+                ].map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setPayoutMethod(m.id as any)}
+                    className={`p-2.5 rounded-lg border text-center transition ${
+                      payoutMethod === m.id
+                        ? 'bg-blue-50 border-[#2874f0] text-[#2874f0] font-bold shadow-xs'
+                        : 'bg-white border-gray-200 hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <span className="text-xs font-bold block">{m.label}</span>
+                    <span className="text-[10px] text-slate-500 block mt-0.5">{m.sub}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* UPI ID Details */}
+            {(payoutMethod === 'UPI' || payoutMethod === 'BOTH') && (
+              <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-3.5 space-y-2">
+                <label className="block text-xs font-bold text-emerald-950 flex items-center justify-between">
+                  <span>UPI ID / VPA (Google Pay, PhonePe, Paytm, BHIM)</span>
+                  <span className="text-[10px] text-emerald-700 bg-white px-2 py-0.5 rounded border border-emerald-200 font-bold">
+                    त्वरित पेआउट
+                  </span>
+                </label>
+                <div className="relative">
+                  <Smartphone className="w-4 h-4 absolute left-3 top-2.5 text-emerald-600" />
+                  <input
+                    type="text"
+                    value={payoutUpiId}
+                    onChange={(e) => setPayoutUpiId(e.target.value.replace(/\s/g, ''))}
+                    placeholder="उदा. 9876543210@paytm या name@oksbi"
+                    className="w-full bg-white border border-emerald-300 rounded-sm pl-9 pr-3 py-2 text-xs font-mono-acc text-slate-900 font-semibold focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+                <span className="text-[11px] text-slate-600 block">
+                  दैनिक कमीशन सीधे इसी UPI खाते में स्वतः क्रेडिट किया जा सकेगा।
+                </span>
+              </div>
+            )}
+
+            {/* Bank Account Details */}
+            {(payoutMethod === 'BANK' || payoutMethod === 'BOTH') && (
+              <div className="bg-slate-50 border border-gray-200 rounded-xl p-3.5 space-y-3">
+                <label className="block text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-[#2874f0]" />
+                  <span>बैंक खाता विवरण (Bank Account Details)</span>
+                </label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      बैंक का नाम (Bank Name)
+                    </label>
+                    <input
+                      type="text"
+                      value={payoutBankName}
+                      onChange={(e) => setPayoutBankName(e.target.value)}
+                      placeholder="उदा. State Bank of India"
+                      className="w-full bg-white border border-gray-300 rounded-sm px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      खाता संख्या (A/C No.)
+                    </label>
+                    <input
+                      type="text"
+                      value={payoutAccountNumber}
+                      onChange={(e) => setPayoutAccountNumber(e.target.value.replace(/\s/g, ''))}
+                      placeholder="उदा. 39182910291"
+                      className="w-full bg-white border border-gray-300 rounded-sm px-3 py-2 text-xs font-mono-acc text-slate-900 focus:outline-none focus:border-[#2874f0]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      IFSC कोड
+                    </label>
+                    <input
+                      type="text"
+                      value={payoutIfsc}
+                      onChange={(e) => setPayoutIfsc(e.target.value.toUpperCase().replace(/\s/g, ''))}
+                      placeholder="उदा. SBIN0001234"
+                      className="w-full bg-white border border-gray-300 rounded-sm px-3 py-2 text-xs font-mono-acc text-slate-900 focus:outline-none focus:border-[#2874f0]"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-2">
+              <button
+                type="button"
+                onClick={() => setStep(2)}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-sm flex items-center gap-2 transition"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>पिछला पृष्ठ</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleNext}
+                className="px-6 py-2.5 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold rounded-sm flex items-center gap-2 shadow-sm transition"
+              >
+                <CreditCard className="w-4 h-4" />
+                <span>₹249 भुगतान पर जाएं (Next)</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 4: ₹249 Payment & UTR Proof */}
+        {step === 4 && (
           <div className="space-y-5 animate-fadeIn">
             {/* Payment Box */}
             <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-xs">
@@ -1064,7 +1333,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
             <div className="flex items-center justify-between pt-2">
               <button
                 type="button"
-                onClick={() => setStep(2)}
+                onClick={() => setStep(3)}
                 className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-sm flex items-center gap-2 transition"
               >
                 <ArrowLeft className="w-4 h-4" />

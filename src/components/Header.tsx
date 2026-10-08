@@ -44,6 +44,60 @@ export const Header: React.FC<HeaderProps> = ({
   const [currentDate, setCurrentDate] = useState<string>('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [siteConfig, setSiteConfig] = useState<SiteConfig>(() => StorageService.getSiteConfig());
+  const [featureIndex, setFeatureIndex] = useState(0);
+
+  // Standout Website Features & Highlights (वेबसाइट की खासियतें)
+  const websiteFeatures = [
+    {
+      badge: 'खासियत 1',
+      tag: '3.30% फिक्स कमीशन',
+      title: '⚡ SWIS रिचार्ज इनकम',
+      desc: 'सभी मोबाइल & DTH रिचार्ज पर सीधा 3.30% फिक्स्ड कमीशन',
+      color: 'bg-emerald-600',
+    },
+    {
+      badge: 'खासियत 2',
+      tag: '₹150 डायरेक्ट पेआउट',
+      title: '👥 TWIS रेफरल अर्निंग',
+      desc: 'प्रति छात्र रेफरल पर सीधा ₹150 बैंक या UPI में',
+      color: 'bg-blue-600',
+    },
+    {
+      badge: 'खासियत 3',
+      tag: 'माता-पिता का UPI मान्य',
+      title: '💳 पेरेंट्स अकाउंट सपोर्ट',
+      desc: 'खुद का बैंक न होने पर छात्र अपने माता-पिता के UPI में लें पेआउट',
+      color: 'bg-purple-600',
+    },
+    {
+      badge: 'खासियत 4',
+      tag: 'लाइफटाइम 🆔 कार्ड',
+      title: '🆔 प्रमाणित डिजिटल ID',
+      desc: 'ISO 9001:2015 मान्यता प्राप्त दोतरफा फुल HD डिजिटल ID कार्ड',
+      color: 'bg-amber-600',
+    },
+    {
+      badge: 'खासियत 5',
+      tag: 'वेरिफाइड APK लिंक',
+      title: '📱 Real App APK डिलीवरी',
+      desc: 'एडमिन द्वारा अधिकृत ऑफिशियल Android एप्लीकेशन सीधा प्राप्त करें',
+      color: 'bg-cyan-700',
+    },
+    {
+      badge: 'खासियत 6',
+      tag: '₹249 वन-टाइम फीस',
+      title: '🔥 Zero Investment Work',
+      desc: 'मात्र ₹249 लाइफटाइम एक्टिवेशन, कोई मासिक शुल्क नहीं',
+      color: 'bg-red-600',
+    },
+  ];
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setFeatureIndex((prev) => (prev + 1) % websiteFeatures.length);
+    }, 3200);
+    return () => clearInterval(timer);
+  }, [websiteFeatures.length]);
 
   useEffect(() => {
     // Sync site config
@@ -133,20 +187,39 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="sticky top-0 z-40 w-full shadow-sm bg-[#2874f0]">
-      {/* Top Yellow Announcement Banner - Flipkart Style */}
-      <div className="bg-[#ffe500] text-[#212121] text-xs font-semibold py-1 px-2.5 overflow-hidden border-b border-yellow-400">
+      {/* Top Yellow Announcement Banner - Highlights & Features Showcase */}
+      <div className="bg-[#ffe500] text-[#212121] text-xs font-semibold py-1 px-2 sm:px-4 overflow-hidden border-b border-yellow-400 select-none">
         <div className="flex items-center justify-between gap-2 max-w-7xl mx-auto w-full">
-          <div className="flex items-center gap-1 shrink-0 bg-[#2874f0] text-white px-1.5 py-0.5 rounded text-[10px] sm:text-[11px] font-bold">
-            <Zap className="w-3 h-3 text-yellow-300 fill-yellow-300" />
-            <span>OFFER</span>
+          {/* Badge: Offer & Website USP Tag */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex items-center gap-1 bg-[#2874f0] text-white px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-black shadow-xs">
+              <Zap className="w-3 h-3 text-yellow-300 fill-yellow-300 animate-pulse" />
+              <span>वेबसाइट की खासियत</span>
+            </div>
+            {/* Active Rotating Feature Tag */}
+            <div className="hidden sm:flex items-center gap-1 text-[11px] font-black text-slate-900 bg-black/10 px-2 py-0.5 rounded transition-all">
+              <span>{websiteFeatures[featureIndex].title}:</span>
+              <span className="font-semibold text-slate-800">{websiteFeatures[featureIndex].tag}</span>
+            </div>
           </div>
+
+          {/* Dynamic Marquee showing Website Features continuously */}
           <div className="overflow-hidden whitespace-nowrap text-[11px] sm:text-xs text-[#212121] font-bold tracking-tight flex-1">
             <span className="inline-block animate-marquee">
-              {siteConfig.announcementMarquee || '🔥 ZERO INVESTMENT WORK | ONE TIME 🆔 ACTIVATION CHARGE ₹249 ONLY | SWIS: 3.30% FIXED COMMISSION | TWIS: ₹150 DIRECT REFERRAL INCOME | START YOUNG, RETIRE YOUNG'}
+              {siteConfig.announcementMarquee 
+                ? `${siteConfig.announcementMarquee} · ⚡ SWIS 3.30% फिक्स रिचार्ज कमीशन · 👥 TWIS ₹150 डायरेक्ट रेफरल · 💳 माता-पिता का UPI/बैंक खाता मान्य · 🆔 प्रमाणित डिजिटल ID कार्ड · 📱 ऑफिशियल Real App APK`
+                : '🌟 वेबसाइट की मुख्य विशेषताएं: ⚡ SWIS 3.30% फिक्स कमीशन | 👥 TWIS ₹150 डायरेक्ट पेआउट | 💳 माता-पिता का UPI/बैंक मान्य | 🆔 लाइफटाइम डिजिटल ID कार्ड | 📱 ऑफिशियल Real App APK | 🔥 मात्र ₹249 लाइफटाइम एक्टिवेशन (Zero Investment Work)'}
             </span>
           </div>
-          <div className="hidden md:flex items-center gap-1 text-[11px] text-[#212121] font-bold shrink-0">
-            <span>OFFICIAL PORTAL</span>
+
+          {/* Quick rotating feature badge on right */}
+          <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-[#212121] font-bold shrink-0">
+            <span className="hidden md:inline bg-white/70 px-1.5 py-0.5 rounded text-slate-800 text-[10px]">
+              {featureIndex + 1}/{websiteFeatures.length}
+            </span>
+            <span className="bg-emerald-700 text-white px-2 py-0.5 rounded text-[10px] font-bold hidden xs:inline">
+              ✓ 100% VERIFIED
+            </span>
           </div>
         </div>
       </div>

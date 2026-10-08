@@ -13,6 +13,17 @@ export interface PrivacySettings {
   showPersonalQr?: boolean; // Whether personal QR is shown on sponsor card
 }
 
+export interface PaymentAccountDetails {
+  holderRelation: 'Self' | 'Father' | 'Mother' | 'Guardian' | string;
+  holderName: string;
+  payoutMethod: 'UPI' | 'BANK' | 'BOTH';
+  upiId?: string;
+  bankName?: string;
+  accountNumber?: string;
+  ifsc?: string;
+  updatedAt?: string;
+}
+
 export interface Member {
   id: string;
   accId: string; // e.g. ACC249SWISRK01 or ACC249TWISRK01
@@ -53,6 +64,11 @@ export interface Member {
   realAppLinkApproved?: boolean;
   rejectionReason?: string;
   privacySettings?: PrivacySettings;
+  payoutDetails?: PaymentAccountDetails;
+  sponsorCommissionStatus?: 'pending' | 'paid';
+  sponsorCommissionPaidAt?: string;
+  sponsorCommissionUtr?: string;
+  sponsorCommissionAmount?: number;
 }
 
 export type ServiceType = 

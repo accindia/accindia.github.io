@@ -46,6 +46,11 @@ import {
   Radio,
   FileText,
   CheckCircle,
+  HelpCircle,
+  Wallet,
+  DollarSign,
+  UserCheck,
+  KeyRound,
 } from 'lucide-react';
 import { Member, PlanType, VerificationStatus, WithdrawalRequest, AppServiceItem, PromotionalPoster, SiteConfig } from '../types';
 import { StorageService, subscribeToSync, SEED_MEMBERS } from '../services/storage';
@@ -117,8 +122,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterPlan, setFilterPlan] = useState<'ALL' | PlanType>('ALL');
   const [filterStatus, setFilterStatus] = useState<'ALL' | VerificationStatus>('ALL');
+  const [filterSponsor, setFilterSponsor] = useState<'ALL' | 'WITH_SPONSOR' | 'COMMISSION_PENDING' | 'COMMISSION_PAID' | 'DIRECT'>('ALL');
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [actionSuccess, setActionSuccess] = useState('');
+
+  // Commission Payout Modal State
+  const [commissionPayMember, setCommissionPayMember] = useState<Member | null>(null);
+  const [commissionUtrInput, setCommissionUtrInput] = useState('');
+
+  // Member Security & Password Reset Support Modal State (Admin tool for users who forgot security answer)
+  const [memberSecurityModal, setMemberSecurityModal] = useState<Member | null>(null);
+  const [memberNewPasswordInput, setMemberNewPasswordInput] = useState('');
+  const [memberSecurityMsg, setMemberSecurityMsg] = useState('');
 
   // Real-time Firestore sync on mount & when unlocked
   useEffect(() => {
@@ -363,6 +378,66 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
       setLinkShareSuccess('');
       setLinkModalMember(null);
     }, 2000);
+  };
+
+  // Commission Payment Confirmation Handler
+  const handleConfirmCommissionPay = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commissionPayMember) return;
+    const utr = commissionUtrInput.trim() || `COMM-${Date.now().toString().slice(-8)}`;
+    StorageService.markCommissionPaid(commissionPayMember.accId, utr);
+    FirestoreService.updateMember(commissionPayMember.accId, {
+      sponsorCommissionStatus: 'paid',
+      sponsorCommissionPaidAt: new Date().toISOString(),
+      sponsorCommissionUtr: utr,
+      sponsorCommissionAmount: 150,
+    });
+
+    if (screenshotModalMember && screenshotModalMember.accId === commissionPayMember.accId) {
+      setScreenshotModalMember({
+        ...screenshotModalMember,
+        sponsorCommissionStatus: 'paid',
+        sponsorCommissionPaidAt: new Date().toISOString(),
+        sponsorCommissionUtr: utr,
+        sponsorCommissionAmount: 150,
+      });
+    }
+
+    if (selectedMember && selectedMember.accId === commissionPayMember.accId) {
+      setSelectedMember({
+        ...selectedMember,
+        sponsorCommissionStatus: 'paid',
+        sponsorCommissionPaidAt: new Date().toISOString(),
+        sponsorCommissionUtr: utr,
+        sponsorCommissionAmount: 150,
+      });
+    }
+
+    refreshData();
+    setActionSuccess(`स्पॉन्सर (${commissionPayMember.sponsorId}) को ₹150 कमीशन भुगतान दर्ज हो गया (UTR: ${utr})!`);
+    setCommissionPayMember(null);
+    setCommissionUtrInput('');
+    setTimeout(() => setActionSuccess(''), 3500);
+  };
+
+  // Admin Reset Member Password Handler
+  const handleAdminResetMemberPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!memberSecurityModal) return;
+    const newPass = memberNewPasswordInput.trim();
+    if (!newPass || newPass.length < 4) {
+      setMemberSecurityMsg('नया पासवर्ड कम से कम 4 अक्षरों का होना चाहिए!');
+      return;
+    }
+
+    StorageService.updateMember(memberSecurityModal.accId, { password: newPass });
+    FirestoreService.updateMember(memberSecurityModal.accId, { password: newPass });
+    refreshData();
+    setMemberSecurityMsg(`✓ सदस्य का पासवर्ड सफलतापूर्वक रीसेट हो गया: ${newPass}`);
+    setActionSuccess(`सदस्य ${memberSecurityModal.accId} का नया पासवर्ड सेट हो गया!`);
+    setTimeout(() => {
+      setMemberSecurityMsg('');
+    }, 3500);
   };
 
   const handleApproveWithdrawal = (id: string) => {
@@ -617,13 +692,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
       (m.accId || '').toLowerCase().includes(q) ||
       String(m.mobile || '').includes(q) ||
       String(m.utrNumber || '').toLowerCase().includes(q) ||
+      (m.sponsorName || '').toLowerCase().includes(q) ||
+      (m.sponsorId || '').toLowerCase().includes(q) ||
       (m.email || '').toLowerCase().includes(q) ||
       (m.city || '').toLowerCase().includes(q);
 
     const matchesPlan = filterPlan === 'ALL' || m.plan === filterPlan;
     const matchesStatus = filterStatus === 'ALL' || m.status === filterStatus;
 
-    return matchesSearch && matchesPlan && matchesStatus;
+    let matchesSponsor = true;
+    const hasSponsor = Boolean(m.sponsorId && m.sponsorId !== 'DIRECT' && m.sponsorId !== 'ADMIN');
+    if (filterSponsor === 'WITH_SPONSOR') {
+      matchesSponsor = hasSponsor;
+    } else if (filterSponsor === 'COMMISSION_PENDING') {
+      matchesSponsor = hasSponsor && m.sponsorCommissionStatus !== 'paid';
+    } else if (filterSponsor === 'COMMISSION_PAID') {
+      matchesSponsor = hasSponsor && m.sponsorCommissionStatus === 'paid';
+    } else if (filterSponsor === 'DIRECT') {
+      matchesSponsor = !hasSponsor;
+    }
+
+    return matchesSearch && matchesPlan && matchesStatus && matchesSponsor;
   });
 
   // System stats
@@ -936,14 +1025,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
         </div>
 
         {/* Filters and Search Bar */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="relative sm:col-span-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="नाम, ACC ID, मोबाइल या UTR से खोजें..."
+              placeholder="नाम, ACC ID, स्पॉन्सर, मोबाइल या UTR..."
               className="w-full bg-white border border-gray-300 rounded-sm pl-9 pr-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0] focus:ring-1 focus:ring-[#2874f0]"
             />
           </div>
@@ -969,9 +1058,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
               className="w-full bg-white border border-gray-300 rounded-sm px-2.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0]"
             >
               <option value="ALL">सभी स्थितियां</option>
-              <option value="pending">⏳ केवल लंबित (Pending Approvals)</option>
+              <option value="pending">⏳ केवल लंबित (Pending)</option>
               <option value="verified">✓ केवल सत्यापित (Verified)</option>
               <option value="rejected">✕ केवल अस्वीकृत (Rejected)</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-amber-900 shrink-0 font-bold">स्पॉन्सर/कमिशन:</span>
+            <select
+              value={filterSponsor}
+              onChange={(e) => setFilterSponsor(e.target.value as any)}
+              className="w-full bg-amber-50 border border-amber-300 rounded-sm px-2.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0] font-medium"
+            >
+              <option value="ALL">सभी सदस्य</option>
+              <option value="WITH_SPONSOR">केवल स्पॉन्सर वाले</option>
+              <option value="COMMISSION_PENDING">⏳ ₹150 कमिशन लंबित</option>
+              <option value="COMMISSION_PAID">✓ ₹150 कमिशन चुकता</option>
+              <option value="DIRECT">🏢 कंपनी डायरेक्ट (No Sponsor)</option>
             </select>
           </div>
         </div>
@@ -987,8 +1091,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                 <th className="py-3 px-3">मोबाइल</th>
                 <th className="py-3 px-3">UTR No. (₹249)</th>
                 <th className="py-3 px-3">रसीद व QR</th>
+                <th className="py-3 px-3 bg-amber-50 text-amber-950 border-x border-amber-200">स्पॉन्सर विवरण व ₹150 कमिशन</th>
                 <th className="py-3 px-3">सत्यापन स्थिति</th>
-                <th className="py-3 px-3 text-right">सत्यापन कार्रवाई (Approve / Reject)</th>
+                <th className="py-3 px-3 text-right">सत्यापन कार्रवाई / सुरक्षा</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-sans bg-white">
@@ -1095,6 +1200,107 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                     </div>
                   </td>
 
+                  {/* SPONSOR & COMMISSION COLUMN (Crystal clear distinction: User vs Sponsor) */}
+                  <td className="py-2.5 px-3 bg-amber-50/40 border-x border-amber-100">
+                    {(() => {
+                      const sponsor = members.find(
+                        (s) => (s.accId || '').toUpperCase() === (m.sponsorId || '').toUpperCase() || s.mobile === m.sponsorId
+                      );
+                      const hasSponsor = Boolean(m.sponsorId && m.sponsorId !== 'DIRECT' && m.sponsorId !== 'ADMIN');
+
+                      if (!hasSponsor) {
+                        return (
+                          <div className="space-y-0.5">
+                            <span className="font-semibold text-slate-700 text-[11px] block">🏢 कंपनी डायरेक्ट</span>
+                            <span className="text-[10px] text-slate-400 block">नो स्पॉन्सर (नो कमिशन)</span>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-slate-900 block truncate max-w-[130px]" title={m.sponsorName || sponsor?.fullName}>
+                              {m.sponsorName || sponsor?.fullName || 'स्पॉन्सर'}
+                            </span>
+                            <span className="text-[9px] bg-blue-100 text-[#2874f0] px-1.5 py-0.2 rounded font-mono font-bold">
+                              {m.sponsorId}
+                            </span>
+                          </div>
+
+                          {/* Sponsor Mobile & WhatsApp */}
+                          {sponsor && (
+                            <div className="flex items-center gap-1 text-[10px] text-slate-600 font-mono">
+                              <span>{sponsor.mobile}</span>
+                              <a
+                                href={`https://api.whatsapp.com/send?phone=91${sponsor.mobile}&text=${encodeURIComponent(
+                                  `नमस्ते ${sponsor.fullName}, मैं Achievers Club एडमिन बोल रहा हूँ। आपके रेफरल ${m.fullName} (${m.accId}) का कमिशन विवरण: ₹150।`
+                                )}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-emerald-600 hover:text-emerald-700 p-0.5"
+                                title="स्पॉन्सर से WhatsApp चैट"
+                              >
+                                <MessageCircle className="w-3 h-3" />
+                              </a>
+                            </div>
+                          )}
+
+                          {/* Sponsor Payout Info (UPI / Bank) */}
+                          {sponsor?.payoutDetails?.upiId ? (
+                            <div className="flex items-center justify-between gap-1 text-[10px] bg-white px-1.5 py-0.5 rounded border border-amber-200">
+                              <span className="font-mono text-emerald-800 font-bold truncate max-w-[110px]" title={sponsor.payoutDetails.upiId}>
+                                {sponsor.payoutDetails.upiId}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(sponsor.payoutDetails?.upiId || '');
+                                  alert('स्पॉन्सर UPI ID कॉपी हो गई: ' + sponsor.payoutDetails?.upiId);
+                                }}
+                                className="text-[#2874f0] hover:underline font-bold text-[9px] shrink-0"
+                              >
+                                कॉपी
+                              </button>
+                            </div>
+                          ) : sponsor?.payoutDetails?.accountNumber ? (
+                            <span className="text-[9px] text-slate-600 block font-mono truncate max-w-[130px]">
+                              A/C: {sponsor.payoutDetails.accountNumber} ({sponsor.payoutDetails.bankName})
+                            </span>
+                          ) : sponsor ? (
+                            <span className="text-[9px] text-slate-400 block font-mono">
+                              UPI: {sponsor.mobile}@upi
+                            </span>
+                          ) : null}
+
+                          {/* Commission Status / Action */}
+                          <div className="pt-0.5 flex items-center gap-1">
+                            {m.sponsorCommissionStatus === 'paid' ? (
+                              <span
+                                className="inline-flex items-center gap-0.5 text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold border border-emerald-300"
+                                title={`Paid: ${m.sponsorCommissionPaidAt || ''}`}
+                              >
+                                ✓ ₹150 चुकता
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCommissionPayMember(m);
+                                  setCommissionUtrInput(`COMM-${Date.now().toString().slice(-8)}`);
+                                }}
+                                className="inline-flex items-center gap-0.5 text-[9px] bg-[#fb641b] hover:bg-[#e85a14] text-white px-1.5 py-0.5 rounded font-bold transition shadow-xs"
+                                title="स्पॉन्सर को ₹150 कमीशन भुगतान दर्ज करें"
+                              >
+                                <span>₹150 पे करें</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </td>
+
                   {/* STATUS BADGE */}
                   <td className="py-2.5 px-3">
                     {m.status === 'verified' ? (
@@ -1115,7 +1321,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                     )}
                   </td>
 
-                  {/* ACTION BUTTONS: APPROVE / REJECT / DETAILS */}
+                  {/* ACTION BUTTONS: APPROVE / REJECT / DETAILS / SECURITY */}
                   <td className="py-2.5 px-3 text-right">
                     <div className="flex items-center justify-end gap-1.5">
                       {/* One-Click Approve */}
@@ -1134,7 +1340,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                       {m.status !== 'rejected' && (
                         <button
                           onClick={() => handleOpenRejectModal(m)}
-                          className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded text-[11px] font-bold flex items-center gap-1 transition"
+                          className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded text-[11px] font-bold flex items-center gap-1 transition"
                           title="अस्वीकृत करें (Reject)"
                         >
                           <X className="w-3 h-3" />
@@ -1152,6 +1358,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                         title="स्क्रीनशॉट व संपूर्ण विवरण देखें"
                       >
                         <Eye className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Admin Security & Password Reset Support Button */}
+                      <button
+                        onClick={() => {
+                          setMemberSecurityModal(m);
+                          setMemberNewPasswordInput('acc@' + Math.floor(1000 + Math.random() * 9000));
+                          setMemberSecurityMsg('');
+                        }}
+                        className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded border border-amber-300 transition"
+                        title="पासवर्ड व सुरक्षा सहायता (सुरक्षा उत्तर भूलने पर समाधान)"
+                      >
+                        <Lock className="w-3.5 h-3.5" />
                       </button>
 
                       {/* Share App Link Button if verified */}
@@ -2058,6 +2277,157 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                       )}
                     </div>
                   </div>
+
+                  {/* SPONSOR & COMMISSION PAYOUT CARD (Crystal Clear Separation: User vs Sponsor) */}
+                  {(() => {
+                    const sponsorObj = members.find(
+                      (s) => (s.accId || '').toUpperCase() === (screenshotModalMember.sponsorId || '').toUpperCase() || s.mobile === screenshotModalMember.sponsorId
+                    );
+                    const hasSponsor = Boolean(screenshotModalMember.sponsorId && screenshotModalMember.sponsorId !== 'DIRECT' && screenshotModalMember.sponsorId !== 'ADMIN');
+
+                    return (
+                      <div className="p-3 bg-amber-50/80 border-2 border-amber-300 rounded-xl space-y-2 text-xs">
+                        <div className="flex items-center justify-between border-b border-amber-200 pb-1.5">
+                          <div className="flex items-center gap-1.5 text-amber-950 font-bold">
+                            <Users className="w-4 h-4 text-amber-700" />
+                            <span>🤝 स्पॉन्सरशिप व ₹150 कमीशन विवरण</span>
+                          </div>
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${
+                            screenshotModalMember.sponsorCommissionStatus === 'paid'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : hasSponsor
+                              ? 'bg-orange-100 text-orange-800 border border-orange-300'
+                              : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {screenshotModalMember.sponsorCommissionStatus === 'paid'
+                              ? '✓ ₹150 कमीशन चुकता'
+                              : hasSponsor
+                              ? '⏳ ₹150 कमीशन देय (Pending)'
+                              : '🏢 डायरेक्ट (नो कमीशन)'}
+                          </span>
+                        </div>
+
+                        {hasSponsor ? (
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-2 bg-white p-2.5 rounded-lg border border-amber-200">
+                              <div>
+                                <span className="text-[10px] text-slate-500 block">स्पॉन्सर का नाम:</span>
+                                <strong className="text-slate-900 text-xs block truncate">
+                                  {screenshotModalMember.sponsorName || sponsorObj?.fullName || 'अज्ञात स्पॉन्सर'}
+                                </strong>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-slate-500 block">स्पॉन्सर 🆔 (ACC ID):</span>
+                                <span className="font-mono-acc font-black text-[#2874f0] text-xs block">
+                                  {screenshotModalMember.sponsorId}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-slate-500 block">स्पॉन्सर मोबाइल व चैट:</span>
+                                <div className="flex items-center gap-1 text-slate-800 font-mono text-[11px]">
+                                  <span>{sponsorObj?.mobile || 'N/A'}</span>
+                                  {sponsorObj?.mobile && (
+                                    <a
+                                      href={`https://api.whatsapp.com/send?phone=91${sponsorObj.mobile}&text=${encodeURIComponent(
+                                        `नमस्ते ${sponsorObj.fullName}, आपके रेफरल ${screenshotModalMember.fullName} (${screenshotModalMember.accId}) का सत्यापन हो गया है। ₹150 कमीशन स्थिति: ${screenshotModalMember.sponsorCommissionStatus === 'paid' ? 'चुकता' : 'प्रक्रियाधीन'}।`
+                                      )}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-emerald-600 hover:text-emerald-700 p-0.5"
+                                      title="स्पॉन्सर को WhatsApp मैसेज"
+                                    >
+                                      <MessageCircle className="w-3.5 h-3.5" />
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-slate-500 block">देय रेफरल बोनस:</span>
+                                <span className="font-bold text-emerald-700 text-xs">₹150 (TWIS Direct Bonus)</span>
+                              </div>
+                            </div>
+
+                            {/* Sponsor's Registered Payout Bank/UPI Details */}
+                            {sponsorObj?.payoutDetails ? (
+                              <div className="bg-emerald-50/90 p-2.5 rounded-lg border border-emerald-300 text-[11px] space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <strong className="text-emerald-950 font-bold">
+                                    स्पॉन्सर का पंजीकृत खाता ({sponsorObj.payoutDetails.holderRelation || 'Self'}):
+                                  </strong>
+                                  <span className="text-[10px] text-slate-600 font-semibold">{sponsorObj.payoutDetails.holderName}</span>
+                                </div>
+                                {sponsorObj.payoutDetails.upiId && (
+                                  <div className="flex items-center justify-between bg-white px-2 py-1 rounded border border-emerald-200">
+                                    <span className="font-mono font-bold text-emerald-800">
+                                      UPI ID: {sponsorObj.payoutDetails.upiId}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(sponsorObj.payoutDetails?.upiId || '');
+                                        alert('स्पॉन्सर की UPI ID कॉपी हो गई: ' + sponsorObj.payoutDetails?.upiId);
+                                      }}
+                                      className="px-2 py-0.5 bg-[#2874f0] text-white text-[10px] font-bold rounded shadow-xs"
+                                    >
+                                      कॉपी UPI
+                                    </button>
+                                  </div>
+                                )}
+                                {sponsorObj.payoutDetails.accountNumber && (
+                                  <div className="text-[10px] text-slate-700 bg-white p-1.5 rounded border border-gray-200 font-mono">
+                                    बैंक: {sponsorObj.payoutDetails.bankName || 'N/A'} | खाता: {sponsorObj.payoutDetails.accountNumber} | IFSC: {sponsorObj.payoutDetails.ifsc}
+                                  </div>
+                                )}
+                              </div>
+                            ) : sponsorObj ? (
+                              <div className="bg-white p-2 rounded border border-amber-200 text-[11px] flex items-center justify-between">
+                                <div>
+                                  <span className="text-slate-500 block text-[10px]">स्पॉन्सर डिफ़ॉल्ट मोबाइल UPI:</span>
+                                  <span className="font-mono font-bold text-slate-800">{sponsorObj.mobile}@upi</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(`${sponsorObj.mobile}@upi`);
+                                    alert('स्पॉन्सर मोबाइल UPI कॉपी हो गया!');
+                                  }}
+                                  className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded border border-gray-300"
+                                >
+                                  कॉपी
+                                </button>
+                              </div>
+                            ) : null}
+
+                            {/* 1-Click Commission Action */}
+                            <div className="pt-1">
+                              {screenshotModalMember.sponsorCommissionStatus === 'paid' ? (
+                                <div className="w-full p-2 bg-emerald-100/80 border border-emerald-300 rounded text-emerald-900 text-center font-bold text-xs flex items-center justify-center gap-1.5">
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                                  <span>₹150 कमीशन भुगतान किया जा चुका है (Ref: {screenshotModalMember.sponsorCommissionUtr || 'PAID'})</span>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCommissionPayMember(screenshotModalMember);
+                                    setCommissionUtrInput(`COMM-${Date.now().toString().slice(-8)}`);
+                                  }}
+                                  className="w-full py-2 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold text-xs rounded-lg shadow-sm flex items-center justify-center gap-1.5 transition"
+                                >
+                                  <DollarSign className="w-4 h-4" />
+                                  <span>स्पॉन्सर को ₹150 कमीशन भुगतान दर्ज करें (Pay ₹150)</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-2 bg-white rounded border border-gray-200 text-slate-600 text-[11px]">
+                            यह सदस्य कंपनी डायरेक्ट (बिना किसी स्पॉन्सर के) जुड़ा है। कोई रेफरल कमीशन देय नहीं है।
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* ACTION BUTTONS IN MODAL */}
@@ -2429,6 +2799,32 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                 <span className="text-slate-800">{selectedMember.address || 'Not specified'}</span>
               </div>
 
+              {/* Registered Payout / Bank / UPI Details */}
+              {selectedMember.payoutDetails && (
+                <div className="bg-emerald-50/70 p-3 rounded-lg border border-emerald-200 space-y-1">
+                  <span className="text-emerald-800 font-bold block text-xs">
+                    पंजीकृत पेआउट खाता (
+                    {selectedMember.payoutDetails.holderRelation === 'Father'
+                      ? 'पिताजी का खाता'
+                      : selectedMember.payoutDetails.holderRelation === 'Mother'
+                      ? 'माताजी का खाता'
+                      : selectedMember.payoutDetails.holderRelation === 'Guardian'
+                      ? 'अभिभावक का खाता'
+                      : 'खुद का खाता'}
+                    ):
+                  </span>
+                  <div className="text-xs text-slate-800 space-y-0.5">
+                    <p>खाता धारक: <strong>{selectedMember.payoutDetails.holderName}</strong></p>
+                    {selectedMember.payoutDetails.upiId && (
+                      <p>UPI ID: <span className="font-mono-acc font-bold text-emerald-800">{selectedMember.payoutDetails.upiId}</span></p>
+                    )}
+                    {selectedMember.payoutDetails.accountNumber && (
+                      <p>Bank: {selectedMember.payoutDetails.bankName || 'N/A'} · A/C: <span className="font-mono-acc font-bold">{selectedMember.payoutDetails.accountNumber}</span> · IFSC: {selectedMember.payoutDetails.ifsc || 'N/A'}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="bg-[#f1f2f4] p-3 rounded-lg border border-gray-200">
                 <span className="text-slate-500 block">पेमेंट UTR / Transaction No.:</span>
                 <span className="font-mono-acc text-emerald-700 font-bold text-sm">
@@ -2467,26 +2863,168 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                   </span>
                 </div>
               )}
+
+              {/* SPONSOR & COMMISSION CARD IN SELECTED MEMBER MODAL */}
+              {(() => {
+                const sponsorObj = members.find(
+                  (s) => (s.accId || '').toUpperCase() === (selectedMember.sponsorId || '').toUpperCase() || s.mobile === selectedMember.sponsorId
+                );
+                const hasSponsor = Boolean(selectedMember.sponsorId && selectedMember.sponsorId !== 'DIRECT' && selectedMember.sponsorId !== 'ADMIN');
+
+                return (
+                  <div className="p-3 bg-amber-50/80 border-2 border-amber-300 rounded-xl space-y-2 text-xs">
+                    <div className="flex items-center justify-between border-b border-amber-200 pb-1.5">
+                      <div className="flex items-center gap-1.5 text-amber-950 font-bold">
+                        <Users className="w-4 h-4 text-amber-700" />
+                        <span>🤝 स्पॉन्सरशिप व ₹150 कमीशन विवरण</span>
+                      </div>
+                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${
+                        selectedMember.sponsorCommissionStatus === 'paid'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          : hasSponsor
+                          ? 'bg-orange-100 text-orange-800 border border-orange-300'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        {selectedMember.sponsorCommissionStatus === 'paid'
+                          ? '✓ ₹150 कमीशन चुकता'
+                          : hasSponsor
+                          ? '⏳ ₹150 कमीशन देय (Pending)'
+                          : '🏢 डायरेक्ट (नो कमीशन)'}
+                      </span>
+                    </div>
+
+                    {hasSponsor ? (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2 bg-white p-2.5 rounded-lg border border-amber-200">
+                          <div>
+                            <span className="text-[10px] text-slate-500 block">स्पॉन्सर नाम:</span>
+                            <strong className="text-slate-900 text-xs block truncate">
+                              {selectedMember.sponsorName || sponsorObj?.fullName || 'अज्ञात'}
+                            </strong>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-500 block">स्पॉन्सर ACC 🆔:</span>
+                            <span className="font-mono-acc font-black text-[#2874f0] text-xs block">
+                              {selectedMember.sponsorId}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-500 block">स्पॉन्सर फोन:</span>
+                            <div className="flex items-center gap-1 text-slate-800 font-mono text-[11px]">
+                              <span>{sponsorObj?.mobile || 'N/A'}</span>
+                              {sponsorObj?.mobile && (
+                                <a
+                                  href={`https://api.whatsapp.com/send?phone=91${sponsorObj.mobile}&text=${encodeURIComponent(
+                                    `नमस्ते ${sponsorObj.fullName}, आपके रेफरल ${selectedMember.fullName} (${selectedMember.accId}) का सत्यापन हो गया है। ₹150 कमीशन स्थिति: ${selectedMember.sponsorCommissionStatus === 'paid' ? 'चुकता' : 'प्रक्रियाधीन'}।`
+                                  )}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-emerald-600 hover:text-emerald-700"
+                                >
+                                  <MessageCircle className="w-3.5 h-3.5" />
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-500 block">देय कमीशन:</span>
+                            <span className="font-bold text-emerald-700 text-xs">₹150 डायरेक्ट बोनस</span>
+                          </div>
+                        </div>
+
+                        {sponsorObj?.payoutDetails && (
+                          <div className="bg-emerald-50/90 p-2.5 rounded-lg border border-emerald-300 text-[11px] space-y-1">
+                            <span className="text-emerald-950 font-bold block">
+                              स्पॉन्सर भुगतान खाता ({sponsorObj.payoutDetails.holderRelation || 'Self'} - {sponsorObj.payoutDetails.holderName}):
+                            </span>
+                            {sponsorObj.payoutDetails.upiId && (
+                              <div className="flex items-center justify-between bg-white px-2 py-1 rounded border border-emerald-200">
+                                <span className="font-mono font-bold text-emerald-800">
+                                  UPI: {sponsorObj.payoutDetails.upiId}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(sponsorObj.payoutDetails?.upiId || '');
+                                    alert('स्पॉन्सर UPI ID कॉपी हो गई: ' + sponsorObj.payoutDetails?.upiId);
+                                  }}
+                                  className="px-2 py-0.5 bg-[#2874f0] text-white text-[10px] font-bold rounded"
+                                >
+                                  कॉपी UPI
+                                </button>
+                              </div>
+                            )}
+                            {sponsorObj.payoutDetails.accountNumber && (
+                              <div className="text-[10px] text-slate-700 bg-white p-1.5 rounded border border-gray-200 font-mono">
+                                बैंक: {sponsorObj.payoutDetails.bankName || 'N/A'} | खाता: {sponsorObj.payoutDetails.accountNumber} | IFSC: {sponsorObj.payoutDetails.ifsc}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="pt-1">
+                          {selectedMember.sponsorCommissionStatus === 'paid' ? (
+                            <div className="w-full p-2 bg-emerald-100/80 border border-emerald-300 rounded text-emerald-900 text-center font-bold text-xs">
+                              ✓ ₹150 कमीशन चुकता (Ref: {selectedMember.sponsorCommissionUtr || 'PAID'})
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCommissionPayMember(selectedMember);
+                                setCommissionUtrInput(`COMM-${Date.now().toString().slice(-8)}`);
+                              }}
+                              className="w-full py-2 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold text-xs rounded-lg shadow-sm flex items-center justify-center gap-1.5 transition"
+                            >
+                              <DollarSign className="w-4 h-4" />
+                              <span>स्पॉन्सर को ₹150 कमीशन भुगतान दर्ज करें (Pay ₹150)</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-2 bg-white rounded border border-gray-200 text-slate-600 text-[11px]">
+                        कंपनी डायरेक्ट (नो स्पॉन्सर) - कोई कमीशन देय नहीं है।
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+            <div className="flex justify-between items-center gap-2 pt-2 border-t border-gray-100">
               <button
                 onClick={() => {
-                  setLinkModalMember(selectedMember);
-                  setSelectedMember(null);
+                  setMemberSecurityModal(selectedMember);
+                  setMemberNewPasswordInput('acc@' + Math.floor(1000 + Math.random() * 9000));
+                  setMemberSecurityMsg('');
                 }}
-                className="px-4 py-2 bg-[#fb641b] hover:bg-[#e85a14] text-white text-xs font-bold rounded-sm flex items-center gap-1.5 shadow-sm"
+                className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold rounded-sm border border-amber-300 flex items-center gap-1"
+                title="सुरक्षा उत्तर व पासवर्ड रीसेट करें"
               >
-                <Share2 className="w-3.5 h-3.5" />
-                <span>Real App Link साझा करें</span>
+                <Lock className="w-3.5 h-3.5" />
+                <span>सुरक्षा/पासवर्ड रीसेट</span>
               </button>
 
-              <button
-                onClick={() => setSelectedMember(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-sm border border-gray-200"
-              >
-                बंद करें
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setLinkModalMember(selectedMember);
+                    setSelectedMember(null);
+                  }}
+                  className="px-4 py-2 bg-[#fb641b] hover:bg-[#e85a14] text-white text-xs font-bold rounded-sm flex items-center gap-1.5 shadow-sm"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>Real App Link</span>
+                </button>
+
+                <button
+                  onClick={() => setSelectedMember(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-sm border border-gray-200"
+                >
+                  बंद करें
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -2817,6 +3355,277 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* COMMISSION PAY MODAL (Record ₹150 Commission to Sponsor) */}
+      {/* ========================================================================= */}
+      {commissionPayMember && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white border border-gray-200 rounded-xl max-w-md w-full p-5 space-y-4 shadow-2xl animate-scaleUp">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2 text-emerald-700">
+                <DollarSign className="w-5 h-5 text-emerald-600" />
+                <h3 className="text-sm font-bold text-slate-900">स्पॉन्सर ₹150 कमीशन भुगतान दर्ज करें</h3>
+              </div>
+              <button
+                onClick={() => setCommissionPayMember(null)}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {(() => {
+              const sponsorObj = members.find(
+                (s) => (s.accId || '').toUpperCase() === (commissionPayMember.sponsorId || '').toUpperCase() || s.mobile === commissionPayMember.sponsorId
+              );
+
+              return (
+                <div className="space-y-3 text-xs">
+                  {/* User & Sponsor Quick Comparison Box */}
+                  <div className="grid grid-cols-2 gap-2 bg-[#f1f2f4] p-3 rounded-lg border border-gray-200">
+                    <div>
+                      <span className="text-[10px] text-slate-500 block font-semibold">नया एक्टिव सदस्य:</span>
+                      <strong className="text-slate-900 text-xs block">{commissionPayMember.fullName}</strong>
+                      <span className="text-[10px] text-slate-600 font-mono-acc">🆔 {commissionPayMember.accId}</span>
+                      <span className="text-[10px] text-emerald-700 font-semibold block">₹249 Paid (UTR: {commissionPayMember.utrNumber})</span>
+                    </div>
+
+                    <div className="border-l border-gray-300 pl-2">
+                      <span className="text-[10px] text-amber-900 block font-bold">हकदार स्पॉन्सर:</span>
+                      <strong className="text-slate-900 text-xs block truncate">{commissionPayMember.sponsorName || sponsorObj?.fullName || 'स्पॉन्सर'}</strong>
+                      <span className="text-[10px] text-[#2874f0] font-mono-acc font-bold">🆔 {commissionPayMember.sponsorId}</span>
+                      <span className="text-[10px] text-slate-600 font-mono block">फोन: {sponsorObj?.mobile || 'N/A'}</span>
+                    </div>
+                  </div>
+
+                  {/* Sponsor Payout Destination */}
+                  <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-300 space-y-1.5">
+                    <span className="text-[11px] font-bold text-emerald-950 block">
+                      स्पॉन्सर का भुगतान खाता ({sponsorObj?.payoutDetails?.holderRelation || 'Self'} - {sponsorObj?.payoutDetails?.holderName || sponsorObj?.fullName}):
+                    </span>
+                    {sponsorObj?.payoutDetails?.upiId ? (
+                      <div className="flex items-center justify-between bg-white p-2 rounded border border-emerald-200">
+                        <span className="font-mono font-bold text-emerald-800 text-xs">
+                          {sponsorObj.payoutDetails.upiId}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(sponsorObj.payoutDetails?.upiId || '');
+                            alert('स्पॉन्सर UPI ID कॉपी हो गई!');
+                          }}
+                          className="px-2 py-0.5 bg-[#2874f0] text-white text-[10px] font-bold rounded"
+                        >
+                          कॉपी UPI
+                        </button>
+                      </div>
+                    ) : sponsorObj ? (
+                      <div className="flex items-center justify-between bg-white p-2 rounded border border-emerald-200">
+                        <span className="font-mono text-xs font-bold text-slate-800">{sponsorObj.mobile}@upi</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${sponsorObj.mobile}@upi`);
+                            alert('स्पॉन्सर मोबाइल UPI कॉपी हो गया!');
+                          }}
+                          className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded"
+                        >
+                          कॉपी
+                        </button>
+                      </div>
+                    ) : null}
+
+                    {sponsorObj?.payoutDetails?.accountNumber && (
+                      <div className="text-[10px] text-slate-700 bg-white p-1.5 rounded border border-gray-200 font-mono">
+                        बैंक: {sponsorObj.payoutDetails.bankName || 'N/A'} | A/C: {sponsorObj.payoutDetails.accountNumber} | IFSC: {sponsorObj.payoutDetails.ifsc}
+                      </div>
+                    )}
+                  </div>
+
+                  <form onSubmit={handleConfirmCommissionPay} className="space-y-3 pt-1">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-800 mb-1">
+                        कमीशन ट्रांसफर UTR / ट्रांजैक्शन संदर्भ नंबर:
+                      </label>
+                      <input
+                        type="text"
+                        value={commissionUtrInput}
+                        onChange={(e) => setCommissionUtrInput(e.target.value)}
+                        placeholder="उदा. COMM-987654 या बैंक UPI UTR"
+                        className="w-full bg-white border border-gray-300 rounded-sm px-3 py-2 text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-[#fb641b]"
+                        required
+                      />
+                    </div>
+
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setCommissionPayMember(null)}
+                        className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-sm border border-gray-200"
+                      >
+                        रद्द करें
+                      </button>
+
+                      <button
+                        type="submit"
+                        className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-sm shadow-sm flex items-center justify-center gap-1.5"
+                      >
+                        <Check className="w-4 h-4" />
+                        <span>₹150 भुगतान चुकता दर्ज करें</span>
+                      </button>
+                    </div>
+
+                    {sponsorObj?.mobile && (
+                      <a
+                        href={`https://api.whatsapp.com/send?phone=91${sponsorObj.mobile}&text=${encodeURIComponent(
+                          `नमस्ते ${sponsorObj.fullName} ji,\nबधाई हो! आपके डायरेक्ट रेफरल ${commissionPayMember.fullName} (${commissionPayMember.accId}) का ₹249 एक्टिवेशन स्वीकार कर लिया गया है।\nआपका ₹150 डायरेक्ट रेफरल कमीशन सफलतापूर्वक जारी कर दिया गया है (Ref: ${commissionUtrInput || 'PAID'})।\nAchievers Club Community (ACC) में आपका धन्यवाद!`
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-2 bg-[#25D366] hover:bg-[#20ba59] text-white text-xs font-bold rounded-sm flex items-center justify-center gap-1.5 transition shadow-xs mt-1"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        <span>स्पॉन्सर को WhatsApp पर कमिशन रसीद भेजें</span>
+                      </a>
+                    )}
+                  </form>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MEMBER SECURITY & PASSWORD RESET MODAL (Admin Support For Users Who Forgot Security Answer) */}
+      {/* ========================================================================= */}
+      {memberSecurityModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white border border-gray-200 rounded-xl max-w-md w-full p-5 space-y-4 shadow-2xl animate-scaleUp">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2 text-amber-800">
+                <Lock className="w-5 h-5 text-amber-600" />
+                <h3 className="text-sm font-bold text-slate-900">सदस्य सुरक्षा उत्तर व पासवर्ड सहायता</h3>
+              </div>
+              <button
+                onClick={() => setMemberSecurityModal(null)}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {memberSecurityMsg && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-lg flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span className="font-semibold">{memberSecurityMsg}</span>
+              </div>
+            )}
+
+            <div className="space-y-3 text-xs">
+              <div className="bg-[#f1f2f4] p-3 rounded-lg border border-gray-200 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-semibold">सदस्य का नाम:</span>
+                  <strong className="text-slate-900">{memberSecurityModal.fullName}</strong>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-semibold">Unique ACC 🆔:</span>
+                  <span className="font-mono-acc font-black text-[#2874f0]">{memberSecurityModal.accId}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-semibold">पंजीकृत मोबाइल:</span>
+                  <span className="font-mono-acc text-slate-800">{memberSecurityModal.mobile}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-semibold">₹249 UTR:</span>
+                  <span className="font-mono-acc text-emerald-700 font-bold">{memberSecurityModal.utrNumber}</span>
+                </div>
+              </div>
+
+              {/* SECURE REGISTERED ANSWER DISPLAY (ADMIN ONLY) */}
+              <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-lg space-y-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase block">
+                  पंजीकृत सुरक्षा प्रश्न (Registered Question):
+                </span>
+                <span className="text-slate-800 font-semibold block text-[11px]">
+                  {memberSecurityModal.securityQuestion || 'आपकी पहली स्कूल या पसंदीदा शहर क्या है?'}
+                </span>
+
+                <span className="text-[10px] font-bold text-slate-500 uppercase block pt-1">
+                  पंजीकृत सुरक्षा उत्तर (Registered Answer):
+                </span>
+                <div className="flex items-center justify-between bg-white px-2.5 py-1.5 rounded border border-blue-300">
+                  <span className="font-mono font-black text-sm text-[#2874f0]">
+                    {memberSecurityModal.securityAnswer || 'कोई उत्तर सेट नहीं'}
+                  </span>
+                  {memberSecurityModal.securityAnswer && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(memberSecurityModal.securityAnswer || '');
+                        alert('सुरक्षा उत्तर क्लिपबोर्ड पर कॉपी हो गया!');
+                      }}
+                      className="text-xs text-[#2874f0] hover:underline font-bold"
+                    >
+                      कॉपी उत्तर
+                    </button>
+                  )}
+                </div>
+                <span className="text-[10px] text-slate-500 block pt-0.5">
+                  यदि सदस्य सुरक्षा उत्तर भूल गया है, तो आप यह उत्तर उन्हें बता सकते हैं या नीचे से नया पासवर्ड सेट कर सकते हैं।
+                </span>
+              </div>
+
+              {/* ADMIN NEW PASSWORD RESET FORM */}
+              <form onSubmit={handleAdminResetMemberPassword} className="space-y-3 pt-1">
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    नया पासवर्ड सेट करें (Set New Password):
+                  </label>
+                  <input
+                    type="text"
+                    value={memberNewPasswordInput}
+                    onChange={(e) => setMemberNewPasswordInput(e.target.value)}
+                    placeholder="उदा. acc@1234 या 6-अंकों का पिन"
+                    className="w-full bg-white border border-gray-300 rounded-sm px-3 py-2 text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-[#fb641b]"
+                    required
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setMemberSecurityModal(null)}
+                    className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-sm border border-gray-200"
+                  >
+                    रद्द करें
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2 bg-[#fb641b] hover:bg-[#e85a14] text-white text-xs font-bold rounded-sm shadow-sm flex items-center justify-center gap-1.5"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>पासवर्ड अपडेट करें</span>
+                  </button>
+                </div>
+
+                <a
+                  href={`https://api.whatsapp.com/send?phone=91${memberSecurityModal.mobile}&text=${encodeURIComponent(
+                    `नमस्ते ${memberSecurityModal.fullName} ji,\nAchievers Club Community एडमिन सहायता:\nआपकी ACC 🆔: ${memberSecurityModal.accId}\nआपका लॉगिन पासवर्ड: ${memberNewPasswordInput}\nसुरक्षा उत्तर: ${memberSecurityModal.securityAnswer || 'N/A'}\n\nअब आप www.achieversclub.in पर सीधे लॉगिन कर सकते हैं!`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2 bg-[#25D366] hover:bg-[#20ba59] text-white text-xs font-bold rounded-sm flex items-center justify-center gap-1.5 transition shadow-xs mt-1"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>WhatsApp पर छात्र को नया पासवर्ड व 🆔 भेजें</span>
+                </a>
+              </form>
+            </div>
           </div>
         </div>
       )}

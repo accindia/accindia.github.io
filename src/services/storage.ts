@@ -813,6 +813,16 @@ export const StorageService = {
     return updated;
   },
 
+  markCommissionPaid(accId: string, commissionUtr?: string): Member | null {
+    const updated = this.updateMember(accId, {
+      sponsorCommissionStatus: 'paid',
+      sponsorCommissionPaidAt: new Date().toISOString(),
+      sponsorCommissionUtr: commissionUtr || `COMM-${Date.now().toString().slice(-8)}`,
+      sponsorCommissionAmount: 150,
+    });
+    return updated;
+  },
+
   getSiteConfig(): SiteConfig {
     try {
       const data = localStorage.getItem(SITE_CONFIG_KEY);
