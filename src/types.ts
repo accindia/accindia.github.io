@@ -4,6 +4,15 @@ export type UserRole = 'member' | 'admin';
 
 export type VerificationStatus = 'verified' | 'pending' | 'rejected';
 
+export interface PrivacySettings {
+  showMobile?: boolean; // If false (default), mobile number is masked on public/sponsor ID card
+  showWhatsapp?: boolean; // If false, whatsapp contact button is hidden/masked
+  showEmail?: boolean; // If false, email is masked
+  showCity?: boolean; // If false, address/city is hidden
+  showProfileLink?: boolean; // Whether custom profile link is public
+  showPersonalQr?: boolean; // Whether personal QR is shown on sponsor card
+}
+
 export interface Member {
   id: string;
   accId: string; // e.g. ACC249SWISRK01 or ACC249TWISRK01
@@ -43,6 +52,7 @@ export interface Member {
   realAppLink?: string;
   realAppLinkApproved?: boolean;
   rejectionReason?: string;
+  privacySettings?: PrivacySettings;
 }
 
 export type ServiceType = 

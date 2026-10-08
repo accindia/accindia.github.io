@@ -33,7 +33,7 @@ import {
   Upload,
   Crop,
 } from 'lucide-react';
-import { Member, WithdrawalRequest } from '../types';
+import { Member, PrivacySettings, WithdrawalRequest } from '../types';
 import { StorageService } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
 import { compressImage } from '../utils/imageCompressor';
@@ -52,10 +52,20 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [statusCheckMsg, setStatusCheckMsg] = useState('');
 
-  // Profile Customization State (Photo, Link, Personal QR)
+  // Profile Customization State (Photo, Link, Personal QR, Privacy)
   const [profileAvatar, setProfileAvatar] = useState<string>(currentUser.avatarUrl || '');
   const [profileLinkInput, setProfileLinkInput] = useState<string>(currentUser.profileLink || '');
   const [personalQrInput, setPersonalQrInput] = useState<string>(currentUser.personalQrUrl || '');
+  const [privacySettings, setPrivacySettings] = useState<PrivacySettings>(
+    currentUser.privacySettings || {
+      showMobile: false,
+      showWhatsapp: false,
+      showEmail: false,
+      showCity: true,
+      showProfileLink: true,
+      showPersonalQr: false,
+    }
+  );
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileSaveSuccess, setProfileSaveSuccess] = useState('');
   const [profileSaveError, setProfileSaveError] = useState('');
@@ -71,7 +81,10 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
     if (currentUser.avatarUrl) setProfileAvatar(currentUser.avatarUrl);
     if (currentUser.profileLink) setProfileLinkInput(currentUser.profileLink);
     if (currentUser.personalQrUrl) setPersonalQrInput(currentUser.personalQrUrl);
-  }, [currentUser.avatarUrl, currentUser.profileLink, currentUser.personalQrUrl]);
+    if (currentUser.privacySettings) {
+      setPrivacySettings(currentUser.privacySettings);
+    }
+  }, [currentUser.avatarUrl, currentUser.profileLink, currentUser.personalQrUrl, currentUser.privacySettings]);
 
   const handleAvatarFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -171,6 +184,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
         avatarUrl: profileAvatar || undefined,
         profileLink: profileLinkInput.trim() || undefined,
         personalQrUrl: personalQrInput || undefined,
+        privacySettings: privacySettings,
       };
 
       const updated = StorageService.updateMember(currentUser.accId, updates);
@@ -178,7 +192,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
 
       if (updated) {
         onUpdateUser(updated);
-        setProfileSaveSuccess('प्रोफाइल फोटो, लिंक एवं पर्सनल QR डिजिटल 🆔 कार्ड में अपडेट हो गए!');
+        setProfileSaveSuccess('प्रोफाइल फोटो, लिंक, QR एवं प्राइवेसी सेटिंग्स डिजिटल 🆔 कार्ड में अपडेट हो गईं!');
         setTimeout(() => setProfileSaveSuccess(''), 3500);
       }
     } catch (err) {
@@ -1317,6 +1331,135 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
                 </div>
               </div>
 
+              {/* Privacy & Visibility Settings (Sponsor ID Card) */}
+              <div className="p-4 bg-indigo-50/50 border border-indigo-200 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-indigo-700" />
+                    <label className="block text-xs font-bold text-indigo-950">
+                      स्पॉन्सर कार्ड प्राइवेसी सेटिंग्स (Privacy & Visibility)
+                    </label>
+                  </div>
+                  <span className="text-[10px] text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200 font-bold">
+                    सुरक्षा नियंत्रण
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600">
+                  जब कोई नया व्यक्ति आपके रेफरल लिंक से आपके स्पॉन्सर आईडी कार्ड को देखता है, तो आप अपनी क्या जानकारी दिखाना या छुपाना चाहते हैं:
+                </p>
+
+                <div className="space-y-2 pt-1 text-xs">
+                  {/* Mobile Privacy Toggle */}
+                  <div className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-indigo-100">
+                    <div>
+                      <span className="font-bold text-slate-800 block text-[11.5px]">
+                        पर्सनल मोबाइल नंबर दिखाएं (Show Mobile)
+                      </span>
+                      <span className="text-[10.5px] text-slate-500">
+                        {privacySettings.showMobile
+                          ? '🟢 सार्वजनिक: स्पॉन्सर कार्ड पर आपका पूरा नंबर दिखेगा'
+                          : '🔒 सुरक्षित (अनुशंसित): नंबर 98••••••12 के रूप में छुपा रहेगा'}
+                      </span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(privacySettings.showMobile)}
+                        onChange={(e) => setPrivacySettings({ ...privacySettings, showMobile: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-8 h-4 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-600"></div>
+                    </label>
+                  </div>
+
+                  {/* WhatsApp Direct Chat Toggle */}
+                  <div className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-indigo-100">
+                    <div>
+                      <span className="font-bold text-slate-800 block text-[11.5px]">
+                        व्हाट्सएप डायरेक्ट चैट लिंक (Show WhatsApp)
+                      </span>
+                      <span className="text-[10.5px] text-slate-500">
+                        {privacySettings.showWhatsapp
+                          ? '🟢 चालू: विजिटर्स सीधे आपसे WhatsApp चैट कर सकेंगे'
+                          : '🔒 बंद: पर्सनल नंबर छुपा रहेगा'}
+                      </span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(privacySettings.showWhatsapp)}
+                        onChange={(e) => setPrivacySettings({ ...privacySettings, showWhatsapp: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-8 h-4 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-600"></div>
+                    </label>
+                  </div>
+
+                  {/* Email Privacy Toggle */}
+                  <div className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-indigo-100">
+                    <div>
+                      <span className="font-bold text-slate-800 block text-[11.5px]">
+                        ईमेल पता दिखाएं (Show Email)
+                      </span>
+                      <span className="text-[10.5px] text-slate-500">
+                        {privacySettings.showEmail ? '🟢 चालू: ईमेल प्रदर्शित होगा' : '🔒 बंद: ईमेल सुरक्षित रहेगा'}
+                      </span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(privacySettings.showEmail)}
+                        onChange={(e) => setPrivacySettings({ ...privacySettings, showEmail: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-8 h-4 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-600"></div>
+                    </label>
+                  </div>
+
+                  {/* City & State Privacy Toggle */}
+                  <div className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-indigo-100">
+                    <div>
+                      <span className="font-bold text-slate-800 block text-[11.5px]">
+                        शहर व राज्य दिखाएं (Show City/State)
+                      </span>
+                      <span className="text-[10.5px] text-slate-500">
+                        {privacySettings.showCity !== false ? '🟢 चालू: शहर व राज्य दिखेगा' : '🔒 बंद: केवल "भारत (India)" दिखेगा'}
+                      </span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={privacySettings.showCity !== false}
+                        onChange={(e) => setPrivacySettings({ ...privacySettings, showCity: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-8 h-4 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-600"></div>
+                    </label>
+                  </div>
+
+                  {/* Personal QR on Sponsor Card Toggle */}
+                  <div className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-indigo-100">
+                    <div>
+                      <span className="font-bold text-slate-800 block text-[11.5px]">
+                        स्पॉन्सर कार्ड पर पर्सनल QR दिखाएं (Personal QR on Sponsor Card)
+                      </span>
+                      <span className="text-[10.5px] text-slate-500">
+                        {privacySettings.showPersonalQr ? '🟢 चालू: पर्सनल QR दिखेगा' : '🔒 बंद (सुरक्षित): हमेशा ऑफिशियल रेफरल QR ही दिखेगा'}
+                      </span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(privacySettings.showPersonalQr)}
+                        onChange={(e) => setPrivacySettings({ ...privacySettings, showPersonalQr: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-8 h-4 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-600"></div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
               {/* Save Button */}
               <div className="pt-2">
                 <button
@@ -1352,7 +1495,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
                   avatarUrl: profileAvatar || currentUser.avatarUrl,
                   profileLink: profileLinkInput || currentUser.profileLink,
                   personalQrUrl: personalQrInput || currentUser.personalQrUrl,
+                  privacySettings: privacySettings,
                 }}
+                onUpdateMember={onUpdateUser}
               />
             </div>
           </div>
@@ -1403,7 +1548,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
 
       {/* TAB 5: Digital ACC ID Card */}
       {activeTab === 'idcard' && (
-        <DigitalIdCard member={currentUser} />
+        <DigitalIdCard member={currentUser} onUpdateMember={onUpdateUser} />
       )}
 
       {/* TAB 6: Courses */}

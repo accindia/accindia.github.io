@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build && rm -rf docs && cp -r dist docs",
+    "start": "node server.ts",
     "preview": "vite preview",
-    "clean": "rm -rf dist docs server.js",
+    "clean": "rm -rf dist docs",
     "lint": "tsc --noEmit",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist -t true"

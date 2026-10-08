@@ -567,6 +567,10 @@ export async function drawIdCardBack(
  * Downloads Front Side HD PNG (1200 x 750)
  */
 export async function downloadPremiumIdCard(member: Member): Promise<void> {
+  if (member.id === 'mem-specimen-demo' || member.id === 'mem-001' || member.id === 'mem-002') {
+    alert('⚠️ यह केवल एक नमूना (Sample Preview) कार्ड है। डाउनलोड केवल वास्तविक सत्यापित सदस्य के लिए उपलब्ध है।');
+    return;
+  }
   const canvas = document.createElement('canvas');
   canvas.width = 1200;
   canvas.height = 750;
@@ -586,6 +590,10 @@ export async function downloadPremiumIdCard(member: Member): Promise<void> {
  * Downloads Back Side HD PNG (1200 x 750)
  */
 export async function downloadPremiumIdCardBack(member: Member): Promise<void> {
+  if (member.id === 'mem-specimen-demo' || member.id === 'mem-001' || member.id === 'mem-002') {
+    alert('⚠️ यह केवल एक नमूना (Sample Preview) कार्ड है। डाउनलोड केवल वास्तविक सत्यापित सदस्य के लिए उपलब्ध है।');
+    return;
+  }
   const canvas = document.createElement('canvas');
   canvas.width = 1200;
   canvas.height = 750;
@@ -606,6 +614,10 @@ export async function downloadPremiumIdCardBack(member: Member): Promise<void> {
  * Suitable for printing, PVC card creation, and lamination at cyber cafés
  */
 export async function downloadBothSidesIdCard(member: Member): Promise<void> {
+  if (member.id === 'mem-specimen-demo' || member.id === 'mem-001' || member.id === 'mem-002') {
+    alert('⚠️ यह केवल एक नमूना (Sample Preview) कार्ड है। डाउनलोड केवल वास्तविक सत्यापित सदस्य के लिए उपलब्ध है।');
+    return;
+  }
   const canvas = document.createElement('canvas');
   // 1240 width x 1600 height for complete 2-sided sheet
   canvas.width = 1240;

@@ -286,6 +286,7 @@ export default function App() {
               <DigitalIdCard
                 member={currentUser}
                 onClose={() => setActiveWindow('home')}
+                onUpdateMember={(updated) => setCurrentUser(updated)}
               />
             ) : referralSponsor ? (
               <div className="space-y-4">
@@ -324,6 +325,7 @@ export default function App() {
 
                 <DigitalIdCard
                   member={referralSponsor}
+                  isSponsorCard={true}
                   onClose={() => setActiveWindow('home')}
                 />
               </div>

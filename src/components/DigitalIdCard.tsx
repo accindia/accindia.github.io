@@ -2,7 +2,6 @@ import React, { useRef, useState } from 'react';
 import {
   ShieldCheck,
   Award,
-  QrCode,
   Download,
   Printer,
   Share2,
@@ -15,13 +14,20 @@ import {
   Phone,
   Mail,
   MapPin,
-  FileText,
   Zap,
-  Users,
+  Lock,
+  Eye,
+  EyeOff,
+  Sliders,
+  X,
   Check,
+  Shield,
+  MessageCircle,
+  AlertTriangle,
 } from 'lucide-react';
-import { Member, SiteConfig } from '../types';
+import { Member, PrivacySettings, SiteConfig } from '../types';
 import { StorageService } from '../services/storage';
+import { FirestoreService } from '../services/firestore';
 import {
   downloadPremiumIdCard,
   downloadPremiumIdCardBack,
@@ -31,14 +37,38 @@ import {
 interface DigitalIdCardProps {
   member: Member;
   onClose?: () => void;
+  onUpdateMember?: (updated: Member) => void;
+  isSponsorCard?: boolean;
 }
 
-export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose }) => {
+export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
+  member,
+  onClose,
+  onUpdateMember,
+  isSponsorCard = false,
+}) => {
   const [copied, setCopied] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [cardSide, setCardSide] = useState<'front' | 'back'>('front');
   const [qrViewMode, setQrViewMode] = useState<'referral' | 'personal'>('referral');
   const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadBlockedMsg, setDownloadBlockedMsg] = useState('');
+  
+  // Privacy Modal State
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [privacyDraft, setPrivacyDraft] = useState<PrivacySettings>(
+    member?.privacySettings || {
+      showMobile: false,
+      showWhatsapp: false,
+      showEmail: false,
+      showCity: true,
+      showProfileLink: true,
+      showPersonalQr: false,
+    }
+  );
+  const [isSavingPrivacy, setIsSavingPrivacy] = useState(false);
+  const [privacySuccessMsg, setPrivacySuccessMsg] = useState('');
+
   const cardRef = useRef<HTMLDivElement>(null);
   const siteConfig: SiteConfig = StorageService.getSiteConfig();
 
@@ -50,7 +80,39 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
     );
   }
 
-  const referralLink = typeof window !== 'undefined' 
+  // Determine if this is the authenticated user's own ID card
+  const currentUser = StorageService.getCurrentUser();
+  const isOwnCard = Boolean(
+    currentUser &&
+    currentUser.accId &&
+    member.accId &&
+    currentUser.accId.trim().toUpperCase() === member.accId.trim().toUpperCase() &&
+    member.id !== 'mem-specimen-demo' &&
+    member.id !== 'mem-001' &&
+    member.id !== 'mem-002'
+  );
+
+  // Strict Rule: ONLY the user can download their OWN ID card.
+  // When viewing a sponsor's card, demo card, or someone else's card, downloading is strictly forbidden.
+  const canDownload = isOwnCard && !isSponsorCard;
+  const isSponsorOrOther = !canDownload;
+
+  const currentPrivacy: PrivacySettings = member.privacySettings || {
+    showMobile: false,
+    showWhatsapp: false,
+    showEmail: false,
+    showCity: true,
+    showProfileLink: true,
+    showPersonalQr: false,
+  };
+
+  // Whether mobile should be displayed in clear text or masked
+  const isMobileVisible = isOwnCard || Boolean(currentPrivacy.showMobile);
+  const maskedMobile = member.mobile
+    ? `${member.mobile.slice(0, 2)}••••••${member.mobile.slice(-2)}`
+    : '98••••••10';
+
+  const referralLink = typeof window !== 'undefined'
     ? `${window.location.origin}/?sponsor=${member.accId}`
     : `https://achieversclub.in/?sponsor=${member.accId}`;
 
@@ -70,24 +132,49 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
   };
 
   const handlePrint = () => {
+    if (!canDownload) {
+      setDownloadBlockedMsg('🔒 सुरक्षा नियम: केवल कार्डधारक ही अपना पहचान पत्र प्रिंट कर सकते हैं। स्पॉन्सर का आईडी कार्ड प्रिंट या डाउनलोड नहीं किया जा सकता।');
+      setTimeout(() => setDownloadBlockedMsg(''), 5000);
+      return;
+    }
     window.print();
   };
 
   const handleShareWhatsApp = () => {
-    const text = encodeURIComponent(
-      `🔥 My Official Achievers Club Community (ACC) Digital ID Card 🔥\n` +
-      `👤 Member: ${member.fullName}\n` +
-      `🆔 Unique ACC ID: ${member.accId}\n` +
-      `💼 System: ${member.plan === 'SWIS' ? 'SELF WORK INCOME SYSTEM (3.30% Recharge Commission)' : 'TEAM WORK INCOME SYSTEM (₹150 Refer & Earn)'}\n` +
-      `⚡ Status: Verified Active Member (₹249 Paid)\n` +
-      `👉 Join with my Sponsor Link: ${referralLink}\n` +
-      (member.profileLink ? `🔗 My Personal Link: ${member.profileLink}\n` : '') +
-      `🌐 Start Young, Retire Young!`
-    );
-    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+    if (isOwnCard) {
+      const text = encodeURIComponent(
+        `🔥 My Official Achievers Club Community (ACC) Digital ID Card 🔥\n` +
+        `👤 Member: ${member.fullName}\n` +
+        `🆔 Unique ACC ID: ${member.accId}\n` +
+        `💼 System: ${member.plan === 'SWIS' ? 'SELF WORK INCOME SYSTEM (3.30% Recharge Commission)' : 'TEAM WORK INCOME SYSTEM (₹150 Refer & Earn)'}\n` +
+        `⚡ Status: Verified Active Member (₹249 Paid)\n` +
+        `👉 Join with my Sponsor Link: ${referralLink}\n` +
+        (member.profileLink ? `🔗 My Personal Link: ${member.profileLink}\n` : '') +
+        `🌐 Start Young, Retire Young!`
+      );
+      window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+    } else {
+      // Sponsor view: if sponsor allows WhatsApp contact, open sponsor's WhatsApp, otherwise general ACC helpline
+      if (currentPrivacy.showWhatsapp && member.mobile) {
+        const text = encodeURIComponent(
+          `नमस्ते ${member.fullName} जी! मैं आपके Achievers Club (ACC) रेफरल लिंक (${referralLink}) से जुड़ना चाहता हूँ। कृपया मुझे मार्गदर्शन दें।`
+        );
+        window.open(`https://api.whatsapp.com/send?phone=91${member.whatsapp || member.mobile}&text=${text}`, '_blank');
+      } else {
+        const text = encodeURIComponent(
+          `नमस्ते! मैं स्पॉन्सर ${member.fullName} (${member.accId}) के रेफरल लिंक से Achievers Club में जुड़ रहा हूँ।`
+        );
+        window.open(`https://api.whatsapp.com/send?phone=918877490845&text=${text}`, '_blank');
+      }
+    }
   };
 
   const handleDownloadFront = async () => {
+    if (!canDownload) {
+      setDownloadBlockedMsg('🔒 सुरक्षा नियम: आप केवल अपना स्वयं का डिजिटल आईडी कार्ड डाउनलोड कर सकते हैं। स्पॉन्सर या अन्य सदस्य का आईडी कार्ड डाउनलोड नहीं किया जा सकता।');
+      setTimeout(() => setDownloadBlockedMsg(''), 5000);
+      return;
+    }
     setIsDownloading(true);
     try {
       await downloadPremiumIdCard(member);
@@ -97,6 +184,11 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
   };
 
   const handleDownloadBack = async () => {
+    if (!canDownload) {
+      setDownloadBlockedMsg('🔒 सुरक्षा नियम: आप केवल अपना स्वयं का डिजिटल आईडी कार्ड डाउनलोड कर सकते हैं।');
+      setTimeout(() => setDownloadBlockedMsg(''), 5000);
+      return;
+    }
     setIsDownloading(true);
     try {
       await downloadPremiumIdCardBack(member);
@@ -106,6 +198,11 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
   };
 
   const handleDownloadBothSides = async () => {
+    if (!canDownload) {
+      setDownloadBlockedMsg('🔒 सुरक्षा नियम: आप केवल अपना स्वयं का डिजिटल आईडी कार्ड डाउनलोड कर सकते हैं।');
+      setTimeout(() => setDownloadBlockedMsg(''), 5000);
+      return;
+    }
     setIsDownloading(true);
     try {
       await downloadBothSidesIdCard(member);
@@ -114,10 +211,35 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
     }
   };
 
+  const handleSavePrivacySettings = async () => {
+    setIsSavingPrivacy(true);
+    setPrivacySuccessMsg('');
+    try {
+      const updated = StorageService.updateMember(member.accId, {
+        privacySettings: privacyDraft,
+      });
+      await FirestoreService.updateMember(member.accId, {
+        privacySettings: privacyDraft,
+      });
+      if (updated && onUpdateMember) {
+        onUpdateMember(updated);
+      }
+      setPrivacySuccessMsg('✓ प्राइवेसी सेटिंग्स सफलतापूर्वक अपडेट हो गई हैं!');
+      setTimeout(() => {
+        setPrivacySuccessMsg('');
+        setShowPrivacyModal(false);
+      }, 1500);
+    } catch (err) {
+      console.error('Error saving privacy settings:', err);
+    } finally {
+      setIsSavingPrivacy(false);
+    }
+  };
+
   return (
     <div className="space-y-4 max-w-2xl mx-auto w-full">
       {/* Sample Card Notification if demo member */}
-      {(member.id === 'mem-001' || member.id === 'mem-002') && (
+      {(member.id === 'mem-001' || member.id === 'mem-002' || member.id === 'mem-specimen-demo') && (
         <div className="bg-blue-50 border border-blue-200 p-3 sm:p-3.5 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs">
           <div className="flex items-center gap-2 text-slate-700">
             <Sparkles className="w-4 h-4 text-[#2874f0] shrink-0" />
@@ -138,6 +260,17 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
         </div>
       )}
 
+      {/* Security alert if someone attempts unauthorized download */}
+      {downloadBlockedMsg && (
+        <div className="bg-amber-50 border-2 border-amber-400 p-3.5 rounded-xl flex items-start gap-3 text-amber-950 animate-shake">
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="text-xs">
+            <strong className="block font-bold">डाउनलोड सुरक्षा प्रतिबंध:</strong>
+            <p className="mt-0.5">{downloadBlockedMsg}</p>
+          </div>
+        </div>
+      )}
+
       {/* Action Toolbar */}
       <div className="bg-white border border-gray-200 p-3 sm:p-4 rounded-xl shadow-xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-gray-100">
@@ -146,11 +279,20 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
               <Award className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate">
-                डिजिटल ACC पहचान पत्र (ID Card)
-              </h4>
+              <div className="flex items-center gap-2">
+                <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                  {isOwnCard ? 'मेरा डिजिटल ACC पहचान पत्र (My ID Card)' : `स्पॉन्सर 🆔 कार्ड (${member.fullName})`}
+                </h4>
+                {isSponsorOrOther && (
+                  <span className="text-[10px] bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.2 rounded font-bold shrink-0 inline-flex items-center gap-1">
+                    <Lock className="w-2.5 h-2.5 text-amber-700" /> केवल व्यू (Protected)
+                  </span>
+                )}
+              </div>
               <p className="text-[11px] text-slate-500 truncate">
-                आधिकारिक प्रमाणित लाइफटाइम डिजिटल सदस्यता कार्ड
+                {isOwnCard
+                  ? 'आधिकारिक प्रमाणित लाइफटाइम डिजिटल सदस्यता कार्ड'
+                  : 'स्पॉन्सर पहचान सत्यापन • प्राइवेसी सुरक्षा लागू'}
               </p>
             </div>
           </div>
@@ -205,21 +347,48 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
             <button
               onClick={handleShareWhatsApp}
               className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-sm shadow-xs transition"
+              title={isOwnCard ? 'व्हाट्सएप पर कार्ड शेयर करें' : 'स्पॉन्सर से संपर्क करें'}
             >
               <Share2 className="w-3.5 h-3.5" />
-              <span>WhatsApp</span>
+              <span>{isOwnCard ? 'WhatsApp' : currentPrivacy.showWhatsapp ? 'स्पॉन्सर चैट' : 'WhatsApp'}</span>
             </button>
 
-            <button
-              onClick={handlePrint}
-              className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-sm border border-gray-200 transition"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>प्रिंट</span>
-            </button>
+            {/* Privacy Controls Modal Button for the cardholder */}
+            {isOwnCard && (
+              <button
+                type="button"
+                onClick={() => {
+                  setPrivacyDraft(member.privacySettings || {
+                    showMobile: false,
+                    showWhatsapp: false,
+                    showEmail: false,
+                    showCity: true,
+                    showProfileLink: true,
+                    showPersonalQr: false,
+                  });
+                  setShowPrivacyModal(true);
+                }}
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-sm border border-indigo-200 transition"
+                title="स्पॉन्सर कार्ड में अपनी पर्सनल जानकारी छुपाएं या दिखाएं"
+              >
+                <Sliders className="w-3.5 h-3.5 text-indigo-600" />
+                <span>⚙️ प्राइवेसी सेटिंग्स</span>
+              </button>
+            )}
+
+            {canDownload && (
+              <button
+                onClick={handlePrint}
+                className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-sm border border-gray-200 transition"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>प्रिंट</span>
+              </button>
+            )}
           </div>
 
-            {/* Download HD Options */}
+          {/* Download HD Options: ONLY SHOWN IF IT IS THE USER'S OWN ID CARD */}
+          {canDownload ? (
             <div className="flex items-center gap-1.5 flex-wrap">
               <button
                 onClick={handleDownloadFront}
@@ -251,23 +420,45 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
                 <span>दोनों भाग (Print Sheet)</span>
               </button>
             </div>
-          </div>
+          ) : (
+            /* Protected Badge when viewing Sponsor or Specimen card - NO DOWNLOAD ALLOWED */
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-300 rounded-lg text-amber-900 text-xs font-semibold shadow-xs">
+              <Lock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+              <span>🔒 स्पॉन्सर कार्ड (डाउनलोड प्रतिबंधित • केवल कार्डधारक डाउनलोड कर सकते हैं)</span>
+            </div>
+          )}
         </div>
+      </div>
 
-        {/* The Printable / Viewable Card Wrapper */}
-        <div className="flex justify-center p-0.5 sm:p-2 w-full max-w-full overflow-hidden">
-          {cardSide === 'front' ? (
-            /* ========================================================================= */
-            /* FRONT SIDE OF DIGITAL ID CARD */
-            /* ========================================================================= */
-            <div
-              id="printable-id-card"
-              ref={cardRef}
-              className="relative w-full max-w-[430px] mx-auto bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 rounded-2xl border-2 border-amber-500/70 shadow-[0_0_40px_rgba(245,158,11,0.18)] overflow-hidden text-slate-100 p-3 sm:p-5 select-none animate-fadeIn"
-            >
+      {/* The Printable / Viewable Card Wrapper */}
+      <div className="flex justify-center p-0.5 sm:p-2 w-full max-w-full overflow-hidden">
+        {cardSide === 'front' ? (
+          /* ========================================================================= */
+          /* FRONT SIDE OF DIGITAL ID CARD */
+          /* ========================================================================= */
+          <div
+            id="printable-id-card"
+            ref={cardRef}
+            className="relative w-full max-w-[430px] mx-auto bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 rounded-2xl border-2 border-amber-500/70 shadow-[0_0_40px_rgba(245,158,11,0.18)] overflow-hidden text-slate-100 p-3 sm:p-5 select-none animate-fadeIn"
+          >
             {/* Subtle Background Pattern & Holographic Accent */}
             <div className="absolute -top-20 -right-20 w-44 h-44 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute -bottom-20 -left-20 w-44 h-44 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Sponsor Privacy Header Notice if viewing Sponsor's card */}
+            {isSponsorOrOther && (
+              <div className="mb-2.5 p-2 bg-gradient-to-r from-amber-950/90 via-slate-900 to-amber-950/90 border border-amber-500/40 rounded-xl flex items-center justify-between text-xs gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span className="text-[10px] sm:text-[10.5px] font-bold text-amber-300 truncate">
+                    🌟 प्रमाणित स्पॉन्सर आईडी • प्राइवेसी सुरक्षित
+                  </span>
+                </div>
+                <span className="text-[9px] font-mono-acc text-amber-300 bg-amber-900/60 border border-amber-500/30 px-1.5 py-0.2 rounded font-bold shrink-0 flex items-center gap-1">
+                  <Lock className="w-2.5 h-2.5 text-amber-400" /> डाउनलोड सुरक्षित
+                </span>
+              </div>
+            )}
 
             {/* Top Gold Foil Header */}
             <div className="relative border-b border-amber-500/30 pb-3 mb-3 flex items-center justify-between gap-2">
@@ -339,7 +530,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
               {/* Core Member Details */}
               <div className="min-w-0 flex-1">
                 <span className="text-[9px] uppercase tracking-wider text-slate-400 block font-medium">
-                  Authorized Member Name
+                  {isOwnCard ? 'Authorized Member Name' : 'Official Sponsor Name'}
                 </span>
                 <h3 className="text-sm sm:text-base font-bold text-white tracking-wide truncate">
                   {member.fullName}
@@ -352,16 +543,41 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
                       {member.plan === 'SWIS' ? 'SELF WORK (SWIS)' : member.plan === 'TWIS' ? 'TEAM WORK (TWIS)' : 'COMBO'}
                     </span>
                   </div>
+
+                  {/* Privacy Controlled Mobile Number */}
                   <div className="flex items-center gap-1.5 text-xs text-slate-300">
                     <span className="text-slate-400 text-[10px]">Mobile:</span>
-                    <span className="font-mono-acc text-slate-200 text-[11px]">
-                      +91 {member.mobile ? `${member.mobile.slice(0, 3)}****${member.mobile.slice(-3)}` : '9876****10'}
-                    </span>
+                    {isMobileVisible ? (
+                      <span className="font-mono-acc text-slate-200 text-[11px] flex items-center gap-1.5">
+                        +91 {member.mobile}
+                        {isOwnCard && (
+                          <span className="text-[8px] text-slate-400 bg-slate-800/80 px-1 rounded border border-slate-700">
+                            स्पॉन्सर व्यू: {currentPrivacy.showMobile ? 'सार्वजनिक' : '🔒 सुरक्षित'}
+                          </span>
+                        )}
+                        {!isOwnCard && (
+                          <span className="text-[8px] bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 px-1 rounded font-bold">
+                            सार्वजनिक
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="font-mono-acc text-amber-300 text-[11px] flex items-center gap-1.5">
+                        +91 {maskedMobile}
+                        <span className="text-[8px] bg-amber-950/80 text-amber-300 border border-amber-500/40 px-1.5 py-0.2 rounded font-bold inline-flex items-center gap-0.5">
+                          <Lock className="w-2.5 h-2.5 text-amber-400" /> प्राइवेसी सुरक्षित
+                        </span>
+                      </span>
+                    )}
                   </div>
+
+                  {/* City & State (Privacy Controlled) */}
                   <div className="flex items-center gap-1.5 text-xs text-slate-300">
                     <span className="text-slate-400 text-[10px]">City:</span>
                     <span className="text-slate-200 text-[11px] truncate">
-                      {member.city || 'Indore'}, {member.state || 'MP'}
+                      {isSponsorOrOther && currentPrivacy.showCity === false
+                        ? 'भारत (India) 🔒'
+                        : `${member.city || 'Indore'}, ${member.state || 'MP'}`}
                     </span>
                   </div>
                 </div>
@@ -425,17 +641,16 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
 
             {/* ============================================================= */}
             {/* FOOTER: REFERRAL QR CODE & USER-SUBMITTED PROFILE LINK */}
-            {/* Left corner has referral QR + links as specifically requested */}
             {/* ============================================================= */}
             <div className="border-t border-slate-800 pt-2.5 flex flex-col xs:flex-row items-stretch xs:items-start justify-between gap-2.5">
               {/* Left Corner: Referral QR & Member Link Section */}
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                {/* QR Code Container with Toggle if personal QR uploaded */}
+                {/* QR Code Container */}
                 <div className="relative shrink-0 flex flex-col items-center">
                   <div className="w-13 h-13 sm:w-14 sm:h-14 bg-white rounded-lg p-0.5 sm:p-1 flex items-center justify-center overflow-hidden border border-amber-400/50 shadow-sm">
                     <img
                       src={
-                        qrViewMode === 'personal' && member.personalQrUrl
+                        qrViewMode === 'personal' && member.personalQrUrl && (isOwnCard || currentPrivacy.showPersonalQr)
                           ? member.personalQrUrl
                           : referralQrUrl
                       }
@@ -443,7 +658,8 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
                       className="w-full h-full object-contain"
                     />
                   </div>
-                  {member.personalQrUrl ? (
+                  {/* Allow toggle only if owner OR if sponsor allows personal QR */}
+                  {member.personalQrUrl && (isOwnCard || currentPrivacy.showPersonalQr) ? (
                     <button
                       type="button"
                       onClick={() => setQrViewMode(qrViewMode === 'referral' ? 'personal' : 'referral')}
@@ -480,7 +696,11 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
                     <span className="text-[8px] text-emerald-400 font-bold block uppercase tracking-wider">
                       यूजर सबमिट लिंक (User Link):
                     </span>
-                    {member.profileLink ? (
+                    {isSponsorOrOther && currentPrivacy.showProfileLink === false ? (
+                      <span className="text-slate-500 text-[8px] italic block flex items-center gap-1">
+                        <Lock className="w-2.5 h-2.5 text-slate-500" /> प्राइवेसी सुरक्षा के तहत सुरक्षित
+                      </span>
+                    ) : member.profileLink ? (
                       <a
                         href={member.profileLink}
                         target="_blank"
@@ -493,7 +713,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
                       </a>
                     ) : (
                       <span className="text-slate-500 text-[8px] italic block">
-                        उपलब्ध नहीं (डैशबोर्ड से जोड़ें)
+                        उपलब्ध नहीं
                       </span>
                     )}
                   </div>
@@ -618,6 +838,227 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
           </div>
         )}
       </div>
+
+      {/* ========================================================================= */}
+      {/* CARDHOLDER PRIVACY SETTINGS MODAL */}
+      {/* Allows the user to decide what to show and what to hide on their sponsor ID card */}
+      {/* ========================================================================= */}
+      {showPrivacyModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-gray-200 overflow-hidden text-slate-900 animate-scaleUp">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-4 sm:p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-400">
+                  <Sliders className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm sm:text-base text-white">
+                    आईडी कार्ड प्राइवेसी सेटिंग्स
+                  </h3>
+                  <p className="text-xs text-slate-300">
+                    निर्धारित करें कि रेफरल स्पॉन्सर कार्ड में आपकी कौन सी जानकारी दिखेगी
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPrivacyModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body: Privacy Toggles */}
+            <div className="p-4 sm:p-6 space-y-4 text-xs max-h-[75vh] overflow-y-auto">
+              <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl text-amber-900 flex items-start gap-2.5">
+                <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-[11px] leading-relaxed">
+                  <strong>सुरक्षा नियम:</strong> जब कोई नया सदस्य आपके रेफरल लिंक से आपके स्पॉन्सर कार्ड को देखेगा, तो वह आपका कार्ड डाउनलोड <strong>नहीं</strong> कर सकेगा। नीचे दिए गए टॉगल से आप अपने संपर्क विवरण की गोपनीयता नियंत्रित कर सकते हैं।
+                </p>
+              </div>
+
+              {/* 1. Mobile Number Privacy */}
+              <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-[#2874f0]" />
+                    <span className="font-bold text-slate-900 text-xs">पर्सनल मोबाइल नंबर (Personal Mobile)</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(privacyDraft.showMobile)}
+                      onChange={(e) => setPrivacyDraft({ ...privacyDraft, showMobile: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
+                </div>
+                <p className="text-[11px] text-slate-600">
+                  {privacyDraft.showMobile
+                    ? '🟢 सार्वजनिक: स्पॉन्सर कार्ड पर आपका पूरा नंबर (+91 ' + member.mobile + ') दिखाई देगा।'
+                    : '🔒 सुरक्षित (अनुशंसित): स्पॉन्सर कार्ड पर आपका नंबर ' + maskedMobile + ' के रूप में छुपा रहेगा।'}
+                </p>
+              </div>
+
+              {/* 2. WhatsApp Direct Contact */}
+              <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MessageCircle className="w-4 h-4 text-emerald-600" />
+                    <span className="font-bold text-slate-900 text-xs">व्हाट्सएप संपर्क (WhatsApp Direct)</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(privacyDraft.showWhatsapp)}
+                      onChange={(e) => setPrivacyDraft({ ...privacyDraft, showWhatsapp: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
+                </div>
+                <p className="text-[11px] text-slate-600">
+                  {privacyDraft.showWhatsapp
+                    ? '🟢 चालू: विजिटर्स स्पॉन्सर कार्ड से आपसे सीधा WhatsApp चैट शुरू कर सकेंगे।'
+                    : '🔒 बंद: पर्सनल व्हाट्सएप संपर्क छुपा रहेगा और कम्युनिटी हेल्पलाइन का उपयोग होगा।'}
+                </p>
+              </div>
+
+              {/* 3. Email Privacy */}
+              <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-purple-600" />
+                    <span className="font-bold text-slate-900 text-xs">ईमेल पता (Email Address)</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(privacyDraft.showEmail)}
+                      onChange={(e) => setPrivacyDraft({ ...privacyDraft, showEmail: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
+                </div>
+                <p className="text-[11px] text-slate-600">
+                  {privacyDraft.showEmail
+                    ? '🟢 चालू: स्पॉन्सर कार्ड के विवरण में ईमेल पता दिखाई देगा।'
+                    : '🔒 बंद: ईमेल पता सुरक्षित और छुपा रहेगा।'}
+                </p>
+              </div>
+
+              {/* 4. City & State Privacy */}
+              <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-red-500" />
+                    <span className="font-bold text-slate-900 text-xs">शहर एवं राज्य (City & State)</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={privacyDraft.showCity !== false}
+                      onChange={(e) => setPrivacyDraft({ ...privacyDraft, showCity: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
+                </div>
+                <p className="text-[11px] text-slate-600">
+                  {privacyDraft.showCity !== false
+                    ? '🟢 चालू: कार्ड पर शहर व राज्य (' + (member.city || 'Indore') + ', ' + (member.state || 'MP') + ') दिखेगा।'
+                    : '🔒 बंद: शहर छुपाकर केवल "भारत (India)" दिखेगा।'}
+                </p>
+              </div>
+
+              {/* 5. Personal QR Privacy */}
+              <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sliders className="w-4 h-4 text-amber-600" />
+                    <span className="font-bold text-slate-900 text-xs">पर्सनल QR कोड (Personal QR)</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(privacyDraft.showPersonalQr)}
+                      onChange={(e) => setPrivacyDraft({ ...privacyDraft, showPersonalQr: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
+                </div>
+                <p className="text-[11px] text-slate-600">
+                  {privacyDraft.showPersonalQr
+                    ? '🟢 चालू: स्पॉन्सर कार्ड पर आपका व्यक्तिगत QR दिखेगा (यदि अपलोड किया है)।'
+                    : '🔒 बंद (सुरक्षित): स्पॉन्सर कार्ड पर हमेशा सुरक्षित ऑफिशियल ACC रेफरल QR ही दिखेगा।'}
+                </p>
+              </div>
+
+              {/* 6. Profile Link Privacy */}
+              <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ExternalLink className="w-4 h-4 text-cyan-600" />
+                    <span className="font-bold text-slate-900 text-xs">पर्सनल प्रोफाइल लिंक (Personal Link)</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={privacyDraft.showProfileLink !== false}
+                      onChange={(e) => setPrivacyDraft({ ...privacyDraft, showProfileLink: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
+                </div>
+                <p className="text-[11px] text-slate-600">
+                  {privacyDraft.showProfileLink !== false
+                    ? '🟢 चालू: स्पॉन्सर कार्ड पर आपका सबमिट किया गया सोशल / पर्सनल लिंक दिखेगा।'
+                    : '🔒 बंद: व्यक्तिगत लिंक सुरक्षित और छुपा रहेगा।'}
+                </p>
+              </div>
+
+              {privacySuccessMsg && (
+                <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 p-3 rounded-lg text-center font-bold text-xs flex items-center justify-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>{privacySuccessMsg}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-slate-50 p-4 border-t border-gray-200 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowPrivacyModal(false)}
+                className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 font-bold rounded-sm border border-gray-300 text-xs transition"
+              >
+                रद्द करें
+              </button>
+              <button
+                type="button"
+                disabled={isSavingPrivacy}
+                onClick={handleSavePrivacySettings}
+                className="px-5 py-2 bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold rounded-sm shadow-md text-xs transition disabled:opacity-50 flex items-center gap-2"
+              >
+                {isSavingPrivacy ? (
+                  <span>सहेज रहे हैं...</span>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>💾 प्राइवेसी सेटिंग्स सहेजें (Save Changes)</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
