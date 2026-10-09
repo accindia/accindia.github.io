@@ -11,6 +11,10 @@ export interface PrivacySettings {
   showCity?: boolean; // If false, address/city is hidden
   showProfileLink?: boolean; // Whether custom profile link is public
   showPersonalQr?: boolean; // Whether personal QR is shown on sponsor card
+  showFullNamePublic?: boolean; // If false, full name is masked (e.g. A*** S***)
+  showUserAccIdPublic?: boolean; // If false, user ID is masked (e.g. ACC249***)
+  showReferralBonusPublic?: boolean; // If false, bonus amount is masked
+  showJoiningDatePublic?: boolean; // If false, exact joining date is masked
 }
 
 export interface PaymentAccountDetails {
@@ -145,6 +149,7 @@ export type ActiveWindow =
   | 'idcard'
   | 'plans'
   | 'calculator'
+  | 'promotions'
   | 'about'
   | 'privacy'
   | 'disclaimer'

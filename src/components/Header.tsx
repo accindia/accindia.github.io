@@ -18,6 +18,7 @@ import {
   Zap,
   MessageCircle,
   User,
+  Megaphone,
 } from 'lucide-react';
 import { ActiveWindow, Member, SiteConfig } from '../types';
 import { StorageService, subscribeToSync } from '../services/storage';
@@ -176,6 +177,11 @@ export const Header: React.FC<HeaderProps> = ({
       id: 'dashboard' as ActiveWindow,
       label: currentUser ? 'मेरा डैशबोर्ड' : 'विद्यार्थी डैशबोर्ड',
       icon: <LayoutDashboard className="w-3.5 h-3.5 text-[#2874f0]" />,
+    },
+    {
+      id: 'promotions' as ActiveWindow,
+      label: 'प्रमोशन & विजिटिंग कार्ड',
+      icon: <Megaphone className="w-3.5 h-3.5 text-amber-300" />,
     },
     { id: 'admin' as ActiveWindow, label: 'एडमिन पैनल', icon: <ShieldCheck className="w-3.5 h-3.5 text-red-500" /> },
     { id: 'about' as ActiveWindow, label: 'हमारे बारे में', icon: <Award className="w-3.5 h-3.5 text-blue-500" /> },

@@ -12,6 +12,7 @@ import { AdminPanel } from './components/AdminPanel';
 import { LegalPages } from './components/LegalPages';
 import { StudentPortalGate } from './components/StudentPortalGate';
 import { IdCardAccessGate } from './components/IdCardAccessGate';
+import { PromotionBrandingHub } from './components/PromotionBrandingHub';
 import { ActiveWindow, Member, SiteConfig } from './types';
 import { StorageService, subscribeToSync } from './services/storage';
 import { FirestoreService } from './services/firestore';
@@ -30,6 +31,7 @@ import {
   Building2,
   Lock,
   ArrowRight,
+  Megaphone,
 } from 'lucide-react';
 
 export default function App() {
@@ -350,6 +352,7 @@ export default function App() {
               <UserDashboard
                 currentUser={currentUser}
                 onUpdateUser={(updated) => setCurrentUser(updated)}
+                onNavigateToPromotions={() => setActiveWindow('promotions')}
               />
             ) : (
               <StudentPortalGate
@@ -374,6 +377,23 @@ export default function App() {
                 const cur = StorageService.getCurrentUser();
                 if (cur) setCurrentUser(cur);
               }}
+            />
+          </WindowFrame>
+        )}
+
+        {/* VIEW: PROMOTIONAL POSTERS & VISITING CARDS (ACC Poster & Branding Hub) */}
+        {activeWindow === 'promotions' && (
+          <WindowFrame
+            title="प्रचार किट, विजिटिंग कार्ड व सोशल मीडिया पोस्टर्स (Branding & Promotion Hub)"
+            subtitle="ACC पोस्टर स्टाइल में अपने नाम व स्पॉन्सर 🆔 का आधिकारिक विजिटिंग कार्ड और पोस्टर बनाएं"
+            icon={<Megaphone className="w-4 h-4 text-amber-500" />}
+            onClose={() => setActiveWindow('home')}
+          >
+            <PromotionBrandingHub
+              currentUser={currentUser}
+              referralSponsor={referralSponsor}
+              onGoToRegister={() => setActiveWindow('register')}
+              onGoToIdCard={handleNavigateToIdCard}
             />
           </WindowFrame>
         )}

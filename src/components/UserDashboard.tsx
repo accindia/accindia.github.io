@@ -33,8 +33,24 @@ import {
   Upload,
   Crop,
   Building2,
+  Play,
+  Pause,
+  Volume2,
+  VolumeX,
+  Maximize,
+  RotateCw,
+  Printer,
+  Award,
+  Search,
+  Megaphone,
+  CheckCircle,
+  PlayCircle,
+  ChevronRight,
+  Eye,
+  X,
+  Calculator,
 } from 'lucide-react';
-import { Member, PrivacySettings, WithdrawalRequest } from '../types';
+import { Member, PrivacySettings, WithdrawalRequest, ReferralRecord } from '../types';
 import { StorageService } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
 import { compressImage } from '../utils/imageCompressor';
@@ -44,15 +60,34 @@ import { ImageCropperModal, CropShape } from './ImageCropperModal';
 interface UserDashboardProps {
   currentUser: Member;
   onUpdateUser: (updated: Member) => void;
+  onNavigateToPromotions?: () => void;
 }
 
-export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpdateUser }) => {
+export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpdateUser, onNavigateToPromotions }) => {
   const [activeTab, setActiveTab] = useState<'applink' | 'twis' | 'swis' | 'idcard' | 'kit' | 'courses' | 'profile'>('applink');
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [statusCheckMsg, setStatusCheckMsg] = useState('');
   const siteConfig = StorageService.getSiteConfig();
+
+  // 3.30% Recharge Commission Guide Modal State
+  const [showRechargeGuideModal, setShowRechargeGuideModal] = useState(false);
+  const [rechargeCalcAmount, setRechargeCalcAmount] = useState<number>(299);
+
+  // Daily Self Work Manual Modal State
+  const [showDailyWorkManualModal, setShowDailyWorkManualModal] = useState(false);
+  const [copiedScriptId, setCopiedScriptId] = useState<string | null>(null);
+
+  // Ad-Free Video Player State in Academy
+  const [currentLessonIdx, setCurrentLessonIdx] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [videoCurrentTime, setVideoCurrentTime] = useState(135);
+  const [videoDuration, setVideoDuration] = useState(840);
+  const [isMuted, setIsMuted] = useState(false);
+  const [showCertificateModal, setShowCertificateModal] = useState(false);
+  const [completedLessons, setCompletedLessons] = useState<number[]>([0, 1]);
 
   // Profile Customization State (Photo, Link, Personal QR, Privacy)
   const [profileAvatar, setProfileAvatar] = useState<string>(currentUser.avatarUrl || '');
@@ -259,6 +294,44 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
   const [withdrawMsg, setWithdrawMsg] = useState('');
   const [withdrawError, setWithdrawError] = useState('');
 
+  // Referrals & Masked Privacy Modal State
+  const [showReferralsPrivacyModal, setShowReferralsPrivacyModal] = useState(false);
+  const [referralModalTab, setReferralModalTab] = useState<'members' | 'privacy'>('members');
+  const [maskingEnabled, setMaskingEnabled] = useState(true);
+  const [isSavingPrivacy, setIsSavingPrivacy] = useState(false);
+  const [privacySaveSuccessMsg, setPrivacySaveSuccessMsg] = useState('');
+
+  // Privacy masking helpers
+  const maskUserId = (id: string) => {
+    if (!id || id.length <= 6) return id;
+    const start = id.slice(0, 6);
+    const end = id.slice(-2);
+    return `${start}****${end}`;
+  };
+
+  const maskName = (name: string) => {
+    if (!name) return 'सदस्य';
+    const parts = name.trim().split(/\s+/);
+    return parts.map((p) => (p.length > 2 ? `${p[0]}***` : p)).join(' ');
+  };
+
+  const handleSavePrivacyDirect = async (updated: PrivacySettings) => {
+    setIsSavingPrivacy(true);
+    setPrivacySaveSuccessMsg('');
+    try {
+      const localUpdated = StorageService.updateMember(currentUser.accId, { privacySettings: updated });
+      await FirestoreService.updateMember(currentUser.accId, { privacySettings: updated });
+      if (localUpdated) onUpdateUser(localUpdated);
+      setPrivacySettings(updated);
+      setPrivacySaveSuccessMsg('✓ आपकी प्राइवेसी सेटिंग्स सफलतापूर्वक सुरक्षित हो गई हैं!');
+      setTimeout(() => setPrivacySaveSuccessMsg(''), 3500);
+    } catch (e) {
+      console.warn('Error saving privacy settings:', e);
+    } finally {
+      setIsSavingPrivacy(false);
+    }
+  };
+
   // Real-time Firestore subscription for this member
   useEffect(() => {
     const unsubscribe = FirestoreService.subscribeToSingleMember(currentUser.accId, (cloudUser) => {
@@ -315,10 +388,187 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
     }
   };
 
-  // Referrals
-  const referrals = StorageService.getReferrals().filter(
-    (r) => r.referrerAccId.toUpperCase() === currentUser.accId.toUpperCase()
+  // Referrals calculation - include direct sponsored members & seed data for full visibility
+  const allStoredReferrals = StorageService.getReferrals();
+  const allMembers = StorageService.getMembers();
+
+  const directSponsoredMembers = allMembers.filter(
+    (m) =>
+      m.accId.toUpperCase() !== currentUser.accId.toUpperCase() &&
+      (m.sponsorId?.trim().toUpperCase() === currentUser.accId.trim().toUpperCase() ||
+        (currentUser.mobile && m.sponsorId?.trim() === currentUser.mobile.trim()))
   );
+
+  const existingRefMap = new Map<string, ReferralRecord>();
+  allStoredReferrals
+    .filter((r) => r.referrerAccId.toUpperCase() === currentUser.accId.toUpperCase())
+    .forEach((r) => existingRefMap.set(r.referredAccId.toUpperCase(), r));
+
+  directSponsoredMembers.forEach((m) => {
+    if (!existingRefMap.has(m.accId.toUpperCase())) {
+      existingRefMap.set(m.accId.toUpperCase(), {
+        id: `ref-${m.accId}`,
+        referrerAccId: currentUser.accId,
+        referredAccId: m.accId,
+        referredName: m.fullName,
+        plan: m.plan,
+        bonusAmount: 150,
+        status: 'credited',
+        date: m.paymentDate || m.createdAt?.split('T')[0] || '2026-10-02',
+      });
+    }
+  });
+
+  const referrals = Array.from(existingRefMap.values());
+
+  // Download Recharge Guide as formatted HTML/PDF file
+  const handleDownloadRechargeGuide = () => {
+    const html = `<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<title>ACC - 3.30% रिचार्ज कमीशन गाइड (${currentUser.accId})</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 30px; color: #1e293b; background: #fff; line-height: 1.6; max-width: 800px; margin: auto; }
+.header { border-bottom: 3px solid #2874f0; padding-bottom: 16px; margin-bottom: 24px; }
+.logo { font-size: 22px; font-weight: 900; color: #2874f0; }
+.badge { background: #dcfce7; color: #166534; font-weight: bold; padding: 4px 10px; border-radius: 4px; font-size: 13px; display: inline-block; }
+table { width: 100%; border-collapse: collapse; margin: 18px 0; }
+th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; font-size: 13px; }
+th { background: #f1f5f9; font-weight: bold; }
+.highlight { background: #fef9c3; font-weight: bold; }
+.footer { margin-top: 40px; padding-top: 15px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #64748b; text-align: center; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo">ACHIEVERS CLUB COMMUNITY (ACC)</div>
+  <h2>📱 3.30% फिक्स्ड रिचार्ज कमीशन सम्पूर्ण गाइड व ऑपरेटर चार्ट</h2>
+  <span class="badge">SWIS • SELF WORKING INCOME SYSTEM</span>
+  <p style="margin-top: 8px; color: #64748b; font-size: 12px;">विद्यार्थी: <strong>${currentUser.fullName} (${currentUser.accId})</strong></p>
+</div>
+
+<h3>1. सभी टेलीकॉम एवं DTH ऑपरेटरों पर 3.30% फिक्स्ड कमीशन</h3>
+<table>
+  <tr><th>ऑपरेटर सेवा</th><th>कमीशन दर</th><th>₹299 मासिक रिचार्ज</th><th>₹749 त्रैमासिक रिचार्ज</th><th>₹2999 वार्षिक रिचार्ज</th></tr>
+  <tr class="highlight"><td>Jio Prepaid & Postpaid</td><td>3.30% फिक्स्ड</td><td>₹9.86 कमीशन</td><td>₹24.71 कमीशन</td><td>₹98.96 कमीशन</td></tr>
+  <tr class="highlight"><td>Airtel Prepaid & Postpaid</td><td>3.30% फिक्स्ड</td><td>₹9.86 कमीशन</td><td>₹24.71 कमीशन</td><td>₹98.96 कमीशन</td></tr>
+  <tr class="highlight"><td>Vi (Vodafone Idea)</td><td>3.30% फिक्स्ड</td><td>₹9.86 कमीशन</td><td>₹24.71 कमीशन</td><td>₹98.96 कमीशन</td></tr>
+  <tr class="highlight"><td>BSNL Prepaid & Postpaid</td><td>3.30% फिक्स्ड</td><td>₹9.86 कमीशन</td><td>₹24.71 कमीशन</td><td>₹98.96 कमीशन</td></tr>
+  <tr class="highlight"><td>DTH (Tata Play, Dish TV, Sun, D2H)</td><td>3.30% फिक्स्ड</td><td>₹9.86 (₹299)</td><td>₹24.71 (₹749)</td><td>-</td></tr>
+</table>
+
+<h3>2. Google Pay / PhonePe vs ACC Real App का अंतर</h3>
+<table>
+  <tr><th>फीचर</th><th>PhonePe / Google Pay</th><th>ACC Real App</th></tr>
+  <tr><td>अतिरिक्त सुविधा शुल्क</td><td>₹2 से ₹3 अतिरिक्त कटते हैं</td><td>₹0.00 (शून्य एक्स्ट्रा चार्ज)</td></tr>
+  <tr><td>रिचार्ज कमीशन</td><td>शून्य (₹0.00)</td><td>3.30% सीधा आपके वॉलेट में तुरंत जमा</td></tr>
+  <tr><td>दैनिक कमाई निकासी</td><td>लागू नहीं</td><td>सीधे UPI द्वारा बैंक खाते में तुरंत निकासी</td></tr>
+</table>
+
+<h3>3. रिचार्ज करने की 5-स्टेप सरल विधि</h3>
+<ol>
+  <li><strong>स्टेप 1:</strong> ACC अधिकृत Android ऐप खोलें और अपनी 🆔 <strong>${currentUser.accId}</strong> से लॉगिन करें।</li>
+  <li><strong>स्टेप 2:</strong> 'Recharge & Bill' विकल्प चुनें एवं ग्राहक/दोस्त का 10-अंकों का मोबाइल नंबर दर्ज करें।</li>
+  <li><strong>स्टेप 3:</strong> ऑपरेटर व सर्कल स्वतः चयनित होगा, प्लान चुनें (उदा. ₹299 या ₹749)।</li>
+  <li><strong>स्टेप 4:</strong> किसी भी UPI ऐप (GPay/PhonePe/Paytm) से सुरक्षित भुगतान करें।</li>
+  <li><strong>स्टेप 5:</strong> रिचार्ज सफल होते ही 3.30% कमीशन आपके वॉलेट में तुरंत जमा हो जाएगा।</li>
+</ol>
+
+<div class="footer">
+  Achievers Club Community • Helpline: +91 8877490845 • www.achieversclub.in<br>
+  Start Young, Retire Young • Zero Investment Work Portal
+</div>
+</body>
+</html>`;
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ACC_3.30_Recharge_Commission_Guide_${currentUser.accId}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Download Daily Work Manual as formatted HTML/PDF file
+  const handleDownloadDailyWorkManual = () => {
+    const html = `<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<title>ACC - डेली 15-30 मिनट मोबाइल वर्क मैनुअल (${currentUser.accId})</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 30px; color: #1e293b; background: #fff; line-height: 1.6; max-width: 800px; margin: auto; }
+.header { border-bottom: 3px solid #16a34a; padding-bottom: 16px; margin-bottom: 24px; }
+.logo { font-size: 22px; font-weight: 900; color: #16a34a; }
+.badge { background: #e0e7ff; color: #3730a3; font-weight: bold; padding: 4px 10px; border-radius: 4px; font-size: 13px; display: inline-block; }
+.routine-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px; margin: 12px 0; }
+.time-badge { background: #2874f0; color: #fff; font-weight: bold; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+.script-box { background: #eef2ff; border-left: 4px solid #4f46e5; padding: 12px; margin: 10px 0; font-size: 12px; border-radius: 0 6px 6px 0; }
+.footer { margin-top: 40px; padding-top: 15px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #64748b; text-align: center; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo">ACHIEVERS CLUB COMMUNITY (ACC)</div>
+  <h2>💼 डेली सेल्फ वर्क मैनुअल (15-30 मिनट दैनिक मोबाइल ब्लूप्रिंट)</h2>
+  <span class="badge">STUDENT POCKET MONEY BLUEPRINT • ₹300-₹1500 DAILY</span>
+  <p style="margin-top: 8px; color: #64748b; font-size: 12px;">विद्यार्थी: <strong>${currentUser.fullName} (${currentUser.accId})</strong></p>
+</div>
+
+<h3>📅 दैनिक 3-टाइम रूटीन (15-30 मिनट दैनिक ब्लूप्रिंट)</h3>
+
+<div class="routine-box">
+  <span class="time-badge">सुबह 8:00 AM - 8:15 AM (15 मिनट)</span>
+  <h4>1. स्टेटस अपडेट व दिन की शुरुआत</h4>
+  <ul>
+    <li>WhatsApp स्टेटस पर SWIS रिचार्ज बचत या TWIS ₹150 अर्निंग प्रूफ पोस्टर लगाएं।</li>
+    <li>अपने कॉलेज/कोचिंग ग्रुप्स में अपना रेफरल लिंक (www.achieversclub.in/?sponsor=${currentUser.accId}) शेयर करें।</li>
+  </ul>
+</div>
+
+<div class="routine-box">
+  <span class="time-badge">दोपहर 1:00 PM - 1:10 PM (10 मिनट)</span>
+  <h4>2. कॉलेज लंच ब्रेक - रिस्पॉन्स व क्वेरी समाधान</h4>
+  <ul>
+    <li>जिन दोस्तों ने स्टेटस देखकर पूछा "यह क्या है?", उन्हें रेडी-मेड 3-लाइन स्क्रिप्ट भेजें।</li>
+    <li>उन्हें बताएं कि वे अपने फोन के रिचार्ज पर 3.30% बचा सकते हैं और दोस्तों को रेफर करके ₹150 कमा सकते हैं।</li>
+  </ul>
+</div>
+
+<div class="routine-box">
+  <span class="time-badge">रात 8:00 PM - 8:15 PM (15 मिनट)</span>
+  <h4>3. एक्टिवेशन फॉलो-अप एवं वॉलेट निकासी</h4>
+  <ul>
+    <li>दिलचस्पी रखने वाले दोस्तों को अपनी Sponsor ID: <strong>${currentUser.accId}</strong> से ₹249 एक्टिवेशन पूरा कराएं।</li>
+    <li>प्रति एक्टिवेशन ₹150 बोनस तुरंत वॉलेट में चेक करें और UPI द्वारा बैंक में निकालें।</li>
+  </ul>
+</div>
+
+<h3>📢 3 रेडी-मेड वायरल मैसेज स्क्रिप्ट्स</h3>
+<div class="script-box">
+  <strong>स्क्रिप्ट 1 (कॉलेज दोस्तों के लिए):</strong><br>
+  "नमस्ते भाई! मैं कॉलेज के साथ अपने फोन से 15-20 मिनट काम करके अपनी पॉकेट मनी कमा रहा हूँ। PhonePe/GPay के एक्स्ट्रा चार्ज से बचकर रिचार्ज पर 3.30% कमीशन मिलता है और हर दोस्त को जोड़ने पर सीधा ₹150 बैंक में आता है। तू भी देख ले: www.achieversclub.in/?sponsor=${currentUser.accId} (Sponsor ID: ${currentUser.accId})"
+</div>
+
+<div class="script-box">
+  <strong>स्क्रिप्ट 2 (रिचार्ज डिस्काउंट के लिए - परिवार व पड़ोसी):</strong><br>
+  "नमस्ते! अगर आप अपने घर के Jio, Airtel, Vi या BSNL का रिचार्ज कराते हैं, तो PhonePe या GPay के ₹2-₹3 एक्स्ट्रा चार्ज मत दीजिए। ACC पर सीधा 3.30% कैशबैक मिलता है। मुझसे करवाएं या खुद अपनी ID बना लें: www.achieversclub.in/?sponsor=${currentUser.accId}"
+</div>
+
+<div class="footer">
+  Achievers Club Community • Start Young, Retire Young • www.achieversclub.in
+</div>
+</body>
+</html>`;
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ACC_Daily_Work_Manual_${currentUser.accId}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const handleCopyLink = () => {
     const link = `${window.location.origin}/?sponsor=${currentUser.accId}`;
@@ -763,12 +1013,43 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
           <span className="text-[10px] text-slate-500 block mt-1">UPI द्वारा सीधे बैंक खाते में ट्रांसफर</span>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
-          <span className="text-[11px] text-slate-500 block font-medium">TWIS रेफरल आय (₹150/दोस्त)</span>
-          <span className="font-mono-acc font-bold text-xl text-[#2874f0] block mt-1 tabular-nums">
-            ₹{currentUser.twisEarnings.toFixed(2)}
-          </span>
-          <span className="text-[10px] text-slate-500 block mt-1">{currentUser.referralsCount} सक्रिय छात्र जुड़े</span>
+        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-slate-500 font-medium">TWIS रेफरल आय (₹150/दोस्त)</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setReferralModalTab('members');
+                  setShowReferralsPrivacyModal(true);
+                }}
+                className="text-[11px] font-bold text-[#2874f0] hover:text-[#1258c7] flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded border border-blue-200 transition shadow-xs cursor-pointer"
+                title="रेफरल सदस्य देखें (मास्क्ड प्राइवेसी के साथ)"
+              >
+                <span>सदस्य देखें</span>
+                <Eye className="w-3 h-3" />
+              </button>
+            </div>
+            <span className="font-mono-acc font-bold text-xl text-[#2874f0] block mt-1 tabular-nums">
+              ₹{currentUser.twisEarnings.toFixed(2)}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100 text-[10px]">
+            <span className="text-slate-500">{currentUser.referralsCount} सक्रिय छात्र जुड़े</span>
+            <button
+              type="button"
+              onClick={() => {
+                setReferralModalTab('privacy');
+                setShowReferralsPrivacyModal(true);
+              }}
+              className="text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200 transition cursor-pointer"
+              title="पब्लिक / प्राइवेट सेटिंग्स चुनें"
+            >
+              <ShieldCheck className="w-3 h-3 text-emerald-600" />
+              <span>प्राइवेसी कंट्रोल ⚙️</span>
+            </button>
+          </div>
         </div>
 
         <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
@@ -1047,13 +1328,22 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
                     Jio, Airtel, Vi, BSNL एवं DTH रिचार्ज पर सीधा 3.30% कमीशन प्राप्त करने की विस्तृत विधि।
                   </p>
                 </div>
-                <button
-                  onClick={() => alert('SWIS रिचार्ज कमीशन चार्ट (PDF) डाउनलोड हो रहा है...')}
-                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-sm flex items-center justify-center gap-1.5 transition shadow-xs"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>कमीशन गाइड डाउनलोड करें</span>
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowRechargeGuideModal(true)}
+                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-sm flex items-center justify-center gap-1.5 transition shadow-xs"
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>कमीशन गाइड देखें व समझें</span>
+                  </button>
+                  <button
+                    onClick={handleDownloadRechargeGuide}
+                    className="p-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-sm font-bold text-xs flex items-center justify-center transition"
+                    title="गाइड PDF / फाइल डाउनलोड करें"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
 
               <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3 shadow-xs flex flex-col justify-between">
@@ -1066,13 +1356,22 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
                     रोजाना 15-30 मिनट मोबाइल वर्क करके अतिरिक्त दैनिक आय अर्जित करने का व्यवस्थित ब्लूप्रिंट।
                   </p>
                 </div>
-                <button
-                  onClick={() => alert('डेली वर्क मैनुअल डाउनलोड हो रहा है...')}
-                  className="w-full py-2 bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold text-xs rounded-sm flex items-center justify-center gap-1.5 transition shadow-xs"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>वर्क मैनुअल डाउनलोड</span>
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowDailyWorkManualModal(true)}
+                    className="flex-1 py-2 bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold text-xs rounded-sm flex items-center justify-center gap-1.5 transition shadow-xs"
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>वर्क मैनुअल खोलें</span>
+                  </button>
+                  <button
+                    onClick={handleDownloadDailyWorkManual}
+                    className="p-2 bg-blue-50 hover:bg-blue-100 text-[#2874f0] border border-blue-200 rounded-sm font-bold text-xs flex items-center justify-center transition"
+                    title="वर्क मैनुअल PDF / फाइल डाउनलोड करें"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
 
               <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3 shadow-xs flex flex-col justify-between">
@@ -1754,53 +2053,394 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
         <DigitalIdCard member={currentUser} onUpdateMember={onUpdateUser} />
       )}
 
-      {/* TAB 6: Courses */}
+      {/* TAB 6: विद्यार्थी स्किल अकेडमी (Real Ad-Free Video System & 2 Student Referral Breakdown) */}
       {activeTab === 'courses' && (
-        <div className="space-y-4">
-          <div className="bg-white border border-gray-200 rounded-xl p-5 sm:p-6 shadow-xs">
-            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <GraduationCap className="w-5 h-5 text-[#2874f0]" />
-              <span>विद्यार्थी स्किल अकेडमी (Start Young, Retire Young)</span>
-            </h3>
-            <p className="text-xs text-slate-600 mt-1">
-              कॉलेज की पढ़ाई के साथ-साथ हाई-पेइंग स्किल्स सीखें: सेल्स, कम्युनिकेशन और सोशल मीडिया मार्केटिंग।
-            </p>
+        <div className="space-y-6 animate-fadeIn">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-blue-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-5 sm:p-6 shadow-md border border-indigo-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span className="text-[11px] font-black uppercase tracking-widest bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full border border-emerald-400/30">
+                  REAL VIDEO MASTERCLASS • 100% AD-FREE WINDOW
+                </span>
+                <span className="text-[11px] font-bold text-yellow-300 bg-yellow-400/20 px-2.5 py-0.5 rounded border border-yellow-300/30">
+                  START YOUNG, RETIRE YOUNG
+                </span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black font-display text-white">
+                विद्यार्थी डिजिटल स्किल अकेडमी
+              </h2>
+              <p className="text-xs text-indigo-200 mt-1 max-w-xl leading-relaxed">
+                कॉलेज की पढ़ाई के साथ-साथ हाई-पेइंग स्किल्स सीखें: 3.30% रिचार्ज सिस्टम, ₹150 रेफरल लीडरशिप, सोशल मीडिया मार्केटिंग और पर्सनल ब्रांडिंग।
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 shrink-0">
+              <button
+                onClick={() => setShowCertificateModal(true)}
+                className="px-4 py-2.5 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold rounded-lg text-xs shadow-md flex items-center gap-1.5 transition"
+              >
+                <Award className="w-4 h-4 text-yellow-300" />
+                <span>सर्टिफिकेट प्राप्त करें</span>
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              {
-                title: 'सेल्स एवं कन्वर्शन मास्टरी',
-                desc: 'बिना झिझक के आत्मविश्वास से बात करने और ग्राहकों को समझाने की व्यावहारिक तकनीक।',
-                duration: '6 मॉड्यूल्स · 2.5 घंटे',
-              },
-              {
-                title: 'सोशल मीडिया मार्केटिंग 2026',
-                desc: 'Instagram, WhatsApp और YouTube से रोजाना 50+ एक्टिव लीड्स प्राप्त करने का तरीका।',
-                duration: '8 मॉड्यूल्स · 3.2 घंटे',
-              },
-              {
-                title: 'पर्सनल ब्रांडिंग और माइंडसेट',
-                desc: 'अचीवर्स क्लब कम्युनिटी के टॉप अर्नर्स के साथ मेंटरशिप और लीडरशिप गाइड।',
-                duration: '5 मॉड्यूल्स · 1.8 घंटे',
-              },
-            ].map((c, i) => (
-              <div key={i} className="bg-white border border-gray-200 rounded-xl p-5 flex flex-col justify-between shadow-xs">
-                <div>
-                  <span className="text-[11px] font-bold text-emerald-700 bg-green-50 px-2 py-0.5 rounded border border-green-200">
-                    UNLOCKED
+          {/* REAL AD-FREE VIDEO PLAYER WINDOW */}
+          <div className="bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl space-y-0">
+            {/* Player Top Meta Bar */}
+            <div className="bg-slate-900/90 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between text-xs text-slate-300">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="font-bold text-white text-[12px] truncate max-w-xs sm:max-w-md">
+                  {currentLessonIdx === 0
+                    ? 'क्लास 1: SWIS 3.30% मोबाइल रिचार्ज एवं बचत मास्टरक्लास'
+                    : currentLessonIdx === 1
+                    ? 'क्लास 2: TWIS ₹150 रेफरल हब व 100 स्टूडेंट कम्युनिटी नेटवर्क'
+                    : currentLessonIdx === 2
+                    ? 'क्लास 3: सोशल मीडिया व WhatsApp लीड जनरेशन मास्टरी 2026'
+                    : currentLessonIdx === 3
+                    ? 'क्लास 4: सेल्स कन्वर्शन, स्टूडेंट माइंडसेट और ऑब्जेक्शन हैंडलिंग'
+                    : 'क्लास 5: ACC Poster पर्सनल ब्रांडिंग व डिजिटल मार्केटिंग'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 font-mono text-[11px]">
+                <span className="bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded font-bold">
+                  ✓ NO ADS (बिना विज्ञापन)
+                </span>
+                <span className="hidden sm:inline bg-slate-800 px-2 py-0.5 rounded text-slate-300 font-semibold">
+                  1080p FHD
+                </span>
+              </div>
+            </div>
+
+            {/* Video Container (Interactive Ad-Free Video Stream) */}
+            <div className="relative aspect-video w-full bg-black flex items-center justify-center overflow-hidden group">
+              <iframe
+                src={`https://www.youtube.com/embed/ZK4EKBuybqw?autoplay=${isPlaying ? '1' : '0'}&rel=0&modestbranding=1&controls=1&showinfo=0`}
+                title="ACC Student Skill Academy Real Video Masterclass"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                className="w-full h-full border-0"
+              />
+            </div>
+
+            {/* Video Control Bar & Speed Selector */}
+            <div className="bg-slate-900 p-3 sm:p-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs text-white">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsPlaying(!isPlaying)}
+                  className="w-9 h-9 rounded-lg bg-[#2874f0] hover:bg-blue-600 text-white flex items-center justify-center transition shadow-sm"
+                  title={isPlaying ? 'रोकें' : 'चलाएं'}
+                >
+                  {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-white" />}
+                </button>
+
+                <div className="space-y-0.5">
+                  <span className="text-[11px] text-slate-400 block font-semibold">
+                    प्रोग्रेस: {completedLessons.length}/5 कक्षाएं पूर्ण ({Math.round((completedLessons.length / 5) * 100)}%)
                   </span>
-                  <h4 className="text-sm font-bold text-slate-900 mt-2">{c.title}</h4>
-                  <p className="text-xs text-slate-600 mt-1 leading-relaxed">{c.desc}</p>
-                </div>
-                <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
-                  <span className="text-slate-500 text-[11px]">{c.duration}</span>
-                  <button className="text-[#2874f0] font-bold hover:underline">
-                    वीडियो देखें
-                  </button>
+                  <div className="w-32 sm:w-48 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 rounded-full transition-all"
+                      style={{ width: `${(completedLessons.length / 5) * 100}%` }}
+                    />
+                  </div>
                 </div>
               </div>
-            ))}
+
+              {/* Speed Buttons */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] text-slate-400 font-semibold hidden sm:inline">स्पीड:</span>
+                {[1, 1.25, 1.5, 2].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setPlaybackSpeed(s)}
+                    className={`px-2 py-1 rounded text-[11px] font-mono font-bold transition ${
+                      playbackSpeed === s
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                    }`}
+                  >
+                    {s}x
+                  </button>
+                ))}
+
+                <button
+                  onClick={() => {
+                    if (!completedLessons.includes(currentLessonIdx)) {
+                      setCompletedLessons([...completedLessons, currentLessonIdx]);
+                    }
+                    alert('✓ यह क्लास पूर्ण चिह्नित कर दी गई है!');
+                  }}
+                  className="ml-2 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold flex items-center gap-1 shadow-xs transition"
+                >
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  <span>क्लास पूर्ण ✓</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 5 Video Modules Playlist Selector */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 space-y-3 shadow-xs">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center justify-between border-b border-gray-100 pb-2.5">
+              <span className="flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-[#2874f0]" />
+                <span>अकेडमी वीडियो पाठ्यक्रम (Curated 5 Modules)</span>
+              </span>
+              <span className="text-xs text-slate-500">क्लिक करके क्लास बदलें</span>
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-2.5">
+              {[
+                { title: '1. SWIS 3.30% रिचार्ज मास्टरक्लास', time: '14 मिनट', cat: 'RECHARGE' },
+                { title: '2. TWIS ₹150 टीम रेफरल हब', time: '18 मिनट', cat: 'REFERRAL' },
+                { title: '3. सोशल मीडिया लीड जनरेशन', time: '16 मिनट', cat: 'MARKETING' },
+                { title: '4. सेल्स व ऑब्जेक्शन हैंडलिंग', time: '15 मिनट', cat: 'CONVERSION' },
+                { title: '5. ACC Poster पर्सनल ब्रांडिंग', time: '13 मिनट', cat: 'BRANDING' },
+              ].map((m, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    setCurrentLessonIdx(idx);
+                    setIsPlaying(true);
+                  }}
+                  className={`p-3 rounded-lg text-left transition border flex flex-col justify-between ${
+                    currentLessonIdx === idx
+                      ? 'bg-blue-50 border-blue-400 text-blue-900 shadow-xs'
+                      : 'bg-slate-50 border-gray-200 hover:bg-slate-100 text-slate-800'
+                  }`}
+                >
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#2874f0] block">
+                      MODULE 0{idx + 1}
+                    </span>
+                    <strong className="text-xs block leading-snug line-clamp-2">{m.title}</strong>
+                  </div>
+                  <div className="mt-2 pt-1 border-t border-gray-200/60 flex items-center justify-between text-[10px] text-slate-500">
+                    <span>{m.time}</span>
+                    {completedLessons.includes(idx) ? (
+                      <span className="text-emerald-700 font-bold">पूर्ण ✓</span>
+                    ) : (
+                      <span className="text-blue-600 font-semibold">देखें ▶</span>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* DYNAMIC & PRIVACY-PROTECTED STUDENT REFERRAL SYSTEM */}
+          {referrals.length === 0 ? (
+            <div className="bg-gradient-to-r from-blue-900 via-indigo-950 to-slate-900 border border-blue-500/30 rounded-2xl p-6 text-white space-y-4 shadow-lg">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-indigo-500/30 pb-3">
+                <div>
+                  <span className="text-[11px] font-bold text-yellow-300 uppercase tracking-widest bg-yellow-400/20 px-2.5 py-0.5 rounded border border-yellow-300/30 inline-block mb-1">
+                    🔒 FULL PRIVACY SHIELD • AUTHORIZED SPONSOR RECORD
+                  </span>
+                  <h3 className="text-base sm:text-lg font-black text-white">
+                    👥 आपके रेफरल से जुड़े विद्यार्थी (Direct Referral Students Record)
+                  </h3>
+                  <p className="text-xs text-indigo-200 mt-0.5">
+                    केवल आपकी स्पॉन्सर 🆔 (<strong className="text-yellow-300 font-mono-acc">{currentUser.accId}</strong>) से पंजीकृत विद्यार्थियों का आधिकारिक रिकॉर्ड
+                  </p>
+                </div>
+                <div className="bg-white/10 px-3 py-2 rounded-xl border border-white/20 text-center shrink-0">
+                  <span className="text-[10px] text-slate-300 block">कुल रेफरल अर्निंग</span>
+                  <span className="font-mono-acc font-black text-2xl text-emerald-400">₹0.00</span>
+                  <span className="text-[10px] text-slate-300 block">0 छात्र जुड़े</span>
+                </div>
+              </div>
+
+              <div className="bg-white/95 text-slate-900 rounded-xl p-6 border border-white/20 text-center space-y-3">
+                <div className="w-12 h-12 rounded-full bg-blue-100 text-[#2874f0] flex items-center justify-center mx-auto shadow-xs">
+                  <Users className="w-6 h-6" />
+                </div>
+                <h4 className="text-sm font-bold text-slate-900">
+                  वर्तमान में आपकी स्पॉन्सर 🆔 से कोई नया विद्यार्थी पंजीकृत नहीं है
+                </h4>
+                <p className="text-xs text-slate-600 max-w-lg mx-auto leading-relaxed">
+                  जब कोई विद्यार्थी आपकी आधिकारिक स्पॉन्सर 🆔 <strong className="font-mono-acc text-[#2874f0]">{currentUser.accId}</strong> का उपयोग करके ₹249 से एक्टिवेशन करेगा, 
+                  तो उसका <strong>यूज़र 🆔</strong>, <strong>प्लान</strong> और <strong>ज्वाइनिंग तिथि</strong> यहाँ पूर्ण गोपनीयता के साथ स्वतः प्रदर्शित होगी।
+                </p>
+                <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    onClick={handleCopyLink}
+                    className="px-4 py-2 bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold text-xs rounded-sm shadow-xs flex items-center gap-1.5 transition"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>{copiedLink ? 'लिंक कॉपी हो गया!' : 'अपना रेफरल लिंक कॉपी करें'}</span>
+                  </button>
+                  <button
+                    onClick={handleShareWhatsApp}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-sm shadow-xs flex items-center gap-1.5 transition"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>WhatsApp पर इनवाइट करें</span>
+                  </button>
+                </div>
+                <div className="pt-3 border-t border-gray-100 text-[11px] text-slate-500 flex items-center justify-center gap-1.5 font-medium">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>प्राइवेसी गारंटी: किसी भी अन्य सदस्य का स्पॉन्सर या निजी संपर्क डेटा आपको या अन्य किसी को कभी नहीं दिखेगा।</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-gradient-to-r from-blue-900 via-indigo-950 to-slate-900 border border-blue-500/30 rounded-2xl p-5 text-white space-y-4 shadow-lg">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-indigo-500/30 pb-3">
+                <div>
+                  <span className="text-[11px] font-bold text-yellow-300 uppercase tracking-widest bg-yellow-400/20 px-2.5 py-0.5 rounded border border-yellow-300/30 inline-block mb-1">
+                    🔒 FULL PRIVACY SHIELD • VERIFIED SPONSOR RECORD ({referrals.length} DIRECT STUDENT{referrals.length > 1 ? 'S' : ''})
+                  </span>
+                  <h3 className="text-base sm:text-lg font-black text-white">
+                    👥 आपके द्वारा स्पॉन्सर किए गए {referrals.length} विद्यार्थी (Direct Referral Students Record)
+                  </h3>
+                  <p className="text-xs text-indigo-200 mt-0.5">
+                    सुरक्षा नीति: केवल आपकी स्पॉन्सर 🆔 (<strong className="text-yellow-300 font-mono-acc">{currentUser.accId}</strong>) से जुड़े विद्यार्थियों का आधिकारिक रिकॉर्ड
+                  </p>
+                </div>
+                <div className="bg-white/10 px-3 py-2 rounded-xl border border-white/20 text-center shrink-0">
+                  <span className="text-[10px] text-slate-300 block">कुल रेफरल अर्निंग</span>
+                  <span className="font-mono-acc font-black text-2xl text-emerald-400">
+                    ₹{(referrals.length * 150).toFixed(2)}
+                  </span>
+                  <span className="text-[10px] text-slate-300 block">
+                    {referrals.length} छात्र × ₹150
+                  </span>
+                </div>
+              </div>
+
+              {referrals.map((r, idx) => (
+                <div
+                  key={r.id || idx}
+                  className={`bg-white/98 text-slate-900 rounded-xl p-4 sm:p-5 border-2 shadow-md space-y-3 ${
+                    idx === 0
+                      ? 'border-blue-400'
+                      : idx === 1
+                      ? 'border-indigo-400'
+                      : 'border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between border-b border-gray-200 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`w-7 h-7 rounded-full text-white font-black text-xs flex items-center justify-center shadow-xs ${
+                          idx === 0 ? 'bg-[#2874f0]' : idx === 1 ? 'bg-indigo-600' : 'bg-slate-700'
+                        }`}
+                      >
+                        {idx + 1}
+                      </span>
+                      <div>
+                        <span className="text-xs font-black text-slate-900 uppercase tracking-wide block">
+                          {idx === 0
+                            ? 'ऊपर (कार्ड 1) • प्रथम छात्र विवरण'
+                            : idx === 1
+                            ? 'नीचे (कार्ड 2) • द्वितीय छात्र विवरण'
+                            : `छात्र विवरण (कार्ड ${idx + 1})`}
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          Direct Student Referral Details
+                        </span>
+                      </div>
+                    </div>
+                    <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2.5 py-1 rounded-full border border-emerald-300 flex items-center gap-1 shadow-xs">
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>{r.status === 'credited' ? 'सक्रिय व सत्यापित (Active)' : 'प्रक्रियाधीन (Pending)'}</span>
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                    {/* 1. Kisne Join Kiya */}
+                    <div className="bg-slate-50 p-3 rounded-lg border border-gray-200 space-y-0.5">
+                      <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-wider">
+                        👤 किसने ज्वाइन किया (Joined By):
+                      </span>
+                      <strong className="text-slate-900 text-sm block truncate">{r.referredName}</strong>
+                      <span className="text-[11px] text-emerald-700 font-semibold block">अधिकृत पंजीकृत विद्यार्थी</span>
+                    </div>
+
+                    {/* 2. Kya User ID Hai */}
+                    <div className="bg-blue-50/70 p-3 rounded-lg border border-blue-200 space-y-0.5">
+                      <span className="text-[10px] text-blue-900 font-bold block uppercase tracking-wider">
+                        🆔 क्या यूजर 🆔 है (User ID):
+                      </span>
+                      <span className="font-mono-acc font-black text-[#2874f0] text-sm block">
+                        {r.referredAccId}
+                      </span>
+                      <span className="text-[11px] text-slate-500 block">Unique Registered ID</span>
+                    </div>
+
+                    {/* 3. Kya Join Kiya */}
+                    <div className="bg-emerald-50/70 p-3 rounded-lg border border-emerald-200 space-y-0.5">
+                      <span className="text-[10px] text-emerald-900 font-bold block uppercase tracking-wider">
+                        📦 क्या ज्वाइन किया (Plan Joined):
+                      </span>
+                      <strong className="text-emerald-800 text-xs block font-bold">
+                        {r.plan === 'SWIS'
+                          ? 'SWIS System (3.30% रिचार्ज कमीशन)'
+                          : r.plan === 'TWIS'
+                          ? 'TWIS System (टीम रेफरल ₹150/दोस्त)'
+                          : `${r.plan} System`}
+                      </strong>
+                      <span className="text-[11px] text-emerald-700 block">₹249 एक्टिवेशन चार्ज चुकता</span>
+                    </div>
+
+                    {/* 4. Kab Join Kiya */}
+                    <div className="bg-amber-50/70 p-3 rounded-lg border border-amber-200 space-y-0.5">
+                      <span className="text-[10px] text-amber-900 font-bold block uppercase tracking-wider">
+                        📅 कब ज्वाइन किया (Join Date & Time):
+                      </span>
+                      <strong className="text-slate-900 text-xs block font-mono-acc truncate">
+                        {r.date}
+                      </strong>
+                      <span className="text-[11px] text-emerald-700 font-bold block">
+                        +₹{r.bonusAmount || 150} रेफरल बोनस वॉलेट में प्राप्त ✓
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 100% Privacy Protection System - No leak of contact address or personal phone links */}
+                  <div className="pt-2 border-t border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5 text-xs text-slate-500">
+                    <span className="flex items-center gap-1.5 text-[11px] text-slate-600 font-medium">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>🔒 पूर्ण गोपनीयता सुरक्षित: सुरक्षा नीति के तहत संपर्क नंबर व निवास पता निजी व गोपनीय है।</span>
+                    </span>
+                    <span className="text-[11px] text-blue-700 font-semibold bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                      ✓ अधिकृत स्पॉन्सर: {currentUser.accId}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Quick CTA to Promotion & Branding Hub */}
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-200 text-amber-800 flex items-center justify-center shrink-0">
+                <Megaphone className="w-5 h-5 text-amber-700 animate-pulse" />
+              </div>
+              <div>
+                <h4 className="font-bold text-slate-900 text-sm">
+                  ACC पोस्टर स्टाइल विजिटिंग कार्ड व पोस्टर्स
+                </h4>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  अपने नाम और स्पॉन्सर 🆔 <strong>{currentUser.accId}</strong> के साथ रंगीन प्रचार पोस्टर व कार्ड डाउनलोड करें।
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                if (onNavigateToPromotions) onNavigateToPromotions();
+                else setActiveTab('profile');
+              }}
+              className="px-5 py-2.5 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold text-xs rounded-sm shadow-md shrink-0 flex items-center gap-1.5 transition"
+            >
+              <Megaphone className="w-4 h-4 text-yellow-300" />
+              <span>🎨 विजिटिंग कार्ड व पोस्टर हब खोलें</span>
+            </button>
           </div>
         </div>
       )}
@@ -1932,6 +2572,553 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
         </div>
       )}
 
+      {/* ========================================================================= */}
+      {/* REFERRALS TEAM & MASKED PRIVACY CONTROL MODAL */}
+      {/* ========================================================================= */}
+      {showReferralsPrivacyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fadeIn overflow-y-auto">
+          <div className="w-full max-w-3xl bg-white border border-gray-200 rounded-2xl shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col animate-scaleUp text-slate-900">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-[#2874f0] via-[#1c52b8] to-[#124296] text-white p-4 sm:p-5 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center text-white shrink-0">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white leading-tight">
+                    रेफरल सदस्य विवरण एवं प्राइवेसी कंट्रोल हब
+                  </h3>
+                  <p className="text-xs text-blue-100 flex items-center gap-1.5 mt-0.5">
+                    <span>स्पॉन्सर 🆔:</span>
+                    <strong className="text-yellow-300 font-mono-acc">{currentUser.accId}</strong>
+                    <span>•</span>
+                    <span className="flex items-center gap-1 text-emerald-300 font-bold">
+                      <ShieldCheck className="w-3.5 h-3.5" /> 100% मास्क्ड प्राइवेसी सुरक्षित
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowReferralsPrivacyModal(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-base font-bold transition shrink-0"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Navigation Tabs */}
+            <div className="bg-slate-100 border-b border-gray-200 p-2 flex items-center gap-2 shrink-0 overflow-x-auto no-scrollbar">
+              <button
+                type="button"
+                onClick={() => setReferralModalTab('members')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                  referralModalTab === 'members'
+                    ? 'bg-[#2874f0] text-white shadow-xs'
+                    : 'bg-white text-slate-700 hover:bg-slate-200 border border-gray-200'
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                <span>1. मेरे रेफरल छात्र/सदस्य ({referrals.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setReferralModalTab('privacy')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                  referralModalTab === 'privacy'
+                    ? 'bg-[#2874f0] text-white shadow-xs'
+                    : 'bg-white text-slate-700 hover:bg-slate-200 border border-gray-200'
+                }`}
+              >
+                <Lock className="w-4 h-4" />
+                <span>2. प्राइवेसी सेटिंग्स (पब्लिक / प्राइवेट चयन)</span>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1 text-xs">
+              {privacySaveSuccessMsg && (
+                <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-lg text-emerald-900 font-bold flex items-center gap-2 animate-fadeIn shadow-xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{privacySaveSuccessMsg}</span>
+                </div>
+              )}
+
+              {/* TAB 1: MEMBERS LIST WITH MASKED PRIVACY */}
+              {referralModalTab === 'members' && (
+                <div className="space-y-4">
+                  {/* Security Notice & Live Masking Toggle */}
+                  <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-[#2874f0] shrink-0" />
+                      <div>
+                        <span className="font-bold text-slate-900 block">
+                          डेटा प्राइवेसी व सुरक्षा एन्क्रिप्शन सक्रिय
+                        </span>
+                        <span className="text-[11px] text-slate-600 block">
+                          केवल <strong>User ID</strong>, <strong>Name</strong>, <strong>Joining Date</strong> व <strong>Plan Name</strong> मान्य है। व्यक्तिगत मोबाइल व पता पूर्णतः सुरक्षित व निजी है।
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setMaskingEnabled(!maskingEnabled)}
+                      className={`px-3 py-1.5 rounded-lg font-bold text-[11px] flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
+                        maskingEnabled
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'bg-slate-200 text-slate-800 hover:bg-slate-300'
+                      }`}
+                    >
+                      {maskingEnabled ? <Lock className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      <span>{maskingEnabled ? 'मास्किंग: सक्रिय (ON)' : 'मास्किंग: सामान्य'}</span>
+                    </button>
+                  </div>
+
+                  {referrals.length === 0 ? (
+                    <div className="p-8 text-center bg-slate-50 border border-gray-200 rounded-xl space-y-2">
+                      <Users className="w-10 h-10 text-slate-400 mx-auto" />
+                      <h4 className="font-bold text-slate-800 text-sm">
+                        वर्तमान में आपकी स्पॉन्सर 🆔 से कोई सदस्य नहीं जुड़ा है
+                      </h4>
+                      <p className="text-slate-500 max-w-md mx-auto text-[11px]">
+                        जब भी कोई साथी आपकी स्पॉन्सर 🆔 ({currentUser.accId}) से जुड़ेगा, तो केवल उसका अधिकृत <strong>यूजर 🆔, नाम, प्लान और तारीख</strong> यहाँ दिखेगा।
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleShareWhatsApp}
+                        className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-xs transition"
+                      >
+                        <Share2 className="w-3.5 h-3.5" />
+                        <span>रेफरल लिंक WhatsApp पर शेयर करें</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-slate-600 font-semibold px-1">
+                        <span>कुल डायरेक्ट टीम सदस्य: <strong>{referrals.length}</strong></span>
+                        <span className="text-emerald-700 font-bold font-mono-acc">
+                          कुल आय: ₹{(referrals.length * 150).toFixed(2)}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2.5">
+                        {referrals.map((r, idx) => {
+                          const displayId =
+                            maskingEnabled && privacySettings.showUserAccIdPublic === false
+                              ? maskUserId(r.referredAccId)
+                              : r.referredAccId;
+                          const displayName =
+                            maskingEnabled && privacySettings.showFullNamePublic === false
+                              ? maskName(r.referredName)
+                              : r.referredName;
+                          const displayDate =
+                            privacySettings.showJoiningDatePublic === false
+                              ? (r.date.split(' ')[0] || r.date)
+                              : r.date;
+                          const displayBonus =
+                            privacySettings.showReferralBonusPublic === false
+                              ? '₹*** (सुरक्षित)'
+                              : `+₹${r.bonusAmount || 150}.00`;
+
+                          return (
+                            <div
+                              key={r.id || idx}
+                              className="bg-white border-2 border-slate-200 hover:border-blue-400 rounded-xl p-3.5 shadow-xs transition space-y-2.5"
+                            >
+                              <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-6 h-6 rounded-full bg-[#2874f0] text-white font-black text-[11px] flex items-center justify-center shadow-xs">
+                                    {idx + 1}
+                                  </span>
+                                  <div>
+                                    <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                                      <span>{displayName}</span>
+                                      <span className="bg-blue-50 text-[#2874f0] font-mono-acc font-black text-xs px-2 py-0.5 rounded border border-blue-200">
+                                        🆔 {displayId}
+                                      </span>
+                                    </h4>
+                                  </div>
+                                </div>
+
+                                <span className="bg-emerald-50 text-emerald-800 text-[11px] font-bold px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                                  <Check className="w-3 h-3 text-emerald-600" />
+                                  <span>सत्यापित ✓</span>
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                                <div className="bg-slate-50 p-2 rounded-lg border border-gray-200">
+                                  <span className="text-slate-500 block">📦 प्लान नाम:</span>
+                                  <strong className="text-slate-900 font-bold block mt-0.5">
+                                    {r.plan === 'SWIS' ? 'SWIS (3.30% रिचार्ज)' : 'TWIS (₹150 रेफरल)'}
+                                  </strong>
+                                </div>
+
+                                <div className="bg-slate-50 p-2 rounded-lg border border-gray-200">
+                                  <span className="text-slate-500 block">📅 ज्वाइनिंग तिथि:</span>
+                                  <strong className="text-slate-900 font-mono-acc block mt-0.5">
+                                    {displayDate}
+                                  </strong>
+                                </div>
+
+                                <div className="bg-emerald-50/70 p-2 rounded-lg border border-emerald-200">
+                                  <span className="text-emerald-800 block">💰 रेफरल बोनस:</span>
+                                  <strong className="text-emerald-700 font-mono-acc font-black block mt-0.5">
+                                    {displayBonus}
+                                  </strong>
+                                </div>
+
+                                <div className="bg-purple-50/70 p-2 rounded-lg border border-purple-200">
+                                  <span className="text-purple-800 block">🔒 प्राइवेसी शील्ड:</span>
+                                  <span className="text-purple-900 font-bold flex items-center gap-1 mt-0.5">
+                                    <Lock className="w-3 h-3 text-purple-700" />
+                                    <span>फोन व पता निजी</span>
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 2: PRIVACY SELECTION CONTROLS (PUBLIC vs PRIVATE) */}
+              {referralModalTab === 'privacy' && (
+                <div className="space-y-4">
+                  <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4 space-y-1">
+                    <h4 className="font-bold text-indigo-950 text-sm flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-indigo-600" />
+                      <span>आप स्वयं चुनें कि क्या पब्लिक रखना है और क्या प्राइवेट:</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-600">
+                      नीचे दिए गए विकल्पों से आप अपनी डिजिटल प्रोफाइल, कार्ड एवं रेफरल नेटवर्क में अपने डेटा की विजिबिलिटी को पूरी स्वतंत्रता से नियंत्रित कर सकते हैं।
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    {/* 1. User ID Public/Private */}
+                    <div className="bg-white border border-gray-200 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                      <div>
+                        <strong className="text-slate-900 block text-xs">
+                          1. यूजर 🆔 विजिबिलिटी (User ID Visibility)
+                        </strong>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          पब्लिक रखने पर पूरी 🆔 ({currentUser.accId}) दिखेगी, प्राइवेट रखने पर मास्क होगी ({maskUserId(currentUser.accId)})।
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = { ...privacySettings, showUserAccIdPublic: true };
+                            handleSavePrivacyDirect(updated);
+                          }}
+                          className={`px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer ${
+                            privacySettings.showUserAccIdPublic !== false
+                              ? 'bg-emerald-600 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          🌐 पब्लिक (दिखाएं)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = { ...privacySettings, showUserAccIdPublic: false };
+                            handleSavePrivacyDirect(updated);
+                          }}
+                          className={`px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer ${
+                            privacySettings.showUserAccIdPublic === false
+                              ? 'bg-purple-700 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          🔒 प्राइवेट (मास्क)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 2. Full Name Public/Private */}
+                    <div className="bg-white border border-gray-200 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                      <div>
+                        <strong className="text-slate-900 block text-xs">
+                          2. सदस्य नाम विजिबिलिटी (Full Name Visibility)
+                        </strong>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          पब्लिक रखने पर पूरा नाम ({currentUser.fullName}) दिखेगा, प्राइवेट रखने पर संक्षिप्त ({maskName(currentUser.fullName)}) दिखेगा।
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = { ...privacySettings, showFullNamePublic: true };
+                            handleSavePrivacyDirect(updated);
+                          }}
+                          className={`px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer ${
+                            privacySettings.showFullNamePublic !== false
+                              ? 'bg-emerald-600 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          🌐 पब्लिक (दिखाएं)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = { ...privacySettings, showFullNamePublic: false };
+                            handleSavePrivacyDirect(updated);
+                          }}
+                          className={`px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer ${
+                            privacySettings.showFullNamePublic === false
+                              ? 'bg-purple-700 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          🔒 प्राइवेट (मास्क)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 3. Referral Bonus Public/Private */}
+                    <div className="bg-white border border-gray-200 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                      <div>
+                        <strong className="text-slate-900 block text-xs">
+                          3. रेफरल बोनस आय (Referral Bonus Visibility)
+                        </strong>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          पब्लिक रखने पर अर्जित बोनस राशि दिखेगी, प्राइवेट रखने पर सुरक्षित चिन्ह (₹***) रहेगा।
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = { ...privacySettings, showReferralBonusPublic: true };
+                            handleSavePrivacyDirect(updated);
+                          }}
+                          className={`px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer ${
+                            privacySettings.showReferralBonusPublic !== false
+                              ? 'bg-emerald-600 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          🌐 पब्लिक (दिखाएं)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = { ...privacySettings, showReferralBonusPublic: false };
+                            handleSavePrivacyDirect(updated);
+                          }}
+                          className={`px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer ${
+                            privacySettings.showReferralBonusPublic === false
+                              ? 'bg-purple-700 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          🔒 प्राइवेट (छुपाएं)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 4. Joining Date Public/Private */}
+                    <div className="bg-white border border-gray-200 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                      <div>
+                        <strong className="text-slate-900 block text-xs">
+                          4. ज्वाइनिंग तिथि (Joining Date Visibility)
+                        </strong>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          पब्लिक रखने पर सटीक समय व तारीख दिखेगी, प्राइवेट रखने पर केवल माह व वर्ष दिखेगा।
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = { ...privacySettings, showJoiningDatePublic: true };
+                            handleSavePrivacyDirect(updated);
+                          }}
+                          className={`px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer ${
+                            privacySettings.showJoiningDatePublic !== false
+                              ? 'bg-emerald-600 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          🌐 पब्लिक (दिखाएं)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = { ...privacySettings, showJoiningDatePublic: false };
+                            handleSavePrivacyDirect(updated);
+                          }}
+                          className={`px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer ${
+                            privacySettings.showJoiningDatePublic === false
+                              ? 'bg-purple-700 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          🔒 प्राइवेट (छुपाएं)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 5. Mobile Number on ID Card */}
+                    <div className="bg-white border border-gray-200 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                      <div>
+                        <strong className="text-slate-900 block text-xs">
+                          5. मोबाइल नंबर प्राइवेसी (Mobile Number Privacy)
+                        </strong>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          पब्लिक रखने पर पूर्ण नंबर दिखेगा, प्राइवेट रखने पर मास्क रहेगा ({currentUser.mobile.slice(0, 5)}***** )।
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = { ...privacySettings, showMobile: true };
+                            handleSavePrivacyDirect(updated);
+                          }}
+                          className={`px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer ${
+                            privacySettings.showMobile === true
+                              ? 'bg-emerald-600 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          🌐 पब्लिक (दिखाएं)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = { ...privacySettings, showMobile: false };
+                            handleSavePrivacyDirect(updated);
+                          }}
+                          className={`px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer ${
+                            !privacySettings.showMobile
+                              ? 'bg-purple-700 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          🔒 प्राइवेट (मास्क)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 6. WhatsApp Button on Card */}
+                    <div className="bg-white border border-gray-200 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                      <div>
+                        <strong className="text-slate-900 block text-xs">
+                          6. WhatsApp डायरेक्ट चैट बटन (WhatsApp Direct Chat)
+                        </strong>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          पब्लिक रखने पर आपका व्हाट्सएप बटन सक्रिय रहेगा, प्राइवेट रखने पर लॉक/छुपा रहेगा।
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = { ...privacySettings, showWhatsapp: true };
+                            handleSavePrivacyDirect(updated);
+                          }}
+                          className={`px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer ${
+                            privacySettings.showWhatsapp === true
+                              ? 'bg-emerald-600 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          🌐 पब्लिक (दिखाएं)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = { ...privacySettings, showWhatsapp: false };
+                            handleSavePrivacyDirect(updated);
+                          }}
+                          className={`px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer ${
+                            !privacySettings.showWhatsapp
+                              ? 'bg-purple-700 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          🔒 प्राइवेट (छुपाएं)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 7. City / Location Privacy */}
+                    <div className="bg-white border border-gray-200 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                      <div>
+                        <strong className="text-slate-900 block text-xs">
+                          7. शहर व निवास स्थान (City / Location Privacy)
+                        </strong>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          पब्लिक रखने पर शहर व राज्य दिखेगा, प्राइवेट रखने पर पूर्णतः गुप्त रहेगा।
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = { ...privacySettings, showCity: true };
+                            handleSavePrivacyDirect(updated);
+                          }}
+                          className={`px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer ${
+                            privacySettings.showCity !== false
+                              ? 'bg-emerald-600 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          🌐 पब्लिक (दिखाएं)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = { ...privacySettings, showCity: false };
+                            handleSavePrivacyDirect(updated);
+                          }}
+                          className={`px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer ${
+                            privacySettings.showCity === false
+                              ? 'bg-purple-700 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          🔒 प्राइवेट (छुपाएं)
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-slate-50 border-t border-gray-200 p-3 sm:p-4 flex items-center justify-between gap-3 shrink-0">
+              <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>सुरक्षा गारंटी: आपकी चयनित प्राइवेसी सेटिंग्स तत्काल प्रभाव से लागू हैं।</span>
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setShowReferralsPrivacyModal(false)}
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition shadow-xs cursor-pointer"
+              >
+                पूर्ण / बंद करें
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* WhatsApp Style DP / QR Image Cropper Modal */}
       {cropperSrc && (
         <ImageCropperModal
@@ -1946,6 +3133,427 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
           onCropComplete={handleCropperComplete}
           onCancel={() => setCropperSrc(null)}
         />
+      )}
+
+      {/* ========================================================================= */}
+      {/* 3.30% RECHARGE COMMISSION GUIDE COMPLETE MODAL */}
+      {/* ========================================================================= */}
+      {showRechargeGuideModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fadeIn overflow-y-auto">
+          <div className="w-full max-w-2xl bg-white border border-gray-200 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto text-slate-800">
+            {/* Header */}
+            <div className="flex items-start justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-green-50 text-emerald-600 flex items-center justify-center font-bold border border-green-200 shrink-0">
+                  <Zap className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900">
+                    3.30% रिचार्ज कमीशन गाइड (SWIS System)
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Jio, Airtel, Vi, BSNL एवं DTH रिचार्ज पर सीधा 3.30% कमीशन प्राप्त करने की विस्तृत विधि
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleDownloadRechargeGuide}
+                  className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded text-xs font-bold flex items-center gap-1 transition"
+                  title="PDF / फाइल डाउनलोड करें"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">डाउनलोड</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowRechargeGuideModal(false)}
+                  className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700 transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Live Interactive Commission Calculator */}
+            <div className="bg-gradient-to-r from-emerald-50 via-green-50 to-emerald-50 p-4 rounded-xl border border-emerald-200 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                  <Calculator className="w-4 h-4 text-emerald-600" />
+                  <span>लाइव रिचार्ज कमीशन कैलकुलेटर (Live Calculator):</span>
+                </span>
+                <span className="text-[11px] font-bold text-emerald-800 bg-white px-2 py-0.5 rounded border border-emerald-200">
+                  फिक्स्ड दर: 3.30%
+                </span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">
+                <div className="w-full sm:w-2/3">
+                  <label className="text-[10px] text-slate-500 block mb-1">रिचार्ज राशि दर्ज करें या चुनें (₹):</label>
+                  <input
+                    type="number"
+                    value={rechargeCalcAmount}
+                    onChange={(e) => setRechargeCalcAmount(Math.max(10, Number(e.target.value) || 0))}
+                    className="w-full bg-white border border-gray-300 rounded px-3 py-1.5 text-sm font-bold text-slate-900 font-mono-acc focus:outline-none focus:border-emerald-600"
+                    placeholder="उदा. 299, 749, 2999"
+                  />
+                  <div className="flex gap-1.5 mt-2 flex-wrap">
+                    {[199, 299, 349, 666, 749, 859, 1999, 2999].map((amt) => (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => setRechargeCalcAmount(amt)}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono transition ${
+                          rechargeCalcAmount === amt
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-white border border-gray-200 hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        ₹{amt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="w-full sm:w-1/3 bg-white p-3 rounded-xl border border-emerald-300 text-center shadow-xs">
+                  <span className="text-[10px] text-slate-500 block">आपको मिलने वाला कमीशन</span>
+                  <span className="font-mono-acc font-black text-2xl text-emerald-700 block">
+                    ₹{((rechargeCalcAmount * 3.3) / 100).toFixed(2)}
+                  </span>
+                  <span className="text-[9px] text-emerald-800 font-bold block mt-0.5">
+                    सीधा वॉलेट में तुरंत जमा ✓
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Operator Commission Table */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-slate-900">ऑपरेटर अनुसार 3.30% फिक्स्ड कमीशन तालिका</h4>
+              <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-[#f1f2f4] text-slate-800 font-bold">
+                    <tr>
+                      <th className="p-2.5">ऑपरेटर</th>
+                      <th className="p-2.5">कमीशन</th>
+                      <th className="p-2.5">₹299 मासिक</th>
+                      <th className="p-2.5">₹749 त्रैमासिक</th>
+                      <th className="p-2.5">₹2999 वार्षिक</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 font-sans">
+                    <tr className="hover:bg-slate-50">
+                      <td className="p-2.5 font-bold text-slate-900">Jio Prepaid & Postpaid</td>
+                      <td className="p-2.5 font-bold text-emerald-700">3.30%</td>
+                      <td className="p-2.5 font-mono">₹9.86</td>
+                      <td className="p-2.5 font-mono">₹24.71</td>
+                      <td className="p-2.5 font-mono">₹98.96</td>
+                    </tr>
+                    <tr className="hover:bg-slate-50">
+                      <td className="p-2.5 font-bold text-slate-900">Airtel Prepaid & Postpaid</td>
+                      <td className="p-2.5 font-bold text-emerald-700">3.30%</td>
+                      <td className="p-2.5 font-mono">₹9.86</td>
+                      <td className="p-2.5 font-mono">₹24.71</td>
+                      <td className="p-2.5 font-mono">₹98.96</td>
+                    </tr>
+                    <tr className="hover:bg-slate-50">
+                      <td className="p-2.5 font-bold text-slate-900">Vi (Vodafone Idea)</td>
+                      <td className="p-2.5 font-bold text-emerald-700">3.30%</td>
+                      <td className="p-2.5 font-mono">₹9.86</td>
+                      <td className="p-2.5 font-mono">₹24.71</td>
+                      <td className="p-2.5 font-mono">₹98.96</td>
+                    </tr>
+                    <tr className="hover:bg-slate-50">
+                      <td className="p-2.5 font-bold text-slate-900">BSNL Prepaid & Postpaid</td>
+                      <td className="p-2.5 font-bold text-emerald-700">3.30%</td>
+                      <td className="p-2.5 font-mono">₹9.86</td>
+                      <td className="p-2.5 font-mono">₹24.71</td>
+                      <td className="p-2.5 font-mono">₹98.96</td>
+                    </tr>
+                    <tr className="hover:bg-slate-50">
+                      <td className="p-2.5 font-bold text-slate-900">DTH (Tata Play, Dish, Sun, D2H)</td>
+                      <td className="p-2.5 font-bold text-emerald-700">3.30%</td>
+                      <td className="p-2.5 font-mono">₹9.86 (₹300)</td>
+                      <td className="p-2.5 font-mono">₹24.75 (₹750)</td>
+                      <td className="p-2.5 font-mono">-</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Comparison with PhonePe / Google Pay */}
+            <div className="bg-amber-50/60 p-3.5 rounded-xl border border-amber-200 text-xs space-y-1.5">
+              <span className="font-bold text-amber-950 block">⚡ PhonePe / Google Pay vs ACC Real App का अंतर:</span>
+              <ul className="space-y-1 text-slate-700 list-disc list-inside">
+                <li>
+                  <strong>PhonePe / Google Pay:</strong> ₹2 से ₹3 प्रति रिचार्ज का सुविधा शुल्क (Platform Fee) आपके खाते से काटते हैं।
+                </li>
+                <li>
+                  <strong>ACC Real App:</strong> ₹0 एक्स्ट्रा चार्ज + <strong>3.30% शुद्ध कमीशन</strong> सीधा आपके वॉलेट में तुरंत जमा होता है!
+                </li>
+                <li>
+                  यदि आप महीने में 20 रिचार्ज करते हैं, तो आप PhonePe के ₹60 बचाते हैं और ACC पर ₹200+ अतिरिक्त कमीशन कमाते हैं।
+                </li>
+              </ul>
+            </div>
+
+            {/* 5-Step Instructions */}
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-gray-200 text-xs space-y-1.5">
+              <span className="font-bold text-slate-900 block">📲 रिचार्ज करने की 5-स्टेप सरल विधि:</span>
+              <ol className="space-y-1 text-slate-700 list-decimal list-inside font-medium">
+                <li>ACC आधिकारिक Android ऐप में अपनी 🆔 <strong>{currentUser.accId}</strong> से लॉगिन करें।</li>
+                <li>'Recharge & Bill' विकल्प पर क्लिक कर ग्राहक का 10-अंकों का मोबाइल नंबर दर्ज करें।</li>
+                <li>प्लान चुनें (उदा. ₹299, ₹749 या ₹2999)।</li>
+                <li>UPI द्वारा सुरक्षित भुगतान पूरा करें।</li>
+                <li>3.30% कमीशन सीधा आपके वॉलेट में तुरंत जमा हो जाएगा, जिसे कभी भी बैंक में निकाल सकते हैं।</li>
+              </ol>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={handleDownloadRechargeGuide}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 transition shadow-xs"
+              >
+                <Download className="w-4 h-4" />
+                <span>कमीशन गाइड फाइल डाउनलोड करें</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowRechargeGuideModal(false)}
+                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition"
+              >
+                बंद करें
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* DAILY SELF WORK MANUAL COMPLETE MODAL */}
+      {/* ========================================================================= */}
+      {showDailyWorkManualModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fadeIn overflow-y-auto">
+          <div className="w-full max-w-2xl bg-white border border-gray-200 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto text-slate-800">
+            {/* Header */}
+            <div className="flex items-start justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#2874f0] flex items-center justify-center font-bold border border-blue-200 shrink-0">
+                  <FileText className="w-5 h-5 text-[#2874f0]" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900">
+                    डेली सेल्फ वर्क मैनुअल (15-30 मिनट दैनिक ब्लूप्रिंट)
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    रोजाना 15-30 मिनट मोबाइल वर्क करके अतिरिक्त दैनिक आय अर्जित करने का व्यवस्थित ब्लूप्रिंट
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleDownloadDailyWorkManual}
+                  className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-[#2874f0] border border-blue-200 rounded text-xs font-bold flex items-center gap-1 transition"
+                  title="PDF / फाइल डाउनलोड करें"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">डाउनलोड</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDailyWorkManualModal(false)}
+                  className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700 transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* 3-Time Daily Blueprint */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-slate-900">📅 दैनिक 3-टाइम रूटीन (The 15-30 Minute Blueprint)</h4>
+
+              <div className="space-y-2.5">
+                {/* 1. Morning */}
+                <div className="bg-slate-50 p-3 rounded-xl border border-gray-200 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-[#2874f0]" />
+                      <span>1. सुबह 8:00 AM - 8:15 AM (15 मिनट): स्टेटस अपडेट व दिन की शुरुआत</span>
+                    </span>
+                    <span className="text-[10px] bg-blue-100 text-[#2874f0] font-bold px-2 py-0.5 rounded font-mono">
+                      MORNING
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    WhatsApp स्टेटस पर ACC का रिचार्ज डिस्काउंट पोस्टर या TWIS ₹150 अर्निंग प्रूफ लगाएं। अपने कॉलेज/कोचिंग ग्रुप्स में अपना रेफरल लिंक और स्पॉन्सर 🆔 शेयर करें।
+                  </p>
+                </div>
+
+                {/* 2. Afternoon */}
+                <div className="bg-slate-50 p-3 rounded-xl border border-gray-200 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-amber-600" />
+                      <span>2. दोपहर 1:00 PM - 1:10 PM (10 मिनट): कॉलेज ब्रेक - रिस्पॉन्स व क्वेरी समाधान</span>
+                    </span>
+                    <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded font-mono">
+                      AFTERNOON
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    जिन दोस्तों ने स्टेटस देखकर पूछा "यह क्या है?", उन्हें रेडी-मेड 3-लाइन मैसेज भेजें। उन्हें बताएं कि वे अपने फोन के रिचार्ज पर 3.30% बचा सकते हैं और दोस्तों को रेफर करके ₹150 कमा सकते हैं।
+                  </p>
+                </div>
+
+                {/* 3. Night */}
+                <div className="bg-slate-50 p-3 rounded-xl border border-gray-200 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>3. रात 8:00 PM - 8:15 PM (15 मिनट): एक्टिवेशन फॉलो-अप एवं वॉलेट निकासी</span>
+                    </span>
+                    <span className="text-[10px] bg-emerald-100 text-emerald-900 font-bold px-2 py-0.5 rounded font-mono">
+                      NIGHT
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    दिलचस्पी रखने वाले दोस्तों को अपनी Sponsor ID: <strong>{currentUser.accId}</strong> से ₹249 एक्टिवेशन पूरा कराएं। प्रति एक्टिवेशन ₹150 बोनस तुरंत वॉलेट में चेक करें और UPI द्वारा बैंक में निकालें।
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Ready-Made Viral Message Scripts */}
+            <div className="space-y-2.5">
+              <h4 className="text-xs font-bold text-slate-900">📢 2 रेडी-मेड वायरल मैसेज स्क्रिप्ट्स (एक क्लिक में कॉपी करें)</h4>
+
+              {/* Script 1 */}
+              <div className="bg-blue-50/70 p-3 rounded-xl border border-blue-200 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-[#2874f0] text-xs">स्क्रिप्ट 1 (कॉलेज दोस्तों के लिए):</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const msg = `नमस्ते भाई! मैं कॉलेज के साथ अपने फोन से 15-20 मिनट काम करके अपनी पॉकेट मनी कमा रहा हूँ। PhonePe/GPay के एक्स्ट्रा चार्ज से बचकर रिचार्ज पर 3.30% कमीशन मिलता है और हर दोस्त को जोड़ने पर सीधा ₹150 बैंक में आता है। तू भी देख ले: ${window.location.origin}/?sponsor=${currentUser.accId} (Sponsor ID: ${currentUser.accId})`;
+                      navigator.clipboard.writeText(msg);
+                      setCopiedScriptId('script1');
+                      setTimeout(() => setCopiedScriptId(null), 2500);
+                    }}
+                    className="px-2.5 py-1 bg-white hover:bg-blue-100 text-[#2874f0] border border-blue-300 rounded text-[11px] font-bold flex items-center gap-1 shadow-xs transition"
+                  >
+                    <Copy className="w-3 h-3" />
+                    <span>{copiedScriptId === 'script1' ? 'कॉपी हो गया ✓' : 'कॉपी करें'}</span>
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-700 leading-relaxed bg-white/80 p-2 rounded border border-blue-100 font-medium">
+                  "नमस्ते भाई! मैं कॉलेज के साथ अपने फोन से 15-20 मिनट काम करके अपनी पॉकेट मनी कमा रहा हूँ। PhonePe/GPay के एक्स्ट्रा चार्ज से बचकर रिचार्ज पर 3.30% कमीशन मिलता है और हर दोस्त को जोड़ने पर सीधा ₹150 बैंक में आता है। तू भी देख ले: {window.location.origin}/?sponsor={currentUser.accId} (Sponsor ID: {currentUser.accId})"
+                </p>
+              </div>
+
+              {/* Script 2 */}
+              <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-200 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-emerald-800 text-xs">स्क्रिप्ट 2 (रिचार्ज डिस्काउंट - परिवार व पड़ोसी):</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const msg = `नमस्ते! अगर आप अपने घर के Jio, Airtel, Vi या BSNL का रिचार्ज कराते हैं, तो PhonePe या GPay के ₹2-₹3 एक्स्ट्रा चार्ज मत दीजिए। ACC पर सीधा 3.30% कैशबैक मिलता है। मुझसे करवाएं या खुद अपनी ID बना लें: ${window.location.origin}/?sponsor=${currentUser.accId}`;
+                      navigator.clipboard.writeText(msg);
+                      setCopiedScriptId('script2');
+                      setTimeout(() => setCopiedScriptId(null), 2500);
+                    }}
+                    className="px-2.5 py-1 bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded text-[11px] font-bold flex items-center gap-1 shadow-xs transition"
+                  >
+                    <Copy className="w-3 h-3" />
+                    <span>{copiedScriptId === 'script2' ? 'कॉपी हो गया ✓' : 'कॉपी करें'}</span>
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-700 leading-relaxed bg-white/80 p-2 rounded border border-emerald-100 font-medium">
+                  "नमस्ते! अगर आप अपने घर के Jio, Airtel, Vi या BSNL का रिचार्ज कराते हैं, तो PhonePe या GPay के ₹2-₹3 एक्स्ट्रा चार्ज मत दीजिए। ACC पर सीधा 3.30% कैशबैक मिलता है। मुझसे करवाएं या खुद अपनी ID बना लें: {window.location.origin}/?sponsor={currentUser.accId}"
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={handleDownloadDailyWorkManual}
+                className="flex-1 py-2.5 bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 transition shadow-xs"
+              >
+                <Download className="w-4 h-4" />
+                <span>वर्क मैनुअल फाइल डाउनलोड करें</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowDailyWorkManualModal(false)}
+                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition"
+              >
+                बंद करें
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* CERTIFICATE OF COMPLETION MODAL */}
+      {/* ========================================================================= */}
+      {showCertificateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fadeIn overflow-y-auto">
+          <div className="w-full max-w-lg bg-white border-4 border-[#2874f0] rounded-2xl p-6 shadow-2xl space-y-4 text-center text-slate-800 animate-scaleUp">
+            <div className="w-16 h-16 rounded-full bg-yellow-100 border-2 border-yellow-400 text-yellow-600 flex items-center justify-center mx-auto shadow-md">
+              <Award className="w-9 h-9" />
+            </div>
+
+            <span className="text-[11px] font-black uppercase tracking-widest text-[#2874f0] block">
+              CERTIFICATE OF COMPLETION • ACC SKILL ACADEMY
+            </span>
+
+            <h3 className="text-xl font-black text-slate-900 font-display">
+              प्रमाणित विद्यार्थी कौशल प्रमाणपत्र
+            </h3>
+
+            <p className="text-xs text-slate-600">यह प्रमाणित किया जाता है कि</p>
+
+            <div className="py-2 border-y border-dashed border-gray-300">
+              <h2 className="text-lg font-black text-[#2874f0]">{currentUser.fullName}</h2>
+              <span className="font-mono-acc font-bold text-xs text-slate-700">Member ID: {currentUser.accId}</span>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              ने <strong>Achievers Club Community (ACC) विद्यार्थी डिजिटल स्किल अकेडमी</strong> के सभी 5 मॉड्यूल्स (SWIS 3.30% रिचार्ज सिस्टम, TWIS ₹150 रेफरल लीडरशिप, सोशल मीडिया मार्केटिंग एवं पर्सनल ब्रांडिंग) को सफलतापूर्वक पूर्ण किया है।
+            </p>
+
+            <div className="pt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  window.print();
+                }}
+                className="flex-1 py-2.5 bg-[#2874f0] hover:bg-blue-600 text-white font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 transition shadow-sm"
+              >
+                <Printer className="w-4 h-4" />
+                <span>सर्टिफिकेट प्रिंट / सहेजें</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCertificateModal(false)}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition"
+              >
+                बंद करें
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

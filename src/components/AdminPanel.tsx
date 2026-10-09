@@ -51,6 +51,7 @@ import {
   DollarSign,
   UserCheck,
   KeyRound,
+  Printer,
 } from 'lucide-react';
 import { Member, PlanType, VerificationStatus, WithdrawalRequest, AppServiceItem, PromotionalPoster, SiteConfig } from '../types';
 import { StorageService, subscribeToSync, SEED_MEMBERS } from '../services/storage';
@@ -69,7 +70,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   const [adminPasswordError, setAdminPasswordError] = useState('');
 
   // Main Admin Navigation Tab
-  const [adminTab, setAdminTab] = useState<'members' | 'withdrawals' | 'website_cms'>('members');
+  const [adminTab, setAdminTab] = useState<'members' | 'form_responses' | 'withdrawals' | 'website_cms'>('members');
+  const [formResponseModalMember, setFormResponseModalMember] = useState<Member | null>(null);
 
   const [members, setMembers] = useState<Member[]>(StorageService.getMembers());
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>(StorageService.getWithdrawals());
@@ -868,7 +870,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
         </div>
       )}
 
-      {/* 3 Main Admin Primary Tabs */}
+      {/* Main Admin Primary Tabs */}
       <div className="flex bg-white border border-gray-200 rounded-xl p-1 gap-1 overflow-x-auto no-scrollbar shadow-xs">
         <button
           onClick={() => setAdminTab('members')}
@@ -880,6 +882,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
         >
           <Users className="w-4 h-4 text-[#2874f0]" />
           <span>👥 पंजीकृत सदस्य व UTR सत्यापन ({members.length})</span>
+        </button>
+
+        <button
+          onClick={() => setAdminTab('form_responses')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold whitespace-nowrap rounded-lg transition ${
+            adminTab === 'form_responses'
+              ? 'bg-blue-50 text-[#2874f0] border border-blue-200 shadow-xs'
+              : 'text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          <FileText className="w-4 h-4 text-[#2874f0]" />
+          <span>📋 यूजर सबमिट फॉर्म रिस्पॉन्स व्यू ({members.length})</span>
         </button>
 
         <button
@@ -1348,6 +1362,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                         </button>
                       )}
 
+                      {/* View Full Form Response Button */}
+                      <button
+                        onClick={() => setFormResponseModalMember(m)}
+                        className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-[#2874f0] border border-blue-200 rounded text-[11px] font-bold flex items-center gap-1 shadow-xs transition"
+                        title="यूजर द्वारा सबमिट किया गया संपूर्ण फॉर्म रिस्पॉन्स देखें"
+                      >
+                        <FileText className="w-3 h-3 text-[#2874f0]" />
+                        <span>फॉर्म देखें</span>
+                      </button>
+
                       {/* View Screenshot & Details */}
                       <button
                         onClick={() => {
@@ -1395,7 +1419,286 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   )}
 
   {/* ========================================================================= */}
-  {/* TAB 2: WITHDRAWALS & PAYOUTS MANAGEMENT */}
+  {/* TAB: USER SUBMITTED FORM RESPONSES VIEW SYSTEM */}
+  {/* ========================================================================= */}
+  {adminTab === 'form_responses' && (
+    <div className="space-y-6 animate-fadeIn">
+      {/* Overview Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-xs">
+          <span className="text-[11px] text-slate-500 block font-medium">कुल सबमिट फॉर्म रिस्पॉन्स</span>
+          <span className="font-mono-acc font-black text-2xl text-slate-900">{members.length}</span>
+          <span className="text-[10px] text-slate-500 block mt-0.5">
+            {members.filter((m) => m.plan === 'SWIS').length} SWIS • {members.filter((m) => m.plan === 'TWIS').length} TWIS
+          </span>
+        </div>
+
+        <div className="bg-amber-50/50 border border-amber-300 rounded-xl p-3.5 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-amber-800 font-bold block">लंबित फॉर्म समीक्षा</span>
+            {pendingMembers.length > 0 && <span className="animate-pulse w-2.5 h-2.5 rounded-full bg-amber-500" />}
+          </div>
+          <span className="font-mono-acc font-black text-2xl text-amber-700">{pendingMembers.length}</span>
+          <span className="text-[10px] text-amber-700 block mt-0.5">सत्यापन व UTR मिलान की प्रतीक्षा में</span>
+        </div>
+
+        <div className="bg-green-50/40 border border-emerald-300 rounded-xl p-3.5 shadow-xs">
+          <span className="text-[11px] text-emerald-800 font-bold block">स्वीकृत व सक्रिय फॉर्म</span>
+          <span className="font-mono-acc font-black text-2xl text-emerald-600">{verifiedMembers.length}</span>
+          <span className="text-[10px] text-emerald-600 block mt-0.5">सफल ₹249 भुगतान एवं एक्टिवेटेड 🆔</span>
+        </div>
+
+        <div className="bg-red-50/40 border border-red-200 rounded-xl p-3.5 shadow-xs">
+          <span className="text-[11px] text-red-800 font-bold block">अस्वीकृत फॉर्म</span>
+          <span className="font-mono-acc font-black text-2xl text-red-600">
+            {members.filter((m) => m.status === 'rejected').length}
+          </span>
+          <span className="text-[10px] text-red-600 block mt-0.5">अमान्य UTR या अस्वीकृत रसीद</span>
+        </div>
+      </div>
+
+      {/* Main Form Responses Container */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 space-y-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+          <div>
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-[#2874f0]" />
+              <span>यूजर द्वारा सबमिट किए गए रजिस्ट्रेशन फॉर्म का लाइव रिस्पॉन्स डेटा</span>
+            </h3>
+            <p className="text-xs text-slate-500">
+              प्रत्येक छात्र द्वारा रजिस्ट्रेशन के समय भरे गए सभी डेटा (व्यक्तिगत विवरण, पता, प्लान, UTR, फोटो व पेआउट बैंक) का पूर्ण दृश्य
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-600">
+              कुल: <strong>{filteredMembers.length}</strong> फॉर्म रिस्पॉन्स
+            </span>
+          </div>
+        </div>
+
+        {/* Search & Filters */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="नाम, ACC ID, मोबाइल, शहर या UTR खोजें..."
+              className="w-full bg-white border border-gray-300 rounded-sm pl-9 pr-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0]"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-600 shrink-0 font-medium">प्लान:</span>
+            <select
+              value={filterPlan}
+              onChange={(e) => setFilterPlan(e.target.value as any)}
+              className="w-full bg-white border border-gray-300 rounded-sm px-2.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0]"
+            >
+              <option value="ALL">सभी प्लान (SWIS + TWIS)</option>
+              <option value="SWIS">SWIS (रिचार्ज कमीशन)</option>
+              <option value="TWIS">TWIS (रेफरल सिस्टम)</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-600 shrink-0 font-medium">स्थिति:</span>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as any)}
+              className="w-full bg-white border border-gray-300 rounded-sm px-2.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0]"
+            >
+              <option value="ALL">सभी स्थितियां</option>
+              <option value="pending">⏳ लंबित समीक्षा (Pending)</option>
+              <option value="verified">✓ सत्यापित (Verified)</option>
+              <option value="rejected">✕ अस्वीकृत (Rejected)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Form Responses Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          {filteredMembers.map((m) => (
+            <div
+              key={m.id || m.accId}
+              className="bg-slate-50 border border-gray-200 hover:border-blue-300 rounded-xl p-4 space-y-3 transition shadow-xs flex flex-col justify-between"
+            >
+              <div className="space-y-3">
+                {/* Header: Photo, Name, ACC ID, Plan & Status */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    {m.avatarUrl ? (
+                      <img
+                        src={m.avatarUrl}
+                        alt={m.fullName}
+                        className="w-12 h-12 rounded-full object-cover border-2 border-[#2874f0] shadow-xs shrink-0"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-blue-100 text-[#2874f0] font-black text-sm flex items-center justify-center shrink-0 border border-blue-200">
+                        {(m.fullName || 'MB').substring(0, 2).toUpperCase()}
+                      </div>
+                    )}
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-sm">{m.fullName}</h4>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="font-mono-acc font-black text-[#2874f0] text-xs bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                          {m.accId}
+                        </span>
+                        <span
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                            m.plan === 'SWIS'
+                              ? 'bg-amber-50 text-amber-900 border-amber-300'
+                              : 'bg-indigo-50 text-indigo-900 border-indigo-300'
+                          }`}
+                        >
+                          {m.plan} Plan
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    {m.status === 'verified' ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                        <Check className="w-3 h-3 text-emerald-600" /> सत्यापित
+                      </span>
+                    ) : m.status === 'rejected' ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] bg-red-100 text-red-800 border border-red-300 px-2 py-0.5 rounded-full font-bold">
+                        <X className="w-3 h-3 text-red-600" /> अस्वीकृत
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full font-bold animate-pulse">
+                        ⏳ लंबित
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Grid of Key Submitted Fields */}
+                <div className="grid grid-cols-2 gap-2 text-xs bg-white p-3 rounded-lg border border-gray-200">
+                  <div>
+                    <span className="text-[10px] text-slate-500 block">पंजीकृत मोबाइल:</span>
+                    <div className="flex items-center gap-1 font-mono-acc font-semibold text-slate-800">
+                      <span>{m.mobile}</span>
+                      <a
+                        href={`https://api.whatsapp.com/send?phone=91${m.mobile}&text=${encodeURIComponent(
+                          `नमस्ते ${m.fullName}, मैं Achievers Club Community एडमिन बात कर रहा हूँ। आपके रजिस्ट्रेशन फॉर्म (${m.accId}) के संबंध में:`
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-emerald-600 hover:text-emerald-700"
+                        title="WhatsApp चैट"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] text-slate-500 block">ईमेल:</span>
+                    <span className="text-slate-700 truncate block text-[11px]">{m.email}</span>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] text-slate-500 block">शिक्षा / कॉलेज:</span>
+                    <span className="text-slate-800 font-medium truncate block text-[11px]">{m.qualification}</span>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] text-slate-500 block">स्थान (City, State):</span>
+                    <span className="text-slate-800 truncate block text-[11px]">
+                      {m.city}, {m.state} ({m.pincode})
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] text-slate-500 block">पेमेंट UTR No. (₹249):</span>
+                    <span className="font-mono-acc font-bold text-emerald-700 text-[11px] truncate block">
+                      {m.utrNumber || 'N/A'}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] text-slate-500 block">स्पॉन्सर विवरण:</span>
+                    <span className="text-slate-800 text-[11px] font-semibold truncate block">
+                      {m.sponsorName || 'Direct'} ({m.sponsorId || 'None'})
+                    </span>
+                  </div>
+                </div>
+
+                {/* Payment Receipt & Payout Account Badges */}
+                <div className="flex items-center justify-between gap-2 text-[10px]">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {m.paymentScreenshotUrl ? (
+                      <span className="bg-emerald-50 text-emerald-800 font-bold px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                        <ImageIcon className="w-3 h-3 text-emerald-600" />
+                        <span>रसीद संलग्न ✓</span>
+                      </span>
+                    ) : (
+                      <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded border border-gray-200">
+                        केवल UTR
+                      </span>
+                    )}
+
+                    {m.payoutDetails?.upiId ? (
+                      <span className="bg-purple-50 text-purple-800 font-bold px-2 py-0.5 rounded border border-purple-200">
+                        UPI: {m.payoutDetails.upiId}
+                      </span>
+                    ) : m.payoutDetails?.accountNumber ? (
+                      <span className="bg-blue-50 text-blue-800 font-bold px-2 py-0.5 rounded border border-blue-200">
+                        A/C: {m.payoutDetails.accountNumber}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <span className="text-slate-400 font-mono text-[10px]">
+                    {m.paymentDate || m.createdAt?.split('T')[0] || '2026-10-08'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-3 border-t border-gray-200 flex items-center justify-between gap-2">
+                <button
+                  onClick={() => setFormResponseModalMember(m)}
+                  className="flex-1 py-1.5 bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold text-xs rounded-sm flex items-center justify-center gap-1.5 shadow-xs transition"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>📋 संपूर्ण फॉर्म रिस्पॉन्स खोलें</span>
+                </button>
+
+                {m.status !== 'verified' && (
+                  <button
+                    onClick={() => handleApproveMember(m)}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-sm flex items-center gap-1 shadow-xs transition"
+                    title="स्वीकृत करें"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>अप्रूव</span>
+                  </button>
+                )}
+
+                {m.status !== 'rejected' && (
+                  <button
+                    onClick={() => handleOpenRejectModal(m)}
+                    className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs rounded-sm border border-red-200 transition"
+                    title="अस्वीकृत करें"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )}
+
+  {/* ========================================================================= */}
+  {/* TAB 2: WITHDRAWALS & PAYOUTS */}
   {/* ========================================================================= */}
   {adminTab === 'withdrawals' && (
     <div className="space-y-6 animate-fadeIn">
@@ -3625,6 +3928,489 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                   <span>WhatsApp पर छात्र को नया पासवर्ड व 🆔 भेजें</span>
                 </a>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* COMPREHENSIVE SUBMITTED FORM RESPONSE MODAL (PRINTABLE / INSPECTABLE) */}
+      {/* ========================================================================= */}
+      {formResponseModalMember && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 animate-fadeIn overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-2xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl animate-scaleUp text-slate-800">
+            {/* Modal Header */}
+            <div className="sticky top-0 z-10 bg-slate-900 text-white p-4 px-6 rounded-t-2xl flex items-center justify-between border-b border-slate-700">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#ffe500] text-[#2874f0] font-black flex items-center justify-center text-sm shadow-xs">
+                  ACC
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                    <span>विद्यार्थी रजिस्ट्रेशन फॉर्म रिस्पॉन्स शीट</span>
+                    <span className="text-[10px] bg-blue-600/60 text-blue-200 px-2 py-0.5 rounded font-mono font-bold">
+                      {formResponseModalMember.accId}
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-300">
+                    छात्र द्वारा सबमिट किया गया मूल आवेदन फॉर्म व ₹249 सत्यापन पत्रक
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded text-xs font-bold flex items-center gap-1 transition"
+                  title="प्रिंट या PDF में सहेजें"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">प्रिंट / PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormResponseModalMember(null)}
+                  className="p-1 hover:bg-white/20 rounded-full text-slate-300 hover:text-white transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Printable Body */}
+            <div className="p-4 sm:p-6 space-y-5 text-xs">
+              {/* Application Top Summary Banner */}
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="relative shrink-0">
+                    {formResponseModalMember.avatarUrl ? (
+                      <img
+                        src={formResponseModalMember.avatarUrl}
+                        alt={formResponseModalMember.fullName}
+                        className="w-16 h-16 rounded-full object-cover border-3 border-[#2874f0] shadow-sm"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-full bg-blue-200 text-[#2874f0] font-black text-xl flex items-center justify-center border-2 border-blue-300">
+                        {(formResponseModalMember.fullName || 'MB').substring(0, 2).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-[#2874f0] font-bold uppercase tracking-wider block">
+                      OFFICIAL APPLICATION RESPONSE
+                    </span>
+                    <h2 className="text-base sm:text-lg font-black text-slate-900">
+                      {formResponseModalMember.fullName}
+                    </h2>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className="font-mono-acc font-black text-[#2874f0] bg-white px-2 py-0.5 rounded border border-blue-200 text-xs">
+                        ID: {formResponseModalMember.accId}
+                      </span>
+                      <span className="bg-indigo-100 text-indigo-900 font-bold px-2 py-0.5 rounded text-[11px] border border-indigo-200">
+                        {formResponseModalMember.plan} सिस्टम प्लान
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-left sm:text-right shrink-0">
+                  <div className="mb-1">
+                    {formResponseModalMember.status === 'verified' ? (
+                      <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded-full text-xs border border-emerald-300">
+                        <Check className="w-3.5 h-3.5 text-emerald-600" /> सत्यापित व सक्रिय (Verified)
+                      </span>
+                    ) : formResponseModalMember.status === 'rejected' ? (
+                      <span className="inline-flex items-center gap-1 bg-red-100 text-red-800 font-bold px-3 py-1 rounded-full text-xs border border-red-300">
+                        <X className="w-3.5 h-3.5 text-red-600" /> अस्वीकृत (Rejected)
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-900 font-bold px-3 py-1 rounded-full text-xs border border-amber-300 animate-pulse">
+                        ⏳ सत्यापन लंबित (Pending Review)
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-slate-500 block">
+                    आवेदन तिथि: {formResponseModalMember.paymentDate || formResponseModalMember.createdAt?.split('T')[0] || '08 Oct 2026'}
+                  </span>
+                </div>
+              </div>
+
+              {/* 1. व्यक्तिगत एवं शैक्षणिक विवरण */}
+              <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+                <h4 className="text-xs font-bold text-slate-900 flex items-center gap-2 border-b border-gray-100 pb-2">
+                  <Users className="w-4 h-4 text-[#2874f0]" />
+                  <span>1. व्यक्तिगत एवं शैक्षणिक विवरण (Personal & Education Profile)</span>
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="bg-slate-50 p-2.5 rounded-lg border border-gray-200">
+                    <span className="text-[10px] text-slate-500 block">पूरा नाम (Full Name):</span>
+                    <strong className="text-slate-900 text-xs block mt-0.5">{formResponseModalMember.fullName}</strong>
+                  </div>
+
+                  <div className="bg-slate-50 p-2.5 rounded-lg border border-gray-200">
+                    <span className="text-[10px] text-slate-500 block">शैक्षणिक योग्यता / कॉलेज:</span>
+                    <strong className="text-slate-900 text-xs block mt-0.5">{formResponseModalMember.qualification || 'कॉलेज विद्यार्थी'}</strong>
+                  </div>
+
+                  <div className="bg-slate-50 p-2.5 rounded-lg border border-gray-200">
+                    <span className="text-[10px] text-slate-500 block">चयनित सिस्टम (Chosen Plan):</span>
+                    <strong className="text-[#2874f0] text-xs block mt-0.5">
+                      {formResponseModalMember.plan === 'SWIS'
+                        ? 'SWIS (3.30% मोबाइल रिचार्ज कमीशन)'
+                        : 'TWIS (₹150 डायरेक्ट रेफरल इनकम)'}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. संपर्क एवं आवासीय पता */}
+              <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+                <h4 className="text-xs font-bold text-slate-900 flex items-center gap-2 border-b border-gray-100 pb-2">
+                  <MapPin className="w-4 h-4 text-[#2874f0]" />
+                  <span>2. संपर्क एवं आवासीय पता (Contact & Address Details)</span>
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="bg-slate-50 p-2.5 rounded-lg border border-gray-200">
+                    <span className="text-[10px] text-slate-500 block">पंजीकृत मोबाइल नंबर:</span>
+                    <div className="flex items-center justify-between mt-0.5">
+                      <span className="font-mono-acc font-bold text-slate-900 text-xs">{formResponseModalMember.mobile}</span>
+                      <div className="flex items-center gap-1.5">
+                        <a
+                          href={`tel:${formResponseModalMember.mobile}`}
+                          className="text-blue-600 hover:text-blue-700"
+                          title="कॉल करें"
+                        >
+                          <Phone className="w-3.5 h-3.5" />
+                        </a>
+                        <a
+                          href={`https://api.whatsapp.com/send?phone=91${formResponseModalMember.mobile}&text=${encodeURIComponent(
+                            `नमस्ते ${formResponseModalMember.fullName}, मैं Achievers Club Community एडमिन बात कर रहा हूँ। आपके फॉर्म (${formResponseModalMember.accId}) का सत्यापन अपडेट:`
+                          )}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-emerald-600 hover:text-emerald-700"
+                          title="WhatsApp चैट"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 p-2.5 rounded-lg border border-gray-200">
+                    <span className="text-[10px] text-slate-500 block">ईमेल पता (Email):</span>
+                    <div className="flex items-center justify-between mt-0.5">
+                      <span className="text-slate-900 text-xs truncate max-w-[170px]">{formResponseModalMember.email}</span>
+                      <a
+                        href={`mailto:${formResponseModalMember.email}`}
+                        className="text-blue-600 hover:text-blue-700"
+                        title="ईमेल भेजें"
+                      >
+                        <Mail className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 p-2.5 rounded-lg border border-gray-200">
+                    <span className="text-[10px] text-slate-500 block">व्हाट्सएप नंबर:</span>
+                    <span className="font-mono-acc font-bold text-slate-900 text-xs block mt-0.5">
+                      {formResponseModalMember.whatsapp || formResponseModalMember.mobile}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 p-2.5 rounded-lg border border-gray-200">
+                  <span className="text-[10px] text-slate-500 block">पूरा पता (Full Address):</span>
+                  <p className="text-slate-800 text-xs mt-0.5 font-medium leading-relaxed">
+                    {formResponseModalMember.address || 'आवासीय पता'}, {formResponseModalMember.city}, {formResponseModalMember.state} - पिनकोड: {formResponseModalMember.pincode}
+                  </p>
+                </div>
+              </div>
+
+              {/* 3. ₹249 एक्टिवेशन पेमेंट, UTR नंबर एवं रसीद */}
+              <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                  <h4 className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-emerald-600" />
+                    <span>3. ₹249 एक्टिवेशन पेमेंट, UTR व रसीद (Payment Verification)</span>
+                  </h4>
+                  <span className="text-[11px] font-mono-acc font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    ₹249.00 PAID
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="bg-emerald-50/60 p-2.5 rounded-lg border border-emerald-200">
+                    <span className="text-[10px] text-emerald-900 font-bold block">पेमेंट UTR / Ref No.:</span>
+                    <div className="flex items-center justify-between mt-0.5">
+                      <span className="font-mono-acc font-bold text-emerald-800 text-xs">
+                        {formResponseModalMember.utrNumber || 'N/A'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(formResponseModalMember.utrNumber || '');
+                          alert('UTR नंबर कॉपी हो गया!');
+                        }}
+                        className="text-[#2874f0] hover:underline text-[10px] font-bold"
+                      >
+                        कॉपी
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 p-2.5 rounded-lg border border-gray-200">
+                    <span className="text-[10px] text-slate-500 block">भुगतान प्राप्तकर्ता UPI:</span>
+                    <span className="font-mono-acc font-bold text-slate-800 text-xs block mt-0.5">
+                      8877490845@spicepay (Vikas Kumar)
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-50 p-2.5 rounded-lg border border-gray-200">
+                    <span className="text-[10px] text-slate-500 block">भुगतान तिथि (Payment Date):</span>
+                    <span className="text-slate-800 text-xs block mt-0.5 font-semibold">
+                      {formResponseModalMember.paymentDate || '2026-10-08'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Screenshot Preview */}
+                {formResponseModalMember.paymentScreenshotUrl ? (
+                  <div className="bg-slate-50 p-3 rounded-lg border border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={formResponseModalMember.paymentScreenshotUrl}
+                        alt="Payment Slip Preview"
+                        className="w-14 h-18 object-cover rounded border border-gray-300 shadow-xs cursor-pointer shrink-0"
+                        onClick={() => {
+                          setScreenshotModalMember(formResponseModalMember);
+                          setZoomLevel(1);
+                        }}
+                      />
+                      <div>
+                        <span className="text-xs font-bold text-slate-900 block flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <span>पेमेंट स्क्रीनशॉट / रसीद संलग्न है</span>
+                        </span>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          छात्र द्वारा अपलोड की गई बैंक/UPI रसीद। क्लिक करके बड़े आकार में देखें।
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setScreenshotModalMember(formResponseModalMember);
+                        setZoomLevel(1);
+                      }}
+                      className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-[#2874f0] border border-blue-200 rounded text-xs font-bold flex items-center gap-1 transition shrink-0"
+                    >
+                      <ImageIcon className="w-3.5 h-3.5" />
+                      <span>रसीद ज़ूम करके देखें</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-200 text-amber-900 text-xs">
+                    ℹ️ छात्र ने केवल UTR नंबर सबमिट किया है, अलग से स्क्रीनशॉट फाइल संलग्न नहीं की।
+                  </div>
+                )}
+              </div>
+
+              {/* 4. स्पॉन्सरशिप व कमिशन विवरण */}
+              <div className="bg-amber-50/50 border border-amber-200 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-amber-200 pb-2">
+                  <h4 className="text-xs font-bold text-amber-950 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-amber-700" />
+                    <span>4. स्पॉन्सरशिप व ₹150 रेफरल कमिशन (Sponsorship Details)</span>
+                  </h4>
+                  <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded border border-amber-300 font-bold">
+                    TWIS रेफरल बोनस
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="bg-white p-2.5 rounded-lg border border-amber-200">
+                    <span className="text-[10px] text-slate-500 block">स्पॉन्सर का नाम:</span>
+                    <strong className="text-slate-900 text-xs block mt-0.5">
+                      {formResponseModalMember.sponsorName || 'कंपनी डायरेक्ट (नो स्पॉन्सर)'}
+                    </strong>
+                  </div>
+
+                  <div className="bg-white p-2.5 rounded-lg border border-amber-200">
+                    <span className="text-[10px] text-slate-500 block">स्पॉन्सर ACC 🆔:</span>
+                    <span className="font-mono-acc font-black text-[#2874f0] text-xs block mt-0.5">
+                      {formResponseModalMember.sponsorId || 'DIRECT'}
+                    </span>
+                  </div>
+
+                  <div className="bg-white p-2.5 rounded-lg border border-amber-200">
+                    <span className="text-[10px] text-slate-500 block">रेफरल कमिशन देय:</span>
+                    <span className="font-bold text-emerald-700 text-xs block mt-0.5">
+                      {formResponseModalMember.sponsorId && formResponseModalMember.sponsorId !== 'DIRECT'
+                        ? '₹150 डायरेक्ट बोनस (चुकता: ' + (formResponseModalMember.sponsorCommissionStatus === 'paid' ? 'हाँ' : 'लंबित') + ')'
+                        : 'कंपनी डायरेक्ट (नो कमिशन)'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 5. पंजीकृत पेआउट बैंक / UPI खाता (खुद का या माता-पिता का) */}
+              <div className="bg-emerald-50/50 border border-emerald-200 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-emerald-200 pb-2">
+                  <h4 className="text-xs font-bold text-emerald-950 flex items-center gap-2">
+                    <Wallet className="w-4 h-4 text-emerald-700" />
+                    <span>5. पंजीकृत पेआउट खाता (Registered Payout Account - Self / Parents)</span>
+                  </h4>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded border border-emerald-300 font-bold">
+                    दैनिक कमाई निकासी
+                  </span>
+                </div>
+
+                {formResponseModalMember.payoutDetails ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="bg-white p-2.5 rounded-lg border border-emerald-200">
+                      <span className="text-[10px] text-slate-500 block">खाता धारक व संबंध:</span>
+                      <strong className="text-slate-900 text-xs block mt-0.5">
+                        {formResponseModalMember.payoutDetails.holderName} ({formResponseModalMember.payoutDetails.holderRelation === 'Father'
+                          ? 'पिताजी का खाता'
+                          : formResponseModalMember.payoutDetails.holderRelation === 'Mother'
+                          ? 'माताजी का खाता'
+                          : formResponseModalMember.payoutDetails.holderRelation === 'Guardian'
+                          ? 'अभिभावक का खाता'
+                          : 'खुद का खाता'})
+                      </strong>
+                    </div>
+
+                    <div className="bg-white p-2.5 rounded-lg border border-emerald-200">
+                      <span className="text-[10px] text-slate-500 block">पंजीकृत UPI ID:</span>
+                      <div className="flex items-center justify-between mt-0.5">
+                        <span className="font-mono-acc font-bold text-emerald-800 text-xs">
+                          {formResponseModalMember.payoutDetails.upiId || 'N/A'}
+                        </span>
+                        {formResponseModalMember.payoutDetails.upiId && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(formResponseModalMember.payoutDetails?.upiId || '');
+                              alert('UPI ID कॉपी हो गई!');
+                            }}
+                            className="text-[#2874f0] text-[10px] font-bold hover:underline"
+                          >
+                            कॉपी
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-2.5 rounded-lg border border-emerald-200">
+                      <span className="text-[10px] text-slate-500 block">बैंक विवरण (Bank A/C & IFSC):</span>
+                      <span className="font-mono-acc text-slate-800 text-[11px] block mt-0.5 truncate">
+                        {formResponseModalMember.payoutDetails.accountNumber
+                          ? `${formResponseModalMember.payoutDetails.bankName || 'Bank'} · ${formResponseModalMember.payoutDetails.accountNumber} · ${formResponseModalMember.payoutDetails.ifsc}`
+                          : 'UPI मोड सक्रिय'}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-slate-600 text-xs bg-white p-2.5 rounded-lg border border-emerald-200">
+                    छात्र ने डिफ़ॉल्ट मोबाइल UPI ({formResponseModalMember.mobile}@upi) दर्ज किया है।
+                  </p>
+                )}
+              </div>
+
+              {/* 6. एडमिन सुरक्षा एवं पासवर्ड रीसेट सुविधा */}
+              <div className="bg-slate-50 border border-gray-200 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                <div>
+                  <span className="font-bold text-slate-900 block flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-amber-600" />
+                    <span>लॉगिन सुरक्षा व पासवर्ड सहायता:</span>
+                  </span>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    यदि छात्र पासवर्ड या सुरक्षा उत्तर भूल जाए, तो एडमिन यहाँ से सीधा नया पासवर्ड दे सकता है।
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMemberSecurityModal(formResponseModalMember);
+                    setMemberNewPasswordInput('acc@' + Math.floor(1000 + Math.random() * 9000));
+                  }}
+                  className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 rounded font-bold text-xs shrink-0 transition"
+                >
+                  पासवर्ड व सुरक्षा रीसेट करें
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Action Bar */}
+            <div className="sticky bottom-0 z-10 bg-slate-50 border-t border-gray-200 p-4 px-6 rounded-b-2xl flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const textData = JSON.stringify(formResponseModalMember, null, 2);
+                    navigator.clipboard.writeText(textData);
+                    alert('फॉर्म रिस्पॉन्स का सम्पूर्ण डेटा क्लिपबोर्ड में कॉपी हो गया!');
+                  }}
+                  className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-gray-300 rounded text-xs font-bold flex items-center gap-1.5 transition"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>डेटा कॉपी करें</span>
+                </button>
+
+                <a
+                  href={`https://api.whatsapp.com/send?phone=91${formResponseModalMember.mobile}&text=${encodeURIComponent(
+                    `नमस्ते ${formResponseModalMember.fullName} ji,\nAchievers Club Community (ACC) में आपका स्वागत है!\n\n🆔 आपकी Member 🆔: ${formResponseModalMember.accId}\n💼 सिस्टम प्लान: ${formResponseModalMember.plan}\n💳 UTR Ref: ${formResponseModalMember.utrNumber}\n🟢 स्टेटस: ${formResponseModalMember.status === 'verified' ? 'सत्यापित (VERIFIED ✓)' : 'समीक्षा में'}\n\nऑफिशियल वेबसाइट: www.achieversclub.in`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-2 bg-[#25D366] hover:bg-[#20ba59] text-white rounded text-xs font-bold flex items-center gap-1.5 transition shadow-xs"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>WhatsApp पर छात्र को भेजें</span>
+                </a>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                {formResponseModalMember.status !== 'verified' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleApproveMember(formResponseModalMember);
+                      setFormResponseModalMember(null);
+                    }}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold flex items-center gap-1.5 shadow-sm transition"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>सत्यापित व स्वीकृत करें (Approve)</span>
+                  </button>
+                )}
+
+                {formResponseModalMember.status !== 'rejected' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleOpenRejectModal(formResponseModalMember);
+                      setFormResponseModalMember(null);
+                    }}
+                    className="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 border border-red-200 rounded text-xs font-bold flex items-center gap-1 transition"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>अस्वीकृत करें (Reject)</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setFormResponseModalMember(null)}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded text-xs font-bold transition"
+                >
+                  बंद करें
+                </button>
+              </div>
             </div>
           </div>
         </div>
