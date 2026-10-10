@@ -98,7 +98,11 @@
 .animate-marquee {
   display: inline-block;
   white-space: nowrap;
-  animation: marquee 26s linear infinite;
+  animation: marquee 45s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
 }
 
 @keyframes fadeIn {

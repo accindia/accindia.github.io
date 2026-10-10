@@ -96,7 +96,7 @@ export const Header: React.FC<HeaderProps> = ({
   useEffect(() => {
     const timer = setInterval(() => {
       setFeatureIndex((prev) => (prev + 1) % websiteFeatures.length);
-    }, 3200);
+    }, 5000);
     return () => clearInterval(timer);
   }, [websiteFeatures.length]);
 
