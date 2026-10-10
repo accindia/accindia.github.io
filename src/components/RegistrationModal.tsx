@@ -645,7 +645,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                 />
               </div>
               <span className="text-[11px] text-slate-500">
-                नोट: आपके नाम के आधार पर यूनिक ID कोड (जैसे RK, SP) बनेगा।
+                नोट: आपके नाम और प्लान के आधार पर यूनिक ID (जैसे Rahul Kumar = <strong>SWACCRK01</strong> / <strong>TWACCRK01</strong>) स्वतः बनेगी।
               </span>
             </div>
 
@@ -898,7 +898,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                   <div className="text-[11px] text-slate-500 space-y-0.5 border-t border-gray-100 pt-2">
                     <p>✓ Zero platform fee (Google Pay/PhonePe से बेहतर)</p>
                     <p>✓ मोबाइल, DTH, बिजली बिल, फास्टैग, गैस बिल</p>
-                    <p>✓ 🆔 कोड फॉर्मेट: <strong>ACC249SWIS...</strong></p>
+                    <p>✓ 🆔 कोड फॉर्मेट: <strong>SWACC + Initials + 01 (उदा. SWACCRK01)</strong></p>
                   </div>
                 </div>
 
@@ -925,7 +925,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                   <div className="text-[11px] text-slate-500 space-y-0.5 border-t border-gray-100 pt-2">
                     <p>✓ हर सफल रजिस्ट्रेशन पर सीधा ₹150 वॉलेट में</p>
                     <p>✓ पर्सनल मेंटरशिप और सोशल मीडिया ट्रेनिंग</p>
-                    <p>✓ 🆔 कोड फॉर्मेट: <strong>ACC249TWIS...</strong></p>
+                    <p>✓ 🆔 कोड फॉर्मेट: <strong>TWACC + Initials + 01 (उदा. TWACCRK01)</strong></p>
                   </div>
                 </div>
               </div>

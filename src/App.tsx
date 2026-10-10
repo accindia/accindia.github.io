@@ -29,6 +29,9 @@ import {
   ExternalLink,
   Info,
   Building2,
+  FileCheck,
+  ShieldAlert,
+  HelpCircle,
   Lock,
   ArrowRight,
   Megaphone,
@@ -139,20 +142,47 @@ export default function App() {
     };
   }, []);
 
+  // Scroll to top helper to bring user instantly to the opened section/window
+  const scrollToTopSection = () => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+    const root = document.getElementById('root');
+    if (root) root.scrollTop = 0;
+    const main = document.querySelector('main');
+    if (main) {
+      main.scrollTop = 0;
+      main.scrollIntoView({ behavior: 'instant', block: 'start' });
+    }
+  };
+
+  const handleNavigateWithScroll = (windowName: ActiveWindow) => {
+    setActiveWindow(windowName);
+    scrollToTopSection();
+    requestAnimationFrame(() => {
+      scrollToTopSection();
+    });
+  };
+
+  // Automatically scroll to top whenever active window/dialog changes
+  useEffect(() => {
+    scrollToTopSection();
+  }, [activeWindow]);
+
   const handleLogout = () => {
     StorageService.setCurrentUser(null);
     setCurrentUser(null);
-    setActiveWindow('home');
+    handleNavigateWithScroll('home');
   };
 
   const handleLoginSuccess = (member: Member) => {
     setCurrentUser(member);
-    setActiveWindow('dashboard');
+    handleNavigateWithScroll('dashboard');
   };
 
   const handleRegistrationSuccess = (member: Member) => {
     setCurrentUser(member);
-    setActiveWindow('dashboard');
+    handleNavigateWithScroll('dashboard');
   };
 
   // Dedicated navigation for ID card:
@@ -161,11 +191,11 @@ export default function App() {
   // 3. If normal visitor without sponsor -> open registration popup directly!
   const handleNavigateToIdCard = () => {
     if (currentUser) {
-      setActiveWindow('idcard');
+      handleNavigateWithScroll('idcard');
     } else if (referralSponsor) {
-      setActiveWindow('idcard');
+      handleNavigateWithScroll('idcard');
     } else {
-      setActiveWindow('register');
+      handleNavigateWithScroll('register');
     }
   };
 
@@ -174,7 +204,7 @@ export default function App() {
       {/* Official Top Bar & Live IOIS-Style Realtime Clock Header */}
       <Header
         activeWindow={activeWindow}
-        setActiveWindow={setActiveWindow}
+        setActiveWindow={handleNavigateWithScroll}
         currentUser={currentUser}
         onLogout={handleLogout}
         referralSponsor={referralSponsor}
@@ -190,7 +220,7 @@ export default function App() {
               if (view === 'idcard') {
                 handleNavigateToIdCard();
               } else {
-                setActiveWindow(view);
+                handleNavigateWithScroll(view);
               }
             }}
             currentUser={currentUser}
@@ -219,7 +249,7 @@ export default function App() {
         {/* VIEW: REGISTRATION FORM */}
         {activeWindow === 'register' && (
           <WindowFrame
-            title="ACC नवीन सदस्यता 🆔 रजिस्ट्रेशन फॉर्म (Google Form Style)"
+            title="ACC नवीन सदस्यता 🆔 रजिस्ट्रेशन फॉर्म (ACC Official Registration Portal)"
             subtitle="₹249 One-Time Joining Fee • SWIS & TWIS Activation"
             icon={<FileText className="w-4 h-4 text-amber-400" />}
             onClose={() => setActiveWindow('home')}
@@ -405,14 +435,53 @@ export default function App() {
           activeWindow === 'terms' ||
           activeWindow === 'contact') && (
           <WindowFrame
-            title="कानूनी नीतियां एवं संस्थागत जानकारी (Legal & Policy)"
-            subtitle="Achievers Club Community • Start Young, Retire Young"
-            icon={<Phone className="w-4 h-4 text-blue-400" />}
-            onClose={() => setActiveWindow('home')}
+            key={activeWindow}
+            title={
+              activeWindow === 'about'
+                ? 'हमारे बारे में (About Achievers Club Community)'
+                : activeWindow === 'terms'
+                ? 'नियम एवं शर्तें (Terms & Conditions)'
+                : activeWindow === 'privacy'
+                ? 'गोपनीयता नीति (Privacy Policy - 100% Data Protection)'
+                : activeWindow === 'disclaimer'
+                ? 'कानूनी अस्वीकरण (Legal Disclaimer & Transparency)'
+                : 'सपोर्ट हेल्पडेस्क एवं संपर्क (Contact Us & Support)'
+            }
+            subtitle={
+              activeWindow === 'about'
+                ? 'ACC कम्युनिटी विजन, मिशन और युवाओं के लिए जीरो-इन्वेस्टमेंट मॉडल'
+                : activeWindow === 'terms'
+                ? 'सदस्यता दिशानिर्देश, 3.30% रिचार्ज कमीशन व ₹150 रेफरल नियम'
+                : activeWindow === 'privacy'
+                ? 'उपयोगकर्ता डेटा सुरक्षा, एन्क्रिप्शन और प्राइवेसी नीतियां'
+                : activeWindow === 'disclaimer'
+                ? 'पारदर्शिता, स्पष्टीकरण और कानूनी अनुपालन विवरण'
+                : '24x7 सहायता, व्हाट्सएप सपोर्ट और अधिकृत कार्यालय पता'
+            }
+            icon={
+              activeWindow === 'about' ? (
+                <Building2 className="w-4 h-4 text-amber-400" />
+              ) : activeWindow === 'terms' ? (
+                <FileCheck className="w-4 h-4 text-emerald-400" />
+              ) : activeWindow === 'privacy' ? (
+                <ShieldAlert className="w-4 h-4 text-cyan-400" />
+              ) : activeWindow === 'disclaimer' ? (
+                <HelpCircle className="w-4 h-4 text-rose-400" />
+              ) : (
+                <Phone className="w-4 h-4 text-blue-400" />
+              )
+            }
+            onClose={() => handleNavigateWithScroll('home')}
           >
             <LegalPages
+              key={activeWindow}
               initialTab={activeWindow}
-              onGoToRegister={() => setActiveWindow('register')}
+              onGoToRegister={() => handleNavigateWithScroll('register')}
+              onTabChange={(newTab) => {
+                if (newTab !== 'description') {
+                  setActiveWindow(newTab as ActiveWindow);
+                }
+              }}
             />
           </WindowFrame>
         )}
@@ -440,32 +509,56 @@ export default function App() {
             <h4 className="text-white font-bold text-xs uppercase tracking-wider text-slate-400">महत्वपूर्ण लिंक्स</h4>
             <ul className="space-y-1.5 text-slate-400">
               <li>
-                <button onClick={() => setActiveWindow('home')} className="hover:text-white transition">
+                <button
+                  type="button"
+                  onClick={() => handleNavigateWithScroll('home')}
+                  className="hover:text-white transition cursor-pointer text-left block w-full py-0.5"
+                >
                   होम पेज (Home)
                 </button>
               </li>
               <li>
-                <button onClick={() => setActiveWindow('video')} className="hover:text-white transition">
+                <button
+                  type="button"
+                  onClick={() => handleNavigateWithScroll('video')}
+                  className="hover:text-white transition cursor-pointer text-left block w-full py-0.5"
+                >
                   ट्रेनिंग वीडियो व प्लान
                 </button>
               </li>
               <li>
-                <button onClick={() => setActiveWindow('calculator')} className="hover:text-white transition">
+                <button
+                  type="button"
+                  onClick={() => handleNavigateWithScroll('calculator')}
+                  className="hover:text-white transition cursor-pointer text-left block w-full py-0.5"
+                >
                   पॉकेट मनी कैलकुलेटर
                 </button>
               </li>
               <li>
-                <button onClick={() => setActiveWindow('dashboard')} className="hover:text-white transition">
+                <button
+                  type="button"
+                  onClick={() => handleNavigateWithScroll('dashboard')}
+                  className="hover:text-white transition cursor-pointer text-left block w-full py-0.5"
+                >
                   विद्यार्थी सदस्य डैशबोर्ड
                 </button>
               </li>
               <li>
                 {currentUser ? (
-                  <button onClick={() => setActiveWindow('idcard')} className="hover:text-white transition">
+                  <button
+                    type="button"
+                    onClick={() => handleNavigateWithScroll('idcard')}
+                    className="hover:text-white transition cursor-pointer text-left block w-full py-0.5"
+                  >
                     मेरा डिजिटल 🆔 कार्ड
                   </button>
                 ) : (
-                  <button onClick={() => setActiveWindow('register')} className="hover:text-[#ffe500] font-semibold transition">
+                  <button
+                    type="button"
+                    onClick={() => handleNavigateWithScroll('register')}
+                    className="hover:text-[#ffe500] font-semibold transition cursor-pointer text-left block w-full py-0.5"
+                  >
                     नया रजिस्ट्रेशन (₹{siteConfig.activationFee || 249} One-Time)
                   </button>
                 )}
@@ -477,27 +570,47 @@ export default function App() {
             <h4 className="text-white font-bold text-xs uppercase tracking-wider text-slate-400">नीति एवं सहायता</h4>
             <ul className="space-y-1.5 text-slate-400">
               <li>
-                <button onClick={() => setActiveWindow('about')} className="hover:text-white transition">
+                <button
+                  type="button"
+                  onClick={() => handleNavigateWithScroll('about')}
+                  className="hover:text-white transition cursor-pointer text-left block w-full py-0.5"
+                >
                   हमारे बारे में (About Us)
                 </button>
               </li>
               <li>
-                <button onClick={() => setActiveWindow('terms')} className="hover:text-white transition">
+                <button
+                  type="button"
+                  onClick={() => handleNavigateWithScroll('terms')}
+                  className="hover:text-white transition cursor-pointer text-left block w-full py-0.5"
+                >
                   नियम एवं शर्तें (Terms & Conditions)
                 </button>
               </li>
               <li>
-                <button onClick={() => setActiveWindow('privacy')} className="hover:text-white transition">
+                <button
+                  type="button"
+                  onClick={() => handleNavigateWithScroll('privacy')}
+                  className="hover:text-white transition cursor-pointer text-left block w-full py-0.5"
+                >
                   गोपनीयता नीति (Privacy Policy)
                 </button>
               </li>
               <li>
-                <button onClick={() => setActiveWindow('disclaimer')} className="hover:text-white transition">
+                <button
+                  type="button"
+                  onClick={() => handleNavigateWithScroll('disclaimer')}
+                  className="hover:text-white transition cursor-pointer text-left block w-full py-0.5"
+                >
                   कानूनी अस्वीकरण (Disclaimer)
                 </button>
               </li>
               <li>
-                <button onClick={() => setActiveWindow('contact')} className="hover:text-white transition">
+                <button
+                  type="button"
+                  onClick={() => handleNavigateWithScroll('contact')}
+                  className="hover:text-white transition cursor-pointer text-left block w-full py-0.5"
+                >
                   सपोर्ट हेल्पडेस्क (Contact Us)
                 </button>
               </li>

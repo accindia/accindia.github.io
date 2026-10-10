@@ -111,7 +111,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               <span className="text-[11px] sm:text-xs">SPECIAL STUDENT & YOUTH EARNING PROGRAM · ACC ASSURED ✓</span>
             </div>
 
-            <h1 className="font-display font-black text-2xl sm:text-4xl lg:text-5xl text-white tracking-tight leading-tight">
+            <h1 className="font-display font-black text-2xl sm:text-4xl lg:text-5xl text-white tracking-tight leading-snug sm:leading-tight">
               कॉलेज व पढ़ाई के साथ{' '}
               <span className="text-[#ffe500]">
                 पॉकेट मनी व पक्की कमाई
@@ -128,13 +128,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
               SWIS रिचार्ज कमीशन (3.30%) और TWIS रेफरल इनकम (₹150 प्रति दोस्त) का 100% वेरिफाइड अवसर देती है।
             </p>
 
-            {/* Student Value Highlights - Flipkart Style Badges */}
-            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-x-4 gap-y-2 text-xs text-blue-100 pt-1">
-              <span className="font-bold text-[#ffe500]">0 इन्वेस्टमेंट · केवल ₹{siteConfig.activationFee || 249} 🆔 शुल्क</span>
-              <span className="text-blue-300">·</span>
-              <span className="font-bold text-white">3.30% फिक्स्ड रिचार्ज कमीशन</span>
-              <span className="text-blue-300">·</span>
-              <span className="font-bold text-[#ffe500]">₹150 प्रति रेफरल डायरेक्ट बैंक/UPI</span>
+            {/* Student Value Highlights - Mobile-Friendly Clean Badges */}
+            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2 text-xs pt-1">
+              <span className="bg-white/10 px-2.5 py-1 rounded-sm text-[#ffe500] font-bold">0 इन्वेस्टमेंट · ₹{siteConfig.activationFee || 249} 🆔 शुल्क</span>
+              <span className="bg-white/10 px-2.5 py-1 rounded-sm text-white font-bold">3.30% फिक्स्ड रिचार्ज कमीशन</span>
+              <span className="bg-white/10 px-2.5 py-1 rounded-sm text-[#ffe500] font-bold">₹150 प्रति रेफरल बैंक/UPI</span>
             </div>
 
             {/* Action Buttons with Symbolic Logos */}
@@ -204,12 +202,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 </span>
               </div>
 
-              <div className="bg-[#f1f2f4] p-3 rounded-lg border border-gray-200 space-y-1 text-xs mb-3">
+              <div className="bg-[#f1f2f4] p-3 rounded-lg border border-gray-200 space-y-1.5 text-xs mb-3">
                 <span className="text-[10px] text-slate-500 block font-semibold">
-                  {currentUser ? 'Official Student 🆔:' : referralSponsor ? '🌟 आपके स्पॉन्सर 🆔 (Referral):' : 'Official Student 🆔:'}
+                  {currentUser ? 'Official Student 🆔:' : referralSponsor ? '🌟 आपके स्पॉन्सर 🆔 (Referral):' : 'यूनिक स्टूडेंट 🆔 (सेट सिस्टम फॉर्मेट):'}
                 </span>
-                <span className="font-mono-acc font-black text-lg text-[#2874f0] block">
-                  {currentUser ? currentUser.accId : referralSponsor ? referralSponsor.accId : 'ACC249SWIS...'}
+                <span className="font-mono-acc font-black text-lg text-[#2874f0] block tracking-wide">
+                  {currentUser ? currentUser.accId : referralSponsor ? referralSponsor.accId : 'SWACCRK01'}
                 </span>
                 <p className="text-[11px] text-slate-600">
                   {currentUser ? (
@@ -219,11 +217,29 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       <span>रेफरल मेंटर: <strong className="text-slate-900">{referralSponsor.fullName}</strong></span>
                     </span>
                   ) : (
-                    <span className="text-slate-600">
-                      फॉर्मेट: <strong>ACC249 + PLAN + INITIALS + 01</strong>
+                    <span className="text-slate-600 block">
+                      फॉर्मेट: <strong>SWACC / TWACC + INITIALS + 01</strong> (उदा. Rahul Kumar = <strong>SWACCRK01</strong>)
                     </span>
                   )}
                 </p>
+                {!currentUser && !referralSponsor && (
+                  <div className="flex flex-wrap items-center gap-1 text-[10px] font-mono-acc pt-1 border-t border-gray-200/80">
+                    <span className="bg-blue-100 text-[#2874f0] px-1.5 py-0.5 rounded font-bold" title="SWIS प्लान प्रीफिक्स">
+                      SWACC
+                    </span>
+                    <span className="text-slate-400 font-sans">+</span>
+                    <span className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold" title="नाम इनिशियल्स (उदा. RK)">
+                      RK
+                    </span>
+                    <span className="text-slate-400 font-sans">+</span>
+                    <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold" title="2-अंकीय क्रम संख्या">
+                      01
+                    </span>
+                    <span className="text-emerald-700 font-bold font-sans ml-auto text-[10px]">
+                      ✓ सिस्टम जनरेटेड
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-center text-xs mb-3">
@@ -411,7 +427,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               जानें कि कॉलेज के दोस्तों को जोड़कर और रिचार्ज करके आप हर महीने कितना कमा सकते हैं:
             </p>
           </div>
-          <div className="text-right">
+          <div className="text-left sm:text-right">
             <span className="text-xs text-slate-500 block">अनुमानित कुल मासिक बचत / आय</span>
             <span className="font-mono-acc font-black text-2xl sm:text-3xl text-emerald-600 tabular-nums">
               ₹{totalStudentMonthlyEarnings.toFixed(0)}
@@ -476,14 +492,23 @@ export const HomeView: React.FC<HomeViewProps> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-slate-50 border border-gray-200 rounded-lg p-5 space-y-2.5">
+          <div className="bg-slate-50 border border-gray-200 rounded-lg p-5 space-y-2.5 flex flex-col justify-between">
             <div className="w-9 h-9 rounded bg-[#2874f0] text-white flex items-center justify-center font-black text-sm font-mono-acc shadow-xs">
               01
             </div>
             <h3 className="text-sm font-bold text-slate-900">रजिस्ट्रेशन और ₹{siteConfig.activationFee || 249} भुगतान</h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Google Form शैली के आसान फॉर्म में अपना नाम, कॉलेज/डिग्री और UPI UTR संदर्भ नंबर दर्ज करें।
+              ACC OFFICIAL REGISTRATION PORTAL के सुरक्षित और आसान फॉर्म में अपना नाम, कॉलेज/डिग्री और UPI UTR संदर्भ नंबर दर्ज करें।
             </p>
+            <button
+              type="button"
+              onClick={() => onNavigate('register')}
+              className="w-full mt-2 py-2 px-3 bg-[#2874f0] hover:bg-[#1258c7] text-white text-xs font-bold rounded-sm shadow-xs flex items-center justify-center gap-1.5 transition group cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-yellow-300 group-hover:scale-110 transition-transform" />
+              <span>रजिस्ट्रेशन करें (₹{siteConfig.activationFee || 249})</span>
+              <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
+            </button>
           </div>
 
           <div className="bg-slate-50 border border-gray-200 rounded-lg p-5 space-y-2.5">
@@ -660,13 +685,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-3 text-xs">
-            <button onClick={() => onNavigate('privacy')} className="hover:text-white transition">गोपनीयता नीति</button>
+            <button type="button" onClick={() => onNavigate('privacy')} className="hover:text-white transition cursor-pointer">गोपनीयता नीति</button>
             <span className="text-slate-600">·</span>
-            <button onClick={() => onNavigate('disclaimer')} className="hover:text-white transition">अस्वीकरण</button>
+            <button type="button" onClick={() => onNavigate('disclaimer')} className="hover:text-white transition cursor-pointer">अस्वीकरण</button>
             <span className="text-slate-600">·</span>
-            <button onClick={() => onNavigate('terms')} className="hover:text-white transition">नियम व शर्तें</button>
+            <button type="button" onClick={() => onNavigate('terms')} className="hover:text-white transition cursor-pointer">नियम व शर्तें</button>
             <span className="text-slate-600">·</span>
-            <button onClick={() => onNavigate('contact')} className="hover:text-white transition">सपोर्ट</button>
+            <button type="button" onClick={() => onNavigate('contact')} className="hover:text-white transition cursor-pointer">सपोर्ट</button>
           </div>
         </div>
 

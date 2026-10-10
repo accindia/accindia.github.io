@@ -36,11 +36,11 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
         <div className="flex items-center gap-2 min-w-0 pr-1">
           {icon && <div className="text-yellow-300 shrink-0">{icon}</div>}
           <div className="min-w-0">
-            <h3 className="text-xs sm:text-sm font-bold text-white tracking-wide truncate flex items-center gap-2">
+            <h3 className="text-xs sm:text-sm font-bold text-white tracking-wide leading-snug line-clamp-2 sm:truncate flex items-center gap-1.5">
               {title}
             </h3>
             {subtitle && (
-              <p className="text-[10px] sm:text-[11px] text-blue-100 truncate">{subtitle}</p>
+              <p className="text-[10px] sm:text-[11px] text-blue-100 leading-normal line-clamp-1 sm:truncate mt-0.5">{subtitle}</p>
             )}
           </div>
         </div>

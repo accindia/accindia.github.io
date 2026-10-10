@@ -106,7 +106,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           ACC विद्यार्थी लॉगिन (Member Login)
         </h2>
         <p className="text-xs text-slate-500 mt-1">
-          अपनी यूनिक ACC 🆔 (उदा. ACC249SWIS...) अथवा मोबाइल नंबर से सुरक्षित लॉगिन करें
+          अपनी यूनिक ACC 🆔 (उदा. SWACCRK01 / ACC249SWIS...) अथवा मोबाइल नंबर से सुरक्षित लॉगिन करें
         </p>
       </div>
 
@@ -135,7 +135,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               type="text"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
-              placeholder="उदा. ACC249SWIS... या 8877490845"
+              placeholder="उदा. SWACCRK01 या 8877490845"
               className="w-full bg-white border border-gray-300 rounded-sm pl-9 pr-3 py-2 text-sm text-slate-900 font-mono-acc focus:outline-none focus:border-[#2874f0] focus:ring-1 focus:ring-[#2874f0]"
               required
             />

@@ -24,14 +24,23 @@ import { FirestoreService } from '../services/firestore';
 interface LegalPagesProps {
   initialTab?: 'privacy' | 'disclaimer' | 'terms' | 'about' | 'contact' | 'description';
   onGoToRegister: () => void;
+  onTabChange?: (tab: 'privacy' | 'disclaimer' | 'terms' | 'about' | 'contact' | 'description') => void;
 }
 
 export const LegalPages: React.FC<LegalPagesProps> = ({
   initialTab = 'about',
   onGoToRegister,
+  onTabChange,
 }) => {
   const [tab, setTab] = useState<'privacy' | 'disclaimer' | 'terms' | 'about' | 'contact' | 'description'>(initialTab);
   const [siteConfig, setSiteConfig] = useState<SiteConfig>(() => StorageService.getSiteConfig());
+
+  // Automatically update active tab whenever initialTab prop changes
+  useEffect(() => {
+    if (initialTab) {
+      setTab(initialTab);
+    }
+  }, [initialTab]);
 
   useEffect(() => {
     const unsubLocal = subscribeToSync(() => {
@@ -85,7 +94,10 @@ export const LegalPages: React.FC<LegalPagesProps> = ({
         ].map((item) => (
           <button
             key={item.id}
-            onClick={() => setTab(item.id as any)}
+            onClick={() => {
+              setTab(item.id as any);
+              onTabChange?.(item.id as any);
+            }}
             className={`px-3.5 py-2 text-xs font-bold rounded-sm whitespace-nowrap transition ${
               tab === item.id
                 ? 'bg-[#2874f0] text-white shadow-xs'
@@ -165,14 +177,13 @@ export const LegalPages: React.FC<LegalPagesProps> = ({
             <div className="bg-[#f1f2f4] p-4 rounded-lg border border-gray-200 space-y-3">
               <h4 className="font-bold text-slate-900">यूनिक 🆔 कोड संरचना (Formula Explained)</h4>
               <p className="text-xs text-slate-600">
-                उदाहरण स्वरूप: <strong className="font-mono-acc text-[#2874f0]">ACC249SWISRK01</strong>
+                आधिकारिक सेट सिस्टम फॉर्मेट: <strong className="font-mono-acc text-[#2874f0] text-sm">SWACCRK01</strong> / <strong className="font-mono-acc text-[#2874f0] text-sm">TWACCRK01</strong>
               </p>
               <ul className="text-xs text-slate-600 space-y-1 list-disc pl-5">
-                <li><strong>ACC</strong> = Achievers Club Community</li>
-                <li><strong>249</strong> = एक्टिवेशन चार्ज (₹249)</li>
-                <li><strong>SWIS / TWIS</strong> = चुना गया सिस्टम (सेल्फ वर्क या टीम वर्क)</li>
+                <li><strong>SWACC / TWACC</strong> = सिस्टम प्लान (SWIS = Self Work Recharge, TWIS = Team Work Referral)</li>
                 <li><strong>RK</strong> = सदस्य के नाम के इनिशियल्स (उदा. Rahul Kumar = RK, Santosh Patidar = SP)</li>
                 <li><strong>01</strong> = सदस्य का क्रम संख्यांक (सीक्वेंस नंबर)</li>
+                <li><strong>लेगेसी सपोर्ट:</strong> पूर्व आईडी कोड (उदा. ACC249SWISRK01) भी सिस्टम में समान रूप से समर्थित हैं।</li>
               </ul>
             </div>
 

@@ -2356,7 +2356,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                       <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-wider">
                         👤 किसने ज्वाइन किया (Joined By):
                       </span>
-                      <strong className="text-slate-900 text-sm block truncate">{r.referredName}</strong>
+                      <strong className="text-slate-900 text-sm block break-words">{r.referredName}</strong>
                       <span className="text-[11px] text-emerald-700 font-semibold block">अधिकृत पंजीकृत विद्यार्थी</span>
                     </div>
 
@@ -2391,7 +2391,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                       <span className="text-[10px] text-amber-900 font-bold block uppercase tracking-wider">
                         📅 कब ज्वाइन किया (Join Date & Time):
                       </span>
-                      <strong className="text-slate-900 text-xs block font-mono-acc truncate">
+                      <strong className="text-slate-900 text-xs block font-mono-acc break-words">
                         {r.date}
                       </strong>
                       <span className="text-[11px] text-emerald-700 font-bold block">
