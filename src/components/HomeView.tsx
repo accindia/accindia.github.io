@@ -691,6 +691,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
             <span className="text-slate-600">·</span>
             <button type="button" onClick={() => onNavigate('terms')} className="hover:text-white transition cursor-pointer">नियम व शर्तें</button>
             <span className="text-slate-600">·</span>
+            <button type="button" onClick={() => onNavigate('faq')} className="hover:text-yellow-300 text-yellow-400 font-bold transition cursor-pointer">FAQ (सामान्य प्रश्न)</button>
+            <span className="text-slate-600">·</span>
             <button type="button" onClick={() => onNavigate('contact')} className="hover:text-white transition cursor-pointer">सपोर्ट</button>
           </div>
         </div>

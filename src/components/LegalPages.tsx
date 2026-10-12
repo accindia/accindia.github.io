@@ -20,11 +20,14 @@ import {
 import { SiteConfig } from '../types';
 import { StorageService, subscribeToSync } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
+import { FAQSection } from './FAQSection';
+
+export type LegalTabType = 'privacy' | 'disclaimer' | 'terms' | 'about' | 'contact' | 'description' | 'faq';
 
 interface LegalPagesProps {
-  initialTab?: 'privacy' | 'disclaimer' | 'terms' | 'about' | 'contact' | 'description';
+  initialTab?: LegalTabType;
   onGoToRegister: () => void;
-  onTabChange?: (tab: 'privacy' | 'disclaimer' | 'terms' | 'about' | 'contact' | 'description') => void;
+  onTabChange?: (tab: LegalTabType) => void;
 }
 
 export const LegalPages: React.FC<LegalPagesProps> = ({
@@ -32,7 +35,7 @@ export const LegalPages: React.FC<LegalPagesProps> = ({
   onGoToRegister,
   onTabChange,
 }) => {
-  const [tab, setTab] = useState<'privacy' | 'disclaimer' | 'terms' | 'about' | 'contact' | 'description'>(initialTab);
+  const [tab, setTab] = useState<LegalTabType>(initialTab);
   const [siteConfig, setSiteConfig] = useState<SiteConfig>(() => StorageService.getSiteConfig());
 
   // Automatically update active tab whenever initialTab prop changes
@@ -86,6 +89,7 @@ export const LegalPages: React.FC<LegalPagesProps> = ({
       <div className="flex bg-white border border-gray-200 rounded-lg p-1.5 gap-1 overflow-x-auto no-scrollbar shadow-xs">
         {[
           { id: 'about', label: 'About Us (हमारे बारे में)' },
+          { id: 'faq', label: 'FAQ (सामान्य प्रश्न)' },
           { id: 'description', label: 'Description (विस्तृत विवरण)' },
           { id: 'disclaimer', label: 'Disclaimer (अस्वीकरण)' },
           { id: 'privacy', label: 'Privacy Policy (गोपनीयता नीति)' },
@@ -445,6 +449,11 @@ export const LegalPages: React.FC<LegalPagesProps> = ({
             )}
           </div>
         </div>
+      )}
+
+      {/* CONTENT: Frequently Asked Questions (FAQ) */}
+      {tab === 'faq' && (
+        <FAQSection onGoToRegister={onGoToRegister} siteConfig={siteConfig} />
       )}
     </div>
   );

@@ -154,7 +154,8 @@ export type ActiveWindow =
   | 'privacy'
   | 'disclaimer'
   | 'terms'
-  | 'contact';
+  | 'contact'
+  | 'faq';
 
 export interface AppServiceItem {
   id: string;

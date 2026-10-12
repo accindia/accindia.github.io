@@ -19,6 +19,7 @@ import {
   MessageCircle,
   User,
   Megaphone,
+  HelpCircle,
 } from 'lucide-react';
 import { ActiveWindow, Member, SiteConfig } from '../types';
 import { StorageService, subscribeToSync } from '../services/storage';
@@ -184,6 +185,7 @@ export const Header: React.FC<HeaderProps> = ({
       icon: <Megaphone className="w-3.5 h-3.5 text-amber-300" />,
     },
     { id: 'admin' as ActiveWindow, label: 'एडमिन पैनल', icon: <ShieldCheck className="w-3.5 h-3.5 text-red-500" /> },
+    { id: 'faq' as ActiveWindow, label: 'FAQ सवाल-जवाब', icon: <HelpCircle className="w-3.5 h-3.5 text-yellow-500" /> },
     { id: 'about' as ActiveWindow, label: 'हमारे बारे में', icon: <Award className="w-3.5 h-3.5 text-blue-500" /> },
     { id: 'contact' as ActiveWindow, label: 'सपोर्ट', icon: <Phone className="w-3.5 h-3.5 text-green-600" /> },
   ];

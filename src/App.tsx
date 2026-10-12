@@ -428,16 +428,19 @@ export default function App() {
           </WindowFrame>
         )}
 
-        {/* VIEW: LEGAL PAGES (About, Privacy, Disclaimer, Terms, Contact) */}
+        {/* VIEW: LEGAL PAGES (About, Privacy, Disclaimer, Terms, Contact, FAQ) */}
         {(activeWindow === 'about' ||
           activeWindow === 'privacy' ||
           activeWindow === 'disclaimer' ||
           activeWindow === 'terms' ||
-          activeWindow === 'contact') && (
+          activeWindow === 'contact' ||
+          activeWindow === 'faq') && (
           <WindowFrame
             key={activeWindow}
             title={
-              activeWindow === 'about'
+              activeWindow === 'faq'
+                ? 'सामान्य प्रश्न (Frequently Asked Questions - FAQ)'
+                : activeWindow === 'about'
                 ? 'हमारे बारे में (About Achievers Club Community)'
                 : activeWindow === 'terms'
                 ? 'नियम एवं शर्तें (Terms & Conditions)'
@@ -448,7 +451,9 @@ export default function App() {
                 : 'सपोर्ट हेल्पडेस्क एवं संपर्क (Contact Us & Support)'
             }
             subtitle={
-              activeWindow === 'about'
+              activeWindow === 'faq'
+                ? 'SWIS 3.30% रिचार्ज कमीशन, TWIS ₹150 रेफरल बोनस, रजिस्ट्रेशन व त्वरित पेआउट संबंधित सवाल'
+                : activeWindow === 'about'
                 ? 'ACC कम्युनिटी विजन, मिशन और युवाओं के लिए जीरो-इन्वेस्टमेंट मॉडल'
                 : activeWindow === 'terms'
                 ? 'सदस्यता दिशानिर्देश, 3.30% रिचार्ज कमीशन व ₹150 रेफरल नियम'
@@ -459,7 +464,9 @@ export default function App() {
                 : '24x7 सहायता, व्हाट्सएप सपोर्ट और अधिकृत कार्यालय पता'
             }
             icon={
-              activeWindow === 'about' ? (
+              activeWindow === 'faq' ? (
+                <HelpCircle className="w-4 h-4 text-yellow-400" />
+              ) : activeWindow === 'about' ? (
                 <Building2 className="w-4 h-4 text-amber-400" />
               ) : activeWindow === 'terms' ? (
                 <FileCheck className="w-4 h-4 text-emerald-400" />
@@ -612,6 +619,15 @@ export default function App() {
                   className="hover:text-white transition cursor-pointer text-left block w-full py-0.5"
                 >
                   सपोर्ट हेल्पडेस्क (Contact Us)
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => handleNavigateWithScroll('faq')}
+                  className="hover:text-yellow-300 font-semibold transition cursor-pointer text-left block w-full py-0.5 text-yellow-400"
+                >
+                  सामान्य प्रश्न (FAQ - सवाल-जवाब)
                 </button>
               </li>
             </ul>
