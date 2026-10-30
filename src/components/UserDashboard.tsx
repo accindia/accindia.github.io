@@ -46,11 +46,19 @@ import {
   CheckCircle,
   PlayCircle,
   ChevronRight,
-  Eye,
   X,
   Calculator,
+  Edit3,
+  MapPin,
+  Mail,
+  Phone,
+  History,
+  Save,
+  Shield,
+  FileSpreadsheet,
+  Eye,
 } from 'lucide-react';
-import { Member, PrivacySettings, WithdrawalRequest, ReferralRecord } from '../types';
+import { Member, PrivacySettings, WithdrawalRequest, ReferralRecord, ProfileFieldChange, ProfileEditAuditLog } from '../types';
 import { StorageService } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
 import { compressImage } from '../utils/imageCompressor';
@@ -90,6 +98,17 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
   const [completedLessons, setCompletedLessons] = useState<number[]>([0, 1]);
 
   // Profile Customization State (Photo, Link, Personal QR, Privacy)
+  const [editFullName, setEditFullName] = useState<string>(currentUser.fullName || '');
+  const [editMobile, setEditMobile] = useState<string>(currentUser.mobile || '');
+  const [editWhatsapp, setEditWhatsapp] = useState<string>(currentUser.whatsapp || '');
+  const [editEmail, setEditEmail] = useState<string>(currentUser.email || '');
+  const [editQualification, setEditQualification] = useState<string>(currentUser.qualification || 'Graduate');
+  const [editState, setEditState] = useState<string>(currentUser.state || '');
+  const [editCity, setEditCity] = useState<string>(currentUser.city || '');
+  const [editPincode, setEditPincode] = useState<string>(currentUser.pincode || '');
+  const [editAddress, setEditAddress] = useState<string>(currentUser.address || '');
+  const [profileViewMode, setProfileViewMode] = useState<'form' | 'audit_history'>('form');
+
   const [profileAvatar, setProfileAvatar] = useState<string>(currentUser.avatarUrl || '');
   const [profileLinkInput, setProfileLinkInput] = useState<string>(currentUser.profileLink || '');
   const [personalQrInput, setPersonalQrInput] = useState<string>(currentUser.personalQrUrl || '');
@@ -130,6 +149,16 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
 
   // Keep state synced with currentUser updates
   useEffect(() => {
+    if (currentUser.fullName) setEditFullName(currentUser.fullName);
+    if (currentUser.mobile) setEditMobile(currentUser.mobile);
+    if (currentUser.whatsapp) setEditWhatsapp(currentUser.whatsapp);
+    if (currentUser.email) setEditEmail(currentUser.email);
+    if (currentUser.qualification) setEditQualification(currentUser.qualification);
+    if (currentUser.state) setEditState(currentUser.state);
+    if (currentUser.city) setEditCity(currentUser.city);
+    if (currentUser.pincode) setEditPincode(currentUser.pincode);
+    if (currentUser.address) setEditAddress(currentUser.address);
+
     if (currentUser.avatarUrl) setProfileAvatar(currentUser.avatarUrl);
     if (currentUser.profileLink) setProfileLinkInput(currentUser.profileLink);
     if (currentUser.personalQrUrl) setPersonalQrInput(currentUser.personalQrUrl);
@@ -159,7 +188,22 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
         setPayoutIfsc(currentUser.payoutDetails.ifsc);
       }
     }
-  }, [currentUser.avatarUrl, currentUser.profileLink, currentUser.personalQrUrl, currentUser.privacySettings, currentUser.payoutDetails]);
+  }, [
+    currentUser.fullName,
+    currentUser.mobile,
+    currentUser.whatsapp,
+    currentUser.email,
+    currentUser.qualification,
+    currentUser.state,
+    currentUser.city,
+    currentUser.pincode,
+    currentUser.address,
+    currentUser.avatarUrl,
+    currentUser.profileLink,
+    currentUser.personalQrUrl,
+    currentUser.privacySettings,
+    currentUser.payoutDetails,
+  ]);
 
   const handleAvatarFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -255,14 +299,104 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
     setProfileSaveError('');
 
     try {
+      // Validate mobile numbers
+      const cleanMobile = editMobile.replace(/[^0-9]/g, '');
+      if (cleanMobile.length > 0 && cleanMobile.length < 10) {
+        setProfileSaveError('कृपया मान्य 10-अंकों का मोबाइल नंबर दर्ज करें।');
+        setIsSavingProfile(false);
+        return;
+      }
+
+      const cleanWhatsapp = editWhatsapp.replace(/[^0-9]/g, '');
+      if (cleanWhatsapp.length > 0 && cleanWhatsapp.length < 10) {
+        setProfileSaveError('कृपया मान्य 10-अंकों का व्हाट्सएप नंबर दर्ज करें।');
+        setIsSavingProfile(false);
+        return;
+      }
+
+      // Track individual field changes for Admin Audit Log
+      const changes: ProfileFieldChange[] = [];
+
+      const checkFieldChange = (field: string, fieldLabel: string, oldVal?: string, newVal?: string) => {
+        const o = (oldVal || '').trim();
+        const n = (newVal || '').trim();
+        if (o !== n) {
+          changes.push({
+            field,
+            fieldLabel,
+            oldValue: o || '(खाली / Not Set)',
+            newValue: n || '(हटाया गया / Removed)',
+          });
+        }
+      };
+
+      checkFieldChange('fullName', 'पूरा नाम (Full Name)', currentUser.fullName, editFullName);
+      checkFieldChange('mobile', 'मोबाइल नंबर (Mobile Number)', currentUser.mobile, editMobile);
+      checkFieldChange('whatsapp', 'व्हाट्सएप नंबर (WhatsApp Number)', currentUser.whatsapp, editWhatsapp);
+      checkFieldChange('email', 'ईमेल आईडी (Email ID)', currentUser.email, editEmail);
+      checkFieldChange('qualification', 'योग्यता (Qualification)', currentUser.qualification, editQualification);
+      checkFieldChange('state', 'राज्य (State)', currentUser.state, editState);
+      checkFieldChange('city', 'शहर (City)', currentUser.city, editCity);
+      checkFieldChange('pincode', 'पिनकोड (Pincode)', currentUser.pincode, editPincode);
+      checkFieldChange('address', 'पूरा पता (Full Address)', currentUser.address, editAddress);
+      checkFieldChange('profileLink', 'पर्सनल प्रोफाइल लिंक (Profile Link)', currentUser.profileLink, profileLinkInput);
+      checkFieldChange('payoutUpiId', 'पेआउट UPI आईडी (Payout UPI)', currentUser.payoutDetails?.upiId, payoutUpiId);
+      checkFieldChange('payoutHolderName', 'खाताधारक का नाम (Beneficiary Name)', currentUser.payoutDetails?.holderName, payoutHolderName);
+      checkFieldChange('payoutBankName', 'बैंक का नाम (Bank Name)', currentUser.payoutDetails?.bankName, payoutBankName);
+      checkFieldChange('payoutAccountNumber', 'बैंक खाता संख्या (Account No.)', currentUser.payoutDetails?.accountNumber, payoutAccountNumber);
+      checkFieldChange('payoutIfsc', 'IFSC कोड (IFSC Code)', currentUser.payoutDetails?.ifsc, payoutIfsc);
+
+      // Check avatar or QR changes
+      if ((profileAvatar || '') !== (currentUser.avatarUrl || '')) {
+        changes.push({
+          field: 'avatarUrl',
+          fieldLabel: 'प्रोफाइल फोटो (Profile DP)',
+          oldValue: currentUser.avatarUrl ? 'पुरानी फोटो सेट थी' : 'कोई फोटो नहीं थी',
+          newValue: profileAvatar ? 'नई प्रोफाइल फोटो सेट की गई' : 'फोटो हटाई गई',
+        });
+      }
+
+      if ((personalQrInput || '') !== (currentUser.personalQrUrl || '')) {
+        changes.push({
+          field: 'personalQrUrl',
+          fieldLabel: 'पर्सनल QR कोड इमेज (Personal QR)',
+          oldValue: currentUser.personalQrUrl ? 'पुराना QR कोड था' : 'कोई QR कोड नहीं था',
+          newValue: personalQrInput ? 'नया QR कोड सेट किया गया' : 'QR कोड हटाया गया',
+        });
+      }
+
+      let newAuditLog: ProfileEditAuditLog | null = null;
+      if (changes.length > 0) {
+        newAuditLog = {
+          id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          accId: currentUser.accId,
+          memberName: editFullName.trim() || currentUser.fullName,
+          timestamp: new Date().toISOString(),
+          changes: changes,
+        };
+        StorageService.saveAuditLog(newAuditLog);
+      }
+
+      const existingHistory = currentUser.editHistory || [];
+      const updatedHistory = newAuditLog ? [newAuditLog, ...existingHistory] : existingHistory;
+
       const updates: Partial<Member> = {
+        fullName: editFullName.trim() || currentUser.fullName,
+        mobile: editMobile.trim() || currentUser.mobile,
+        whatsapp: editWhatsapp.trim() || currentUser.whatsapp,
+        email: editEmail.trim(),
+        qualification: editQualification.trim(),
+        state: editState.trim(),
+        city: editCity.trim(),
+        pincode: editPincode.trim(),
+        address: editAddress.trim(),
         avatarUrl: profileAvatar || undefined,
         profileLink: profileLinkInput.trim() || undefined,
         personalQrUrl: personalQrInput || undefined,
         privacySettings: privacySettings,
         payoutDetails: {
           holderRelation: payoutHolderRelation,
-          holderName: payoutHolderName.trim() || currentUser.fullName,
+          holderName: payoutHolderName.trim() || editFullName.trim() || currentUser.fullName,
           payoutMethod: payoutMethod,
           upiId: payoutUpiId.trim() || undefined,
           bankName: payoutBankName.trim() || undefined,
@@ -270,6 +404,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
           ifsc: payoutIfsc.trim().toUpperCase() || undefined,
           updatedAt: new Date().toISOString(),
         },
+        editHistory: updatedHistory,
+        lastEditedAt: new Date().toISOString(),
       };
 
       const updated = StorageService.updateMember(currentUser.accId, updates);
@@ -277,10 +413,17 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
 
       if (updated) {
         onUpdateUser(updated);
-        setProfileSaveSuccess('प्रोफाइल फोटो, लिंक, QR, पेआउट बैंक खाता एवं प्राइवेसी सेटिंग्स सफलतापूर्वक अपडेट हो गईं!');
-        setTimeout(() => setProfileSaveSuccess(''), 3500);
+        if (changes.length > 0) {
+          setProfileSaveSuccess(
+            `✓ प्रोफाइल सफलतापूर्वक अपडेट हो गई! (${changes.length} बदलाव सुरक्षित किए गए और एडमिन रिकॉर्ड में दर्ज हो गए हैं)`
+          );
+        } else {
+          setProfileSaveSuccess('✓ आपकी प्रोफाइल सेटिंग्स सुरक्षित हैं।');
+        }
+        setTimeout(() => setProfileSaveSuccess(''), 4500);
       }
     } catch (err) {
+      console.warn('Error saving profile:', err);
       setProfileSaveError('प्रोफाइल अपडेट करने में त्रुटि आई। कृपया पुनः प्रयास करें।');
     } finally {
       setIsSavingProfile(false);
@@ -1063,91 +1206,111 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
         </div>
       </div>
 
-      {/* Tabs Navigation */}
-      <div className="flex bg-white border border-gray-200 rounded-xl p-1 gap-1 overflow-x-auto no-scrollbar shadow-xs">
-        <button
-          onClick={() => setActiveTab('applink')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold whitespace-nowrap rounded-lg transition ${
-            activeTab === 'applink'
-              ? 'bg-blue-50 text-[#2874f0] border border-blue-200'
-              : 'text-slate-700 hover:bg-slate-50'
-          }`}
-        >
-          <Smartphone className="w-4 h-4 text-[#2874f0]" />
-          <span>Real App डिलीवरी लिंक</span>
-        </button>
+      {/* Redesigned Clean Dashboard Menu System */}
+      <div className="bg-white border border-gray-200 rounded-xl p-2.5 shadow-xs space-y-2">
+        <div className="flex items-center justify-between px-2 pt-1 border-b border-gray-100 pb-2">
+          <div className="flex items-center gap-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-[#2874f0] animate-pulse"></div>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
+              डैशबोर्ड मुख्य मेनू (Select Services & Actions)
+            </span>
+          </div>
+          <span className="text-[11px] text-[#2874f0] font-bold bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
+            {activeTab === 'applink' && '📱 Real App डिलीवरी लिंक'}
+            {activeTab === 'kit' && '📚 मेरी किट व ट्रेनिंग'}
+            {activeTab === 'twis' && '👥 TWIS रेफरल (₹150/दोस्त)'}
+            {activeTab === 'swis' && '⚡ SWIS रिचार्ज (3.30% कमीशन)'}
+            {activeTab === 'idcard' && '🪪 डिजिटल ID कार्ड'}
+            {activeTab === 'profile' && '✏️ प्रोफाइल व विवरण एडिट'}
+            {activeTab === 'courses' && '🎓 स्टूडेंट अकेडमी'}
+          </span>
+        </div>
 
-        <button
-          onClick={() => setActiveTab('kit')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold whitespace-nowrap rounded-lg transition ${
-            activeTab === 'kit'
-              ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-              : 'text-slate-700 hover:bg-slate-50'
-          }`}
-        >
-          <BookOpen className="w-4 h-4 text-indigo-600" />
-          <span>📚 मेरी {currentUser.plan} किट व प्रशिक्षण</span>
-        </button>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-1.5 sm:gap-2 bg-slate-50/80 p-1.5 rounded-lg w-full max-w-full">
+          <button
+            onClick={() => setActiveTab('applink')}
+            className={`flex items-center justify-center gap-1.5 px-2.5 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+              activeTab === 'applink'
+                ? 'bg-[#2874f0] text-white shadow-xs ring-1 ring-[#2874f0]'
+                : 'bg-white text-slate-700 hover:text-[#2874f0] hover:bg-blue-50/50 border border-gray-200/80'
+            }`}
+          >
+            <Smartphone className="w-4 h-4 shrink-0" />
+            <span className="truncate">Real App</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('twis')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold whitespace-nowrap rounded-lg transition ${
-            activeTab === 'twis'
-              ? 'bg-blue-50 text-[#2874f0] border border-blue-200'
-              : 'text-slate-700 hover:bg-slate-50'
-          }`}
-        >
-          <Users className="w-4 h-4 text-[#2874f0]" />
-          <span>TWIS रेफरल हब (₹150/दोस्त)</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('twis')}
+            className={`flex items-center justify-center gap-1.5 px-2.5 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+              activeTab === 'twis'
+                ? 'bg-[#2874f0] text-white shadow-xs ring-1 ring-[#2874f0]'
+                : 'bg-white text-slate-700 hover:text-[#2874f0] hover:bg-blue-50/50 border border-gray-200/80'
+            }`}
+          >
+            <Users className="w-4 h-4 shrink-0" />
+            <span className="truncate">TWIS (₹150)</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('swis')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold whitespace-nowrap rounded-lg transition ${
-            activeTab === 'swis'
-              ? 'bg-green-50 text-emerald-700 border border-green-200'
-              : 'text-slate-700 hover:bg-slate-50'
-          }`}
-        >
-          <Zap className="w-4 h-4 text-emerald-600" />
-          <span>SWIS रिचार्ज सेवाएं (3.30% कमीशन)</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('swis')}
+            className={`flex items-center justify-center gap-1.5 px-2.5 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+              activeTab === 'swis'
+                ? 'bg-emerald-600 text-white shadow-xs ring-1 ring-emerald-600'
+                : 'bg-white text-slate-700 hover:text-emerald-700 hover:bg-emerald-50/50 border border-gray-200/80'
+            }`}
+          >
+            <Zap className="w-4 h-4 shrink-0 text-emerald-500" />
+            <span className="truncate">SWIS (3.30%)</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('idcard')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold whitespace-nowrap rounded-lg transition ${
-            activeTab === 'idcard'
-              ? 'bg-amber-50 text-amber-800 border border-amber-200'
-              : 'text-slate-700 hover:bg-slate-50'
-          }`}
-        >
-          <CreditCard className="w-4 h-4 text-amber-600" />
-          <span>डिजिटल ID कार्ड</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('idcard')}
+            className={`flex items-center justify-center gap-1.5 px-2.5 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+              activeTab === 'idcard'
+                ? 'bg-amber-600 text-white shadow-xs ring-1 ring-amber-600'
+                : 'bg-white text-slate-700 hover:text-amber-800 hover:bg-amber-50/50 border border-gray-200/80'
+            }`}
+          >
+            <CreditCard className="w-4 h-4 shrink-0 text-amber-500" />
+            <span className="truncate">डिजिटल ID</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('courses')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold whitespace-nowrap rounded-lg transition ${
-            activeTab === 'courses'
-              ? 'bg-purple-50 text-purple-800 border border-purple-200'
-              : 'text-slate-700 hover:bg-slate-50'
-          }`}
-        >
-          <GraduationCap className="w-4 h-4 text-purple-600" />
-          <span>स्टूडेंट अकेडमी कोर्सेज</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('profile')}
+            className={`flex items-center justify-center gap-1.5 px-2.5 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+              activeTab === 'profile'
+                ? 'bg-[#fb641b] text-white shadow-xs ring-2 ring-[#fb641b]'
+                : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-300 font-extrabold shadow-xs'
+            }`}
+          >
+            <Edit3 className={`w-4 h-4 shrink-0 ${activeTab === 'profile' ? 'text-white' : 'text-[#fb641b]'}`} />
+            <span className="truncate">✏️ प्रोफाइल एडिट</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('profile')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold whitespace-nowrap rounded-lg transition ${
-            activeTab === 'profile'
-              ? 'bg-amber-50 text-amber-900 border border-amber-300 shadow-xs'
-              : 'text-slate-700 hover:bg-slate-50'
-          }`}
-        >
-          <Camera className="w-4 h-4 text-amber-600" />
-          <span>👤 प्रोफाइल फोटो व 🆔 लिंक</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('kit')}
+            className={`flex items-center justify-center gap-1.5 px-2.5 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+              activeTab === 'kit'
+                ? 'bg-indigo-600 text-white shadow-xs ring-1 ring-indigo-600'
+                : 'bg-white text-slate-700 hover:text-indigo-700 hover:bg-indigo-50/50 border border-gray-200/80'
+            }`}
+          >
+            <BookOpen className="w-4 h-4 shrink-0 text-indigo-500" />
+            <span className="truncate">📚 किट & ट्रेनिंग</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('courses')}
+            className={`flex items-center justify-center gap-1.5 px-2.5 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+              activeTab === 'courses'
+                ? 'bg-purple-600 text-white shadow-xs ring-1 ring-purple-600'
+                : 'bg-white text-slate-700 hover:text-purple-700 hover:bg-purple-50/50 border border-gray-200/80'
+            }`}
+          >
+            <GraduationCap className="w-4 h-4 shrink-0 text-purple-500" />
+            <span className="truncate">स्टूडेंट अकेडमी</span>
+          </button>
+        </div>
       </div>
 
       {/* TAB 1: Real App Link Section */}
@@ -1558,18 +1721,49 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
         </div>
       )}
 
-      {/* TAB 6: Profile Photo & ID Card Customization */}
+      {/* TAB 6: Comprehensive Profile Edit & Audit History Portal */}
       {activeTab === 'profile' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fadeIn">
           <div className="lg:col-span-7 bg-white border border-gray-200 rounded-xl p-5 sm:p-6 space-y-5 shadow-xs">
-            <div className="border-b border-gray-100 pb-3">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Camera className="w-5 h-5 text-[#2874f0]" />
-                <span>डिजिटल 🆔 कार्ड प्रोफाइल फोटो व कस्टमाइज़ेशन</span>
-              </h3>
-              <p className="text-xs text-slate-500 mt-1">
-                अपनी आकर्षक पासपोर्ट फोटो लगाएं, पर्सनल वेबसाइट / सोशल मीडिया लिंक जोड़ें और अपना पर्सनल QR कोड सेट करें।
-              </p>
+            {/* Header & Sub-Tabs */}
+            <div className="border-b border-gray-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Edit3 className="w-5 h-5 text-[#fb641b]" />
+                  <span>मेरी प्रोफाइल व व्यक्तिगत विवरण (Edit Profile)</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  आप अपना नाम, मोबाइल, पता, योग्यता व बैंक विवरण कभी भी अपडेट कर सकते हैं।
+                </p>
+              </div>
+
+              {/* Sub-view switcher */}
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setProfileViewMode('form')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                    profileViewMode === 'form'
+                      ? 'bg-white text-[#2874f0] shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>एडिट फॉर्म</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProfileViewMode('audit_history')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                    profileViewMode === 'audit_history'
+                      ? 'bg-white text-emerald-700 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <History className="w-3.5 h-3.5" />
+                  <span>अपडेट हिस्ट्री ({currentUser.editHistory?.length || 0})</span>
+                </button>
+              </div>
             </div>
 
             {profileSaveSuccess && (
@@ -1586,9 +1780,204 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
               </div>
             )}
 
-            <form onSubmit={handleSaveProfileSettings} className="space-y-4">
-              {/* Profile Photo Uploader */}
-              <div className="p-4 bg-slate-50 border border-gray-200 rounded-xl flex flex-col sm:flex-row items-center gap-4">
+            {profileViewMode === 'form' ? (
+              <form onSubmit={handleSaveProfileSettings} className="space-y-4">
+                {/* 🔒 LOCKED IDENTIFIERS NOTICE BANNER */}
+                <div className="p-3.5 bg-amber-50/80 border border-amber-300 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-amber-950 font-bold text-xs">
+                      <Lock className="w-3.5 h-3.5 text-amber-700" />
+                      <span>सिस्टम सुरक्षित एवं स्थायी विवरण (Locked Identifiers - Non-Editable)</span>
+                    </div>
+                    <span className="text-[10px] font-bold bg-amber-200 text-amber-950 px-2 py-0.5 rounded-full border border-amber-300">
+                      🔒 स्थायी लॉक
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                    सुरक्षा एवं कानूनी पारदर्शिता हेतु आपकी <strong>Unique ACC ID</strong> और <strong>Sponsor ID</strong> स्थायी हैं और इन्हें बदला नहीं जा सकता। बाकी सभी व्यक्तिगत व संपर्क विवरण आप अपनी सुविधानुसार नीचे कभी भी अपडेट कर सकते हैं।
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-xs">
+                    <div className="bg-white p-2 rounded-lg border border-amber-200">
+                      <span className="text-[10px] text-slate-500 font-medium block">आपकी Unique ACC ID:</span>
+                      <div className="flex items-center justify-between mt-0.5">
+                        <span className="font-mono-acc font-black text-slate-900 text-xs">{currentUser.accId}</span>
+                        <Lock className="w-3 h-3 text-slate-400" />
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-2 rounded-lg border border-amber-200">
+                      <span className="text-[10px] text-slate-500 font-medium block">Sponsor ID:</span>
+                      <div className="flex items-center justify-between mt-0.5">
+                        <span className="font-mono-acc font-black text-slate-900 text-xs">{currentUser.sponsorId || 'ACC-ADMIN'}</span>
+                        <Lock className="w-3 h-3 text-slate-400" />
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-2 rounded-lg border border-amber-200">
+                      <span className="text-[10px] text-slate-500 font-medium block">सक्रिय प्लान:</span>
+                      <div className="flex items-center justify-between mt-0.5">
+                        <span className="font-bold text-[#2874f0] text-xs">{currentUser.plan} प्लान (₹249)</span>
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SECTION 1: PRIMARY PERSONAL DETAILS */}
+                <div className="p-3.5 bg-slate-50 border border-gray-200 rounded-xl space-y-2.5">
+                  <div className="flex items-center gap-1.5 border-b border-gray-200 pb-1.5">
+                    <User className="w-3.5 h-3.5 text-[#2874f0]" />
+                    <h4 className="text-xs font-bold text-slate-900">1. व्यक्तिगत विवरण (Personal Details)</h4>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-800 mb-1">
+                        पूरा नाम (Full Name) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={editFullName}
+                        onChange={(e) => setEditFullName(e.target.value)}
+                        placeholder="उदा. Rahul Kumar"
+                        required
+                        className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs text-slate-900 font-semibold focus:outline-none focus:border-[#2874f0] focus:ring-1 focus:ring-[#2874f0]"
+                      />
+                      <span className="text-[10px] text-slate-500 mt-0.5 block">यह नाम आपके डिजिटल आईडी कार्ड पर दिखेगा</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-800 mb-1">
+                        शैक्षणिक योग्यता (Qualification)
+                      </label>
+                      <select
+                        value={editQualification}
+                        onChange={(e) => setEditQualification(e.target.value)}
+                        className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs text-slate-900 font-semibold focus:outline-none focus:border-[#2874f0]"
+                      >
+                        <option value="10th Pass">10वीं पास (10th Pass)</option>
+                        <option value="12th Pass">12वीं पास (12th Pass)</option>
+                        <option value="Undergraduate">कॉलेज छात्र (Undergraduate)</option>
+                        <option value="Graduate">स्नातक (Graduate)</option>
+                        <option value="Post Graduate">परास्नातक (Post Graduate)</option>
+                        <option value="Diploma / ITI">डिप्लोमा / आईटीआई</option>
+                        <option value="Other">अन्य (Other)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SECTION 2: CONTACT DETAILS */}
+                <div className="p-3.5 bg-slate-50 border border-gray-200 rounded-xl space-y-2.5">
+                  <div className="flex items-center gap-1.5 border-b border-gray-200 pb-1.5">
+                    <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                    <h4 className="text-xs font-bold text-slate-900">2. संपर्क विवरण (Contact Details)</h4>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-800 mb-1">
+                        मोबाइल नंबर (Calling Mobile) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        value={editMobile}
+                        onChange={(e) => setEditMobile(e.target.value.replace(/[^0-9]/g, ''))}
+                        maxLength={10}
+                        placeholder="10 अंक"
+                        required
+                        className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono-acc text-slate-900 focus:outline-none focus:border-[#2874f0]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-800 mb-1">
+                        व्हाट्सएप नंबर (WhatsApp Number) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        value={editWhatsapp}
+                        onChange={(e) => setEditWhatsapp(e.target.value.replace(/[^0-9]/g, ''))}
+                        maxLength={10}
+                        placeholder="10 अंक"
+                        required
+                        className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono-acc text-slate-900 focus:outline-none focus:border-[#2874f0]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-800 mb-1">
+                        ईमेल आईडी (Email Address)
+                      </label>
+                      <input
+                        type="email"
+                        value={editEmail}
+                        onChange={(e) => setEditEmail(e.target.value)}
+                        placeholder="उदा. name@gmail.com"
+                        className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0]"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* SECTION 3: LOCATION & ADDRESS */}
+                <div className="p-3.5 bg-slate-50 border border-gray-200 rounded-xl space-y-2.5">
+                  <div className="flex items-center gap-1.5 border-b border-gray-200 pb-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-rose-600" />
+                    <h4 className="text-xs font-bold text-slate-900">3. आवासीय पता व स्थान (Address & Location)</h4>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-800 mb-1">राज्य (State)</label>
+                      <input
+                        type="text"
+                        value={editState}
+                        onChange={(e) => setEditState(e.target.value)}
+                        placeholder="उदा. Madhya Pradesh"
+                        className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-800 mb-1">शहर / जिला (City)</label>
+                      <input
+                        type="text"
+                        value={editCity}
+                        onChange={(e) => setEditCity(e.target.value)}
+                        placeholder="उदा. Indore"
+                        className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-800 mb-1">पिनकोड (Pincode)</label>
+                      <input
+                        type="text"
+                        value={editPincode}
+                        onChange={(e) => setEditPincode(e.target.value.replace(/[^0-9]/g, ''))}
+                        maxLength={6}
+                        placeholder="6 अंक (उदा. 452001)"
+                        className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono-acc text-slate-900 focus:outline-none focus:border-[#2874f0]"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-800 mb-1">पूरा पता (Full Address)</label>
+                    <textarea
+                      rows={2}
+                      value={editAddress}
+                      onChange={(e) => setEditAddress(e.target.value)}
+                      placeholder="मकान नंबर, वार्ड, कॉलोनी या गांव/कस्बा"
+                      className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0]"
+                    />
+                  </div>
+                </div>
+
+                {/* Profile Photo Uploader */}
+                <div className="p-4 bg-slate-50 border border-gray-200 rounded-xl flex flex-col sm:flex-row items-center gap-4">
                 <div className="relative shrink-0">
                   <div className="w-24 h-24 rounded-full bg-slate-200 border-3 border-[#2874f0] flex items-center justify-center overflow-hidden shadow-sm">
                     {profileAvatar ? (
@@ -1962,38 +2351,149 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                 </div>
               </div>
 
-              {/* Save Button */}
-              <div className="pt-2">
+              {/* Save and Reset Buttons */}
+              <div className="pt-2 flex flex-col sm:flex-row items-center gap-2.5">
                 <button
                   type="submit"
                   disabled={isSavingProfile}
-                  className="w-full py-3 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold text-xs rounded-sm shadow-md flex items-center justify-center gap-2 transition disabled:opacity-50"
+                  className="w-full sm:flex-1 py-3 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold text-xs rounded-lg shadow-md flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer"
                 >
                   {isSavingProfile ? (
                     <span>सहेज रहे हैं...</span>
                   ) : (
                     <>
-                      <Sparkles className="w-4 h-4" />
-                      <span>💾 प्रोफाइल फोटो एवं आईडी कार्ड अपडेट सहेजें (Save Changes)</span>
+                      <Save className="w-4 h-4" />
+                      <span>💾 सभी प्रोफाइल बदलाव सहेजें (Save Profile Changes)</span>
                     </>
                   )}
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditFullName(currentUser.fullName || '');
+                    setEditMobile(currentUser.mobile || '');
+                    setEditWhatsapp(currentUser.whatsapp || '');
+                    setEditEmail(currentUser.email || '');
+                    setEditQualification(currentUser.qualification || 'Graduate');
+                    setEditState(currentUser.state || '');
+                    setEditCity(currentUser.city || '');
+                    setEditPincode(currentUser.pincode || '');
+                    setEditAddress(currentUser.address || '');
+                    setProfileAvatar(currentUser.avatarUrl || '');
+                    setProfileLinkInput(currentUser.profileLink || '');
+                    setPersonalQrInput(currentUser.personalQrUrl || '');
+                    setProfileSaveSuccess('फॉर्म रीसेट कर दिया गया।');
+                    setTimeout(() => setProfileSaveSuccess(''), 2500);
+                  }}
+                  className="w-full sm:w-auto px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg border border-gray-200 transition cursor-pointer"
+                >
+                  🔄 रीसेट
+                </button>
               </div>
             </form>
+            ) : (
+              /* MY EDIT HISTORY AUDIT LOG VIEW */
+              <div className="space-y-4">
+                <div className="flex items-center justify-between bg-blue-50/60 p-3 rounded-lg border border-blue-200">
+                  <div className="flex items-center gap-2">
+                    <History className="w-4 h-4 text-[#2874f0]" />
+                    <span className="text-xs font-bold text-slate-800">
+                      मेरी प्रोफाइल अपडेट हिस्ट्री (My Profile Edit Log)
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-bold text-[#2874f0] bg-white px-2 py-0.5 rounded border border-blue-200">
+                    कुल {currentUser.editHistory?.length || 0} बार अपडेट किया गया
+                  </span>
+                </div>
+
+                {(!currentUser.editHistory || currentUser.editHistory.length === 0) ? (
+                  <div className="text-center py-10 bg-slate-50 rounded-xl border border-dashed border-gray-200 space-y-2">
+                    <History className="w-8 h-8 text-slate-300 mx-auto" />
+                    <p className="text-xs font-bold text-slate-600">
+                      अभी तक आपने कोई प्रोफाइल विवरण अपडेट नहीं किया है।
+                    </p>
+                    <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                      जब भी आप अपना नाम, मोबाइल, पता, या बैंक विवरण बदलेंगे, यहाँ पुराना और नया विवरण तारीख के साथ दिखाई देगा।
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setProfileViewMode('form')}
+                      className="mt-2 px-3.5 py-1.5 bg-[#2874f0] text-white font-bold text-xs rounded-lg transition cursor-pointer"
+                    >
+                      प्रोफाइल एडिट करें
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {currentUser.editHistory.map((log, idx) => (
+                      <div key={log.id || idx} className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-xs space-y-2.5">
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-2 text-xs">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <span className="font-bold text-slate-800">अपडेट सेशन #{currentUser.editHistory!.length - idx}</span>
+                          </div>
+                          <span className="text-[11px] text-slate-500 flex items-center gap-1 font-mono-acc">
+                            <Clock className="w-3 h-3 text-slate-400" />
+                            {new Date(log.timestamp).toLocaleString('hi-IN')}
+                          </span>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-[11px] text-left border-collapse">
+                            <thead>
+                              <tr className="bg-slate-50 text-slate-600 border-b border-gray-200">
+                                <th className="py-1 px-2 font-bold">फ़ील्ड नाम</th>
+                                <th className="py-1 px-2 font-bold text-red-700">पुराना मान (Old Value)</th>
+                                <th className="py-1 px-2 font-bold text-emerald-700">नया मान (New Value)</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {log.changes.map((change, cIdx) => (
+                                <tr key={cIdx} className="hover:bg-slate-50/50">
+                                  <td className="py-1.5 px-2 font-semibold text-slate-800">{change.fieldLabel}</td>
+                                  <td className="py-1.5 px-2 font-mono text-red-600 bg-red-50/40 rounded line-through">
+                                    {change.oldValue}
+                                  </td>
+                                  <td className="py-1.5 px-2 font-mono text-emerald-700 font-bold bg-emerald-50/40 rounded">
+                                    {change.newValue}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* RIGHT: Live ID Card Preview with Photo & Link */}
           <div className="lg:col-span-5 space-y-3">
-            <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
-              <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-2">
-                लाइव डिजिटल 🆔 कार्ड प्रिव्यू (Live Preview)
-              </span>
+            <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs sticky top-20">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
+                  लाइव डिजिटल 🆔 कार्ड प्रिव्यू (Live Preview)
+                </span>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                  रियल-टाइम सिंक ✓
+                </span>
+              </div>
               <p className="text-[11px] text-slate-500 mb-3">
-                आपकी अपलोड की गई फोटो और लिंक नीचे दिए गए स्टूडेंट आईडी कार्ड पर तुरंत लाइव दिखाई देगी:
+                जैसे ही आप अपना नाम, फोटो या शहर अपडेट करेंगे, आपका यह स्टूडेंट पहचान पत्र तुरंत नए विवरण के साथ अपडेट हो जाएगा:
               </p>
               <DigitalIdCard
                 member={{
                   ...currentUser,
+                  fullName: editFullName || currentUser.fullName,
+                  mobile: editMobile || currentUser.mobile,
+                  whatsapp: editWhatsapp || currentUser.whatsapp,
+                  email: editEmail || currentUser.email,
+                  city: editCity || currentUser.city,
+                  state: editState || currentUser.state,
                   avatarUrl: profileAvatar || currentUser.avatarUrl,
                   profileLink: profileLinkInput || currentUser.profileLink,
                   personalQrUrl: personalQrInput || currentUser.personalQrUrl,

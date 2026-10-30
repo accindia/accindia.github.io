@@ -10,7 +10,7 @@ import {
   onSnapshot,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { Member, RechargeTransaction, ReferralRecord, WithdrawalRequest, SiteConfig } from '../types';
+import { Member, RechargeTransaction, ReferralRecord, WithdrawalRequest, SiteConfig, ProfileEditAuditLog } from '../types';
 import { ensureSafeFirestoreSize } from '../utils/imageCompressor';
 
 // Collections
@@ -475,6 +475,45 @@ export const FirestoreService = {
       );
     } catch (e) {
       console.warn('Could not subscribe to site config:', e);
+      return () => {};
+    }
+  },
+
+  // Save profile edit audit log
+  async saveAuditLog(log: ProfileEditAuditLog): Promise<boolean> {
+    try {
+      await setDoc(doc(db, 'profile_audit_logs', log.id), JSON.parse(JSON.stringify(log)));
+      return true;
+    } catch (err) {
+      console.warn('Firestore saveAuditLog error:', err);
+      return false;
+    }
+  },
+
+  // Fetch all profile edit audit logs
+  async getAuditLogs(): Promise<ProfileEditAuditLog[]> {
+    try {
+      const snap = await getDocs(collection(db, 'profile_audit_logs'));
+      return snap.docs
+        .map((d) => d.data() as ProfileEditAuditLog)
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    } catch (err) {
+      console.warn('Firestore getAuditLogs error:', err);
+      return [];
+    }
+  },
+
+  // Subscribe to profile audit logs
+  subscribeToAuditLogs(onUpdate: (logs: ProfileEditAuditLog[]) => void): () => void {
+    try {
+      return onSnapshot(collection(db, 'profile_audit_logs'), (snap) => {
+        const logs = snap.docs
+          .map((d) => d.data() as ProfileEditAuditLog)
+          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        onUpdate(logs);
+      });
+    } catch (e) {
+      console.warn('Could not subscribe to profile audit logs:', e);
       return () => {};
     }
   },

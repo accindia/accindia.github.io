@@ -28,6 +28,21 @@ export interface PaymentAccountDetails {
   updatedAt?: string;
 }
 
+export interface ProfileFieldChange {
+  field: string;
+  fieldLabel: string;
+  oldValue: string;
+  newValue: string;
+}
+
+export interface ProfileEditAuditLog {
+  id: string;
+  accId: string;
+  memberName: string;
+  timestamp: string;
+  changes: ProfileFieldChange[];
+}
+
 export interface Member {
   id: string;
   accId: string; // e.g. ACC249SWISRK01 or ACC249TWISRK01
@@ -73,6 +88,8 @@ export interface Member {
   sponsorCommissionPaidAt?: string;
   sponsorCommissionUtr?: string;
   sponsorCommissionAmount?: number;
+  editHistory?: ProfileEditAuditLog[];
+  lastEditedAt?: string;
 }
 
 export type ServiceType = 

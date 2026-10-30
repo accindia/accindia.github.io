@@ -153,39 +153,35 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const navItems = [
-    { id: 'home' as ActiveWindow, label: 'होम', icon: <Sparkles className="w-3.5 h-3.5 text-yellow-300" /> },
+    { id: 'home' as ActiveWindow, label: 'होम', icon: <Sparkles className="w-3.5 h-3.5 text-amber-500" /> },
     { id: 'video' as ActiveWindow, label: 'ट्रेनिंग वीडियो', icon: <Video className="w-3.5 h-3.5 text-rose-500" /> },
-    { id: 'calculator' as ActiveWindow, label: 'पॉकेट मनी कैलकुलेटर', icon: <Calculator className="w-3.5 h-3.5 text-emerald-600" /> },
+    { id: 'calculator' as ActiveWindow, label: 'कैलकुलेटर', icon: <Calculator className="w-3.5 h-3.5 text-emerald-600" /> },
     ...(!currentUser
       ? [
           {
             id: 'register' as ActiveWindow,
-            label: `रजिस्ट्रेशन (₹${siteConfig.activationFee || 249})`,
-            icon: <Sparkles className="w-3.5 h-3.5 text-amber-500" />,
+            label: 'रजिस्ट्रेशन',
+            icon: <Sparkles className="w-3.5 h-3.5 text-[#fb641b]" />,
           },
         ]
       : []),
     {
       id: 'idcard' as ActiveWindow,
-      label: currentUser
-        ? 'मेरा डिजिटल ID कार्ड'
-        : referralSponsor
-        ? 'स्पॉन्सर डिजिटल ID कार्ड'
-        : 'डिजिटल ID कार्ड',
+      label: 'डिजिटल ID',
       icon: <CreditCard className="w-3.5 h-3.5 text-cyan-600" />,
     },
     {
       id: 'dashboard' as ActiveWindow,
-      label: currentUser ? 'मेरा डैशबोर्ड' : 'विद्यार्थी डैशबोर्ड',
+      label: 'डैशबोर्ड',
       icon: <LayoutDashboard className="w-3.5 h-3.5 text-[#2874f0]" />,
     },
     {
       id: 'promotions' as ActiveWindow,
-      label: 'प्रमोशन & विजिटिंग कार्ड',
-      icon: <Megaphone className="w-3.5 h-3.5 text-amber-300" />,
+      label: 'प्रमोशन किट',
+      icon: <Megaphone className="w-3.5 h-3.5 text-amber-500" />,
     },
     { id: 'admin' as ActiveWindow, label: 'एडमिन पैनल', icon: <ShieldCheck className="w-3.5 h-3.5 text-red-500" /> },
-    { id: 'faq' as ActiveWindow, label: 'FAQ सवाल-जवाब', icon: <HelpCircle className="w-3.5 h-3.5 text-yellow-500" /> },
+    { id: 'faq' as ActiveWindow, label: 'FAQ', icon: <HelpCircle className="w-3.5 h-3.5 text-yellow-500" /> },
     { id: 'about' as ActiveWindow, label: 'हमारे बारे में', icon: <Award className="w-3.5 h-3.5 text-blue-500" /> },
     { id: 'contact' as ActiveWindow, label: 'सपोर्ट', icon: <Phone className="w-3.5 h-3.5 text-green-600" /> },
   ];
@@ -194,7 +190,7 @@ export const Header: React.FC<HeaderProps> = ({
   const cleanWhatsApp = (siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '');
 
   return (
-    <header className="sticky top-0 z-40 w-full shadow-sm bg-[#2874f0]">
+    <header className="fixed top-0 left-0 right-0 z-50 w-full shadow-md bg-[#2874f0] select-none">
       {/* Top Yellow Announcement Banner - Highlights & Features Showcase */}
       <div className="bg-[#ffe500] text-[#212121] text-xs font-semibold py-1 px-2 sm:px-4 overflow-hidden border-b border-yellow-400 select-none">
         <div className="flex items-center justify-between gap-2 max-w-7xl mx-auto w-full">
@@ -344,19 +340,19 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Navigation Sub-bar (Clean White Flipkart Style - Desktop & Tablet) */}
-      <div className="hidden md:block bg-white border-b border-gray-200 px-4 py-1 shadow-xs">
-        <div className="max-w-7xl mx-auto flex items-center gap-1 overflow-x-auto no-scrollbar">
+      {/* Navigation Sub-bar - Perfectly Adjusted Desktop Menu */}
+      <div className="hidden md:block bg-white border-b border-gray-200 px-3 py-1 shadow-xs w-full">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-1 lg:gap-1.5">
           {navItems.map((item) => {
             const isActive = activeWindow === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => handleNavClick(item.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs whitespace-nowrap transition-all ${
+                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md font-semibold transition-all cursor-pointer whitespace-nowrap ${
                   isActive
-                    ? 'text-[#2874f0] font-bold border-b-2 border-[#2874f0] bg-blue-50/50'
-                    : 'text-slate-700 font-medium hover:text-[#2874f0] hover:bg-slate-50'
+                    ? 'text-[#2874f0] font-bold bg-blue-50 border border-blue-200 shadow-xs ring-1 ring-blue-300/50'
+                    : 'text-slate-700 hover:text-[#2874f0] hover:bg-slate-100 border border-transparent'
                 }`}
               >
                 {item.icon}

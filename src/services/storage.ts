@@ -1,4 +1,4 @@
-import { Member, PlanType, RechargeTransaction, ReferralRecord, WithdrawalRequest, AppServiceItem, PromotionalPoster, SiteConfig } from '../types';
+import { Member, PlanType, RechargeTransaction, ReferralRecord, WithdrawalRequest, AppServiceItem, PromotionalPoster, SiteConfig, ProfileEditAuditLog } from '../types';
 import { FirestoreService } from './firestore';
 
 const MEMBERS_KEY = 'acc_members_data_v2';
@@ -7,6 +7,7 @@ const REFERRALS_KEY = 'acc_referrals_data_v2';
 const WITHDRAWALS_KEY = 'acc_withdrawals_data_v2';
 const CURRENT_USER_KEY = 'acc_current_user_v2';
 const SITE_CONFIG_KEY = 'acc_site_config_v2';
+const PROFILE_AUDIT_KEY = 'acc_profile_audit_logs_v1';
 
 export const DEFAULT_SERVICES: AppServiceItem[] = [
   {
@@ -565,6 +566,27 @@ export const StorageService = {
       this.setCurrentUser(members[idx]);
     }
     return members[idx];
+  },
+
+  getAuditLogs(): ProfileEditAuditLog[] {
+    try {
+      const data = localStorage.getItem(PROFILE_AUDIT_KEY);
+      return data ? JSON.parse(data) : [];
+    } catch {
+      return [];
+    }
+  },
+
+  saveAuditLog(log: ProfileEditAuditLog): void {
+    const current = this.getAuditLogs();
+    const updated = [log, ...current];
+    try {
+      localStorage.setItem(PROFILE_AUDIT_KEY, JSON.stringify(updated.slice(0, 500)));
+    } catch (e) {
+      console.warn('Storage audit log error:', e);
+    }
+    FirestoreService.saveAuditLog(log).catch((e) => console.warn('Firestore audit log error:', e));
+    notifySync();
   },
 
   getTransactions(): RechargeTransaction[] {

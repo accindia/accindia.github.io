@@ -13,6 +13,7 @@ import { LegalPages } from './components/LegalPages';
 import { StudentPortalGate } from './components/StudentPortalGate';
 import { IdCardAccessGate } from './components/IdCardAccessGate';
 import { PromotionBrandingHub } from './components/PromotionBrandingHub';
+import { LockedFooterBar } from './components/LockedFooterBar';
 import { ActiveWindow, Member, SiteConfig } from './types';
 import { StorageService, subscribeToSync } from './services/storage';
 import { FirestoreService } from './services/firestore';
@@ -201,7 +202,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#f1f2f4] text-slate-800 flex flex-col selection:bg-[#2874f0] selection:text-white font-sans w-full max-w-[100vw] overflow-x-hidden">
-      {/* Official Top Bar & Live IOIS-Style Realtime Clock Header */}
+      {/* Official Top Bar & Live IOIS-Style Realtime Clock Header (Fixed Rock-Solid) */}
       <Header
         activeWindow={activeWindow}
         setActiveWindow={handleNavigateWithScroll}
@@ -210,6 +211,9 @@ export default function App() {
         referralSponsor={referralSponsor}
         onNavigateToIdCard={handleNavigateToIdCard}
       />
+
+      {/* Spacer ensuring page content starts right below the permanently fixed header */}
+      <div className="h-[80px] md:h-[114px] w-full shrink-0" aria-hidden="true" />
 
       {/* Main Container - 100% Mobile Fluid Fit */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-2 sm:p-4 md:p-6 pb-24 overflow-x-hidden">
@@ -661,7 +665,7 @@ export default function App() {
           </div>
         </div>
 
-        <div className="bg-[#0f172a] py-3 px-4 border-t border-slate-800 text-center text-[11px] text-slate-500">
+        <div className="bg-[#0f172a] py-3 px-4 border-t border-slate-800 text-center text-[11px] text-slate-500 mb-20 sm:mb-16">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
             <span>© {new Date().getFullYear()} Achievers Club Community (ACC). All Rights Reserved.</span>
             <span className="text-slate-400">
@@ -671,52 +675,14 @@ export default function App() {
         </div>
       </footer>
 
-      {/* Floating Bottom Quick Bar for Mobile & WhatsApp quick support */}
-      <div className="fixed bottom-3 right-3 z-30 flex items-center gap-2">
-        {siteConfig.showHelplineCallButton !== false && (
-          <a
-            href={`tel:${(siteConfig.helplinePhone || '+91 8877490845').replace(/[^0-9]/g, '')}`}
-            className="bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold text-xs p-2.5 sm:px-3.5 sm:py-2.5 rounded-full shadow-lg flex items-center gap-1.5 hover:scale-105 transition"
-            title="हेल्पलाइन पर कॉल करें"
-          >
-            <Phone className="w-4 h-4 text-white" />
-            <span className="hidden sm:inline">कॉल: {siteConfig.helplinePhone || '+91 8877490845'}</span>
-          </a>
-        )}
-
-        {siteConfig.showHelplineWhatsAppButton !== false && (
-          <a
-            href={`https://api.whatsapp.com/send?phone=${(siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '')}&text=${encodeURIComponent(
-              'Namaste ACC Support, mujhe Achievers Club Community ke SWIS TWIS system ke bare me jankari chahiye.'
-            )}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs p-2.5 sm:px-3.5 sm:py-2.5 rounded-full shadow-lg flex items-center gap-1.5 hover:scale-105 transition"
-            title="WhatsApp चैट सपोर्ट"
-          >
-            <MessageCircle className="w-4 h-4 text-white" />
-            <span className="hidden sm:inline">WhatsApp</span>
-          </a>
-        )}
-
-        {currentUser ? (
-          <button
-            onClick={() => setActiveWindow('dashboard')}
-            className="bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold text-xs px-3.5 py-2.5 sm:px-4 sm:py-2.5 rounded-full shadow-lg flex items-center gap-1.5 hover:scale-105 transition"
-          >
-            <LayoutDashboard className="w-3.5 h-3.5 text-yellow-300" />
-            <span>मेरा डैशबोर्ड</span>
-          </button>
-        ) : (
-          <button
-            onClick={() => setActiveWindow('register')}
-            className="bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold text-xs px-3.5 py-2.5 sm:px-4 sm:py-2.5 rounded-full shadow-lg flex items-center gap-1.5 hover:scale-105 transition"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-[#ffe500]" />
-            <span>रजिस्टर ₹{siteConfig.activationFee || 249}</span>
-          </button>
-        )}
-      </div>
+      {/* Permanently Locked Bottom Action Dock with Distinct Dynamic Options */}
+      <LockedFooterBar
+        currentUser={currentUser}
+        referralSponsor={referralSponsor}
+        siteConfig={siteConfig}
+        activeWindow={activeWindow}
+        setActiveWindow={handleNavigateWithScroll}
+      />
     </div>
   );
 }

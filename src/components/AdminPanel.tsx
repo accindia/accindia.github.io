@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ShieldCheck,
   Users,
@@ -52,8 +52,28 @@ import {
   UserCheck,
   KeyRound,
   Printer,
+  History,
+  Clock,
+  ArrowRight,
+  Activity,
+  Calendar,
+  Award,
+  LayoutGrid,
+  Table,
 } from 'lucide-react';
-import { Member, PlanType, VerificationStatus, WithdrawalRequest, AppServiceItem, PromotionalPoster, SiteConfig } from '../types';
+import {
+  Member,
+  PlanType,
+  VerificationStatus,
+  WithdrawalRequest,
+  AppServiceItem,
+  PromotionalPoster,
+  SiteConfig,
+  ProfileEditAuditLog,
+  ProfileFieldChange,
+  RechargeTransaction,
+  ReferralRecord,
+} from '../types';
 import { StorageService, subscribeToSync, SEED_MEMBERS } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
 
@@ -70,11 +90,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   const [adminPasswordError, setAdminPasswordError] = useState('');
 
   // Main Admin Navigation Tab
-  const [adminTab, setAdminTab] = useState<'members' | 'form_responses' | 'withdrawals' | 'website_cms'>('members');
+  const [adminTab, setAdminTab] = useState<'members' | 'form_responses' | 'profile_audits' | 'withdrawals' | 'website_cms'>('members');
   const [formResponseModalMember, setFormResponseModalMember] = useState<Member | null>(null);
+
+  // Profile Edit Audit Logs & Member 360 Database State
+  const [auditLogs, setAuditLogs] = useState<ProfileEditAuditLog[]>(() => StorageService.getAuditLogs());
+  const [auditSearchQuery, setAuditSearchQuery] = useState('');
+  const [selectedMemberFor360, setSelectedMemberFor360] = useState<Member | null>(null);
+  const [member360ActiveTab, setMember360ActiveTab] = useState<'profile_info' | 'audit_history' | 'financials' | 'recharges' | 'referrals' | 'withdrawals'>('profile_info');
 
   const [members, setMembers] = useState<Member[]>(StorageService.getMembers());
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>(StorageService.getWithdrawals());
+  const [transactions, setTransactions] = useState<RechargeTransaction[]>(() => StorageService.getTransactions());
+  const [referrals, setReferrals] = useState<ReferralRecord[]>(() => StorageService.getReferrals());
   const [siteConfig, setSiteConfig] = useState<SiteConfig>(() => StorageService.getSiteConfig());
 
   // Contact & Helpline settings form
@@ -181,17 +209,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
       }
     });
 
-    // 5. Tab / local sync
+    // 5. Real-time audit logs listener
+    const unsubscribeAuditLogs = FirestoreService.subscribeToAuditLogs((cloudLogs) => {
+      if (cloudLogs && cloudLogs.length > 0) {
+        setAuditLogs(cloudLogs);
+      }
+    });
+
+    // 6. Tab / local sync
     const unsubscribeSync = subscribeToSync(() => {
       setMembers(StorageService.getMembers());
       setWithdrawals(StorageService.getWithdrawals());
       setSiteConfig(StorageService.getSiteConfig());
+      setAuditLogs(StorageService.getAuditLogs());
+      setTransactions(StorageService.getTransactions());
+      setReferrals(StorageService.getReferrals());
     });
 
     return () => {
       unsubscribeMembers();
       unsubscribeWithdrawals();
       unsubscribeSiteConfig();
+      unsubscribeAuditLogs();
       unsubscribeSync();
     };
   }, []);
@@ -216,6 +255,53 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   const [newPassInput, setNewPassInput] = useState('');
   const [passwordModalMsg, setPasswordModalMsg] = useState('');
   const [passwordModalError, setPasswordModalError] = useState('');
+  // View mode for members: 'cards' (optimal for PC & mobile with 0 horizontal scroll) vs 'table'
+  const [memberViewMode, setMemberViewMode] = useState<'cards' | 'table'>('cards');
+
+  // Dedicated refs for Modal auto-scroll and background scroll lock preservation
+  const modal360BodyRef = useRef<HTMLDivElement>(null);
+  const savedScrollY = useRef<number>(0);
+
+  const isAnyModalOpen = Boolean(
+    selectedMemberFor360 ||
+    formResponseModalMember ||
+    screenshotModalMember ||
+    rejectionModalMember ||
+    memberSecurityModal ||
+    commissionPayMember ||
+    selectedMember ||
+    showServiceModal ||
+    showPosterModal ||
+    showPasswordModal ||
+    linkModalMember
+  );
+
+  // Background Scroll Locking & Perfect Restoration (Prevents jumping on open/close at any position)
+  useEffect(() => {
+    if (isAnyModalOpen) {
+      savedScrollY.current = window.scrollY || window.pageYOffset || 0;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${savedScrollY.current}px`;
+      document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
+    } else {
+      const scrollY = savedScrollY.current;
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+      if (scrollY > 0) {
+        window.scrollTo(0, scrollY);
+      }
+    }
+  }, [isAnyModalOpen]);
+
+  // When 360 modal opens or sub-tab changes, automatically reset modal body to top: 0
+  useEffect(() => {
+    if (selectedMemberFor360 && modal360BodyRef.current) {
+      modal360BodyRef.current.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [selectedMemberFor360, member360ActiveTab]);
 
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -296,12 +382,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
       } else {
         setWithdrawals(StorageService.getWithdrawals());
       }
+
+      const cloudAudits = await FirestoreService.getAuditLogs();
+      if (cloudAudits && cloudAudits.length > 0) {
+        setAuditLogs(cloudAudits);
+      } else {
+        setAuditLogs(StorageService.getAuditLogs());
+      }
+      setTransactions(StorageService.getTransactions());
+      setReferrals(StorageService.getReferrals());
+
       setActionSuccess('क्लाउड डेटाबेस (Firestore) से ताज़ा यूजर रिकॉर्ड लोड हो गए!');
       setTimeout(() => setActionSuccess(''), 3000);
     } catch (e) {
       console.warn('refreshData error:', e);
       setMembers(StorageService.getMembers());
       setWithdrawals(StorageService.getWithdrawals());
+      setAuditLogs(StorageService.getAuditLogs());
+      setTransactions(StorageService.getTransactions());
+      setReferrals(StorageService.getReferrals());
     } finally {
       setIsCloudSyncing(false);
       onRefresh();
@@ -870,54 +969,66 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
         </div>
       )}
 
-      {/* Main Admin Primary Tabs */}
-      <div className="flex bg-white border border-gray-200 rounded-xl p-1 gap-1 overflow-x-auto no-scrollbar shadow-xs">
+      {/* Main Admin Primary Tabs (100% Screen-Fit Flexible Wrap - Zero Overflow) */}
+      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 bg-white border border-gray-200 rounded-xl p-1.5 sm:p-2 shadow-xs w-full max-w-full">
         <button
           onClick={() => setAdminTab('members')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold whitespace-nowrap rounded-lg transition ${
+          className={`flex-1 min-w-[130px] sm:min-w-[160px] max-w-full flex items-center justify-center text-center gap-1.5 p-2 sm:p-2.5 text-xs font-bold rounded-lg transition cursor-pointer ${
             adminTab === 'members'
               ? 'bg-blue-50 text-[#2874f0] border border-blue-200 shadow-xs'
-              : 'text-slate-700 hover:bg-slate-50'
+              : 'text-slate-700 hover:bg-slate-50 border border-transparent'
           }`}
         >
-          <Users className="w-4 h-4 text-[#2874f0]" />
-          <span>👥 पंजीकृत सदस्य व UTR सत्यापन ({members.length})</span>
+          <Users className="w-4 h-4 text-[#2874f0] shrink-0" />
+          <span className="truncate">सदस्य व UTR ({members.length})</span>
         </button>
 
         <button
           onClick={() => setAdminTab('form_responses')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold whitespace-nowrap rounded-lg transition ${
+          className={`flex-1 min-w-[130px] sm:min-w-[160px] max-w-full flex items-center justify-center text-center gap-1.5 p-2 sm:p-2.5 text-xs font-bold rounded-lg transition cursor-pointer ${
             adminTab === 'form_responses'
               ? 'bg-blue-50 text-[#2874f0] border border-blue-200 shadow-xs'
-              : 'text-slate-700 hover:bg-slate-50'
+              : 'text-slate-700 hover:bg-slate-50 border border-transparent'
           }`}
         >
-          <FileText className="w-4 h-4 text-[#2874f0]" />
-          <span>📋 यूजर सबमिट फॉर्म रिस्पॉन्स व्यू ({members.length})</span>
+          <FileText className="w-4 h-4 text-[#2874f0] shrink-0" />
+          <span className="truncate">फॉर्म रिस्पॉन्स ({members.length})</span>
+        </button>
+
+        <button
+          onClick={() => setAdminTab('profile_audits')}
+          className={`flex-1 min-w-[130px] sm:min-w-[160px] max-w-full flex items-center justify-center text-center gap-1.5 p-2 sm:p-2.5 text-xs font-bold rounded-lg transition cursor-pointer ${
+            adminTab === 'profile_audits'
+              ? 'bg-purple-50 text-purple-800 border border-purple-300 shadow-xs'
+              : 'text-slate-700 hover:bg-slate-50 border border-transparent'
+          }`}
+        >
+          <History className="w-4 h-4 text-purple-600 shrink-0" />
+          <span className="truncate">एडिट ऑडिट ({auditLogs.length})</span>
         </button>
 
         <button
           onClick={() => setAdminTab('withdrawals')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold whitespace-nowrap rounded-lg transition ${
+          className={`flex-1 min-w-[130px] sm:min-w-[160px] max-w-full flex items-center justify-center text-center gap-1.5 p-2 sm:p-2.5 text-xs font-bold rounded-lg transition cursor-pointer ${
             adminTab === 'withdrawals'
               ? 'bg-amber-50 text-amber-800 border border-amber-300 shadow-xs'
-              : 'text-slate-700 hover:bg-slate-50'
+              : 'text-slate-700 hover:bg-slate-50 border border-transparent'
           }`}
         >
-          <CreditCard className="w-4 h-4 text-amber-600" />
-          <span>💰 निकासी अनुरोध ({withdrawals.filter((w) => w.status === 'pending').length} लंबित)</span>
+          <CreditCard className="w-4 h-4 text-amber-600 shrink-0" />
+          <span className="truncate">निकासी ({withdrawals.filter((w) => w.status === 'pending').length})</span>
         </button>
 
         <button
           onClick={() => setAdminTab('website_cms')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold whitespace-nowrap rounded-lg transition ${
+          className={`flex-1 min-w-[130px] sm:min-w-[160px] max-w-full flex items-center justify-center text-center gap-1.5 p-2 sm:p-2.5 text-xs font-bold rounded-lg transition cursor-pointer ${
             adminTab === 'website_cms'
               ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-xs'
-              : 'text-slate-700 hover:bg-slate-50'
+              : 'text-slate-700 hover:bg-slate-50 border border-transparent'
           }`}
         >
-          <Sliders className="w-4 h-4 text-emerald-600" />
-          <span>⚙️ वेबपेज व सिस्टम संपूर्ण नियंत्रण (Helpline, Address, Posters & Services)</span>
+          <Sliders className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span className="truncate">वेबपेज नियंत्रण</span>
         </button>
       </div>
 
@@ -1031,10 +1142,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-600">
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-600 hidden sm:inline">
               कुल: <strong>{filteredMembers.length}</strong> सदस्य
             </span>
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-gray-200">
+              <button
+                type="button"
+                onClick={() => setMemberViewMode('cards')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition cursor-pointer ${
+                  memberViewMode === 'cards'
+                    ? 'bg-white text-[#2874f0] shadow-xs border border-gray-200'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="PC पर बिना साइड स्क्रॉल के सभी विकल्प सीधे देखें"
+              >
+                <LayoutGrid className="w-3.5 h-3.5 text-[#2874f0]" />
+                <span>🗂️ स्मार्ट कार्ड (No-Scroll)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMemberViewMode('table')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition cursor-pointer ${
+                  memberViewMode === 'table'
+                    ? 'bg-white text-[#2874f0] shadow-xs border border-gray-200'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="पारंपरिक टेबल दृश्य (Sticky Actions के साथ)"
+              >
+                <Table className="w-3.5 h-3.5 text-slate-600" />
+                <span>📋 टेबल दृश्य</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1094,326 +1233,572 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
           </div>
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto border border-gray-200 rounded-lg">
-          <table className="w-full text-left text-xs text-slate-700">
-            <thead className="bg-[#f1f2f4] text-slate-800 uppercase font-bold text-[11px] border-b border-gray-200">
-              <tr>
-                <th className="py-3 px-3">सदस्य प्रोफाइल</th>
-                <th className="py-3 px-3">Unique ACC 🆔</th>
-                <th className="py-3 px-3">सिस्टम</th>
-                <th className="py-3 px-3">मोबाइल</th>
-                <th className="py-3 px-3">UTR No. (₹249)</th>
-                <th className="py-3 px-3">रसीद व QR</th>
-                <th className="py-3 px-3 bg-amber-50 text-amber-950 border-x border-amber-200">स्पॉन्सर विवरण व ₹150 कमिशन</th>
-                <th className="py-3 px-3">सत्यापन स्थिति</th>
-                <th className="py-3 px-3 text-right">सत्यापन कार्रवाई / सुरक्षा</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 font-sans bg-white">
-              {filteredMembers.map((m) => (
-                <tr key={m.id || m.accId} className="hover:bg-blue-50/40 transition">
-                  <td className="py-2.5 px-3">
-                    <div className="flex items-center gap-2.5">
-                      {m.avatarUrl ? (
-                        <img
-                          src={m.avatarUrl}
-                          alt={m.fullName}
-                          className="w-9 h-9 rounded-full object-cover border-2 border-[#2874f0] shadow-xs shrink-0"
-                        />
-                      ) : (
-                        <div className="w-9 h-9 rounded-full bg-blue-100 text-[#2874f0] font-bold text-xs flex items-center justify-center shrink-0 border border-blue-200">
-                          {(m.fullName || 'M').substring(0, 2).toUpperCase()}
+        {/* ========================================================================= */}
+        {/* VIEW 1: SMART CARDS GRID (PC NO-SCROLL & ALL ACTIONS VISIBLE) */}
+        {/* ========================================================================= */}
+        {memberViewMode === 'cards' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
+            {filteredMembers.map((m) => {
+              const sponsor = members.find(
+                (s) => (s.accId || '').toUpperCase() === (m.sponsorId || '').toUpperCase() || s.mobile === m.sponsorId
+              );
+              const hasSponsor = Boolean(m.sponsorId && m.sponsorId !== 'DIRECT' && m.sponsorId !== 'ADMIN');
+
+              return (
+                <div
+                  key={m.id || m.accId}
+                  className="bg-white border border-gray-200 hover:border-purple-300 rounded-xl p-4 space-y-3 shadow-xs hover:shadow-md transition flex flex-col justify-between"
+                >
+                  <div className="space-y-2.5">
+                    {/* Header: Photo, Name, ACC ID, Plan, Status */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {m.avatarUrl ? (
+                          <img
+                            src={m.avatarUrl}
+                            alt={m.fullName}
+                            className="w-10 h-10 rounded-full object-cover border-2 border-[#2874f0] shadow-xs shrink-0"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-blue-100 text-[#2874f0] font-bold text-xs flex items-center justify-center shrink-0 border border-blue-200">
+                            {(m.fullName || 'M').substring(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-slate-900 text-sm truncate" title={m.fullName}>
+                            {m.fullName}
+                          </h4>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono-acc font-black text-xs text-[#2874f0] bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200">
+                              {m.accId}
+                            </span>
+                            <span
+                              className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                                m.plan === 'SWIS'
+                                  ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                  : 'bg-blue-100 text-blue-800 border border-blue-200'
+                              }`}
+                            >
+                              {m.plan}
+                            </span>
+                          </div>
                         </div>
-                      )}
-                      <div className="min-w-0">
-                        <span className="font-bold text-slate-900 block truncate">{m.fullName}</span>
-                        <span className="text-[10px] text-slate-500 block truncate">{m.city || 'शहर'}, {m.state || 'राज्य'}</span>
-                        {m.profileLink && (
-                          <a
-                            href={m.profileLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[10px] text-[#2874f0] hover:underline"
-                            title="प्रोफाइल लिंक खोलें"
+                      </div>
+
+                      <div className="shrink-0 text-right">
+                        {m.status === 'verified' ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                            <Check className="w-3 h-3 text-emerald-600" /> सत्यापित
+                          </span>
+                        ) : m.status === 'rejected' ? (
+                          <span
+                            className="inline-flex items-center gap-1 text-[10px] bg-red-50 text-red-700 border border-red-300 px-2 py-0.5 rounded-full font-bold cursor-help"
+                            title={m.rejectionReason || 'अस्वीकृत'}
                           >
-                            <ExternalLink className="w-2.5 h-2.5 shrink-0" />
-                            <span className="truncate max-w-[120px]">{m.profileLink.replace(/^https?:\/\//, '')}</span>
-                          </a>
+                            <X className="w-3 h-3 text-red-600" /> अस्वीकृत
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] bg-amber-50 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full font-bold animate-pulse">
+                            ⏳ लंबित समीक्षा
+                          </span>
                         )}
                       </div>
                     </div>
-                  </td>
-                  <td className="py-2.5 px-3">
-                    <span className="font-mono-acc font-bold text-[#2874f0] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                      {m.accId}
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-3">
-                    <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        m.plan === 'SWIS' ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-blue-100 text-blue-800 border border-blue-200'
-                      }`}
-                    >
-                      {m.plan}
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-3 font-mono-acc text-slate-700">
-                    <div className="flex items-center gap-1">
-                      <span>{m.mobile}</span>
-                      <a
-                        href={`https://api.whatsapp.com/send?phone=91${m.mobile}&text=${encodeURIComponent(`नमस्ते ${m.fullName}, मैं Achievers Club Community एडमिन बात कर रहा हूँ।`)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-emerald-600 hover:text-emerald-700 p-0.5"
-                        title="WhatsApp चैट"
-                      >
-                        <MessageCircle className="w-3.5 h-3.5" />
-                      </a>
-                    </div>
-                  </td>
-                  <td className="py-2.5 px-3 font-mono-acc text-slate-700 text-[11px]">
-                    <span className="text-emerald-700 font-semibold block">₹249 PAID</span>
-                    <span className="text-[10px] text-slate-500 font-bold">{m.utrNumber || 'N/A'}</span>
-                  </td>
 
-                  {/* PAYMENT SCREENSHOT & PERSONAL QR COLUMN */}
-                  <td className="py-2.5 px-3">
-                    <div className="flex flex-col gap-1">
-                      {m.paymentScreenshotUrl ? (
-                        <button
-                          onClick={() => {
-                            setScreenshotModalMember(m);
-                            setZoomLevel(1);
-                          }}
-                          className="flex items-center gap-1 px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-[#2874f0] border border-blue-200 rounded text-[10px] font-bold shadow-xs transition group w-fit"
-                          title="स्क्रीनशॉट रसीद देखें"
-                        >
-                          <ImageIcon className="w-3 h-3 text-[#2874f0] group-hover:scale-110 transition-transform" />
-                          <span>रसीद देखें</span>
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setScreenshotModalMember(m);
-                            setZoomLevel(1);
-                          }}
-                          className="text-[10px] text-slate-400 hover:text-slate-700 flex items-center gap-1"
-                          title="रसीद संलग्न नहीं, केवल UTR देखें"
-                        >
-                          <span>कोई रसीद नहीं</span>
-                        </button>
-                      )}
+                    {/* Contact & Location Info */}
+                    <div className="bg-slate-50 p-2.5 rounded-lg border border-gray-200 space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 text-[11px]">मोबाइल:</span>
+                        <div className="flex items-center gap-1 font-mono-acc font-semibold text-slate-800">
+                          <span>{m.mobile}</span>
+                          <a
+                            href={`https://api.whatsapp.com/send?phone=91${m.mobile}&text=${encodeURIComponent(
+                              `नमस्ते ${m.fullName}, मैं Achievers Club Community एडमिन बात कर रहा हूँ।`
+                            )}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-emerald-600 hover:text-emerald-700 p-0.5"
+                            title="WhatsApp चैट"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                          </a>
+                        </div>
+                      </div>
 
-                      {m.personalQrUrl && (
-                        <span className="text-[9px] text-purple-700 font-bold bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 w-fit">
-                          पर्सनल QR उपलब्ध ✓
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-500">स्थान:</span>
+                        <span className="text-slate-700 truncate max-w-[180px]">
+                          {m.city || 'शहर'}, {m.state || 'राज्य'} ({m.pincode || 'पिनकोड'})
                         </span>
-                      )}
+                      </div>
+
+                      <div className="flex items-center justify-between text-[11px] pt-1 border-t border-gray-200">
+                        <span className="text-slate-500">₹249 UTR:</span>
+                        <div className="flex items-center gap-1 font-mono-acc">
+                          <span className="font-bold text-slate-800">{m.utrNumber || 'उपलब्ध नहीं'}</span>
+                          {m.paymentScreenshotUrl ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setScreenshotModalMember(m);
+                                setZoomLevel(1);
+                              }}
+                              className="text-[10px] text-[#2874f0] bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200 font-bold hover:underline cursor-pointer"
+                            >
+                              रसीद देखें ✓
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-slate-400">नो रसीद</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </td>
 
-                  {/* SPONSOR & COMMISSION COLUMN (Crystal clear distinction: User vs Sponsor) */}
-                  <td className="py-2.5 px-3 bg-amber-50/40 border-x border-amber-100">
-                    {(() => {
-                      const sponsor = members.find(
-                        (s) => (s.accId || '').toUpperCase() === (m.sponsorId || '').toUpperCase() || s.mobile === m.sponsorId
-                      );
-                      const hasSponsor = Boolean(m.sponsorId && m.sponsorId !== 'DIRECT' && m.sponsorId !== 'ADMIN');
-
-                      if (!hasSponsor) {
-                        return (
-                          <div className="space-y-0.5">
-                            <span className="font-semibold text-slate-700 text-[11px] block">🏢 कंपनी डायरेक्ट</span>
-                            <span className="text-[10px] text-slate-400 block">नो स्पॉन्सर (नो कमिशन)</span>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-slate-900 block truncate max-w-[130px]" title={m.sponsorName || sponsor?.fullName}>
+                    {/* Sponsor & ₹150 Commission Row */}
+                    <div className="bg-amber-50/70 p-2.5 rounded-lg border border-amber-200 text-xs space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-amber-900 font-bold text-[11px]">🤝 स्पॉन्सर:</span>
+                        {hasSponsor ? (
+                          <div className="flex items-center gap-1">
+                            <span className="font-bold text-slate-900 truncate max-w-[120px]">
                               {m.sponsorName || sponsor?.fullName || 'स्पॉन्सर'}
                             </span>
-                            <span className="text-[9px] bg-blue-100 text-[#2874f0] px-1.5 py-0.2 rounded font-mono font-bold">
+                            <span className="text-[10px] font-mono-acc text-[#2874f0] bg-white px-1.5 py-0.2 rounded border border-amber-200 font-bold">
                               {m.sponsorId}
                             </span>
                           </div>
+                        ) : (
+                          <span className="text-[11px] text-slate-600">🏢 कंपनी डायरेक्ट</span>
+                        )}
+                      </div>
 
-                          {/* Sponsor Mobile & WhatsApp */}
-                          {sponsor && (
-                            <div className="flex items-center gap-1 text-[10px] text-slate-600 font-mono">
-                              <span>{sponsor.mobile}</span>
-                              <a
-                                href={`https://api.whatsapp.com/send?phone=91${sponsor.mobile}&text=${encodeURIComponent(
-                                  `नमस्ते ${sponsor.fullName}, मैं Achievers Club एडमिन बोल रहा हूँ। आपके रेफरल ${m.fullName} (${m.accId}) का कमिशन विवरण: ₹150।`
-                                )}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-emerald-600 hover:text-emerald-700 p-0.5"
-                                title="स्पॉन्सर से WhatsApp चैट"
-                              >
-                                <MessageCircle className="w-3 h-3" />
-                              </a>
-                            </div>
+                      {hasSponsor && (
+                        <div className="flex items-center justify-between pt-1 border-t border-amber-200 text-[11px]">
+                          <span className="text-amber-800 font-semibold">देय कमीशन:</span>
+                          {m.sponsorCommissionStatus === 'paid' ? (
+                            <span className="text-emerald-800 font-bold bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-300">
+                              ✓ ₹150 चुकता
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCommissionPayMember(m);
+                                setCommissionUtrInput(`COMM-${Date.now().toString().slice(-8)}`);
+                              }}
+                              className="text-white font-bold bg-[#fb641b] hover:bg-[#e85a14] px-2 py-0.5 rounded shadow-xs cursor-pointer"
+                            >
+                              ₹150 पे करें
+                            </button>
                           )}
-
-                          {/* Sponsor Payout Info (UPI / Bank) */}
-                          {sponsor?.payoutDetails?.upiId ? (
-                            <div className="flex items-center justify-between gap-1 text-[10px] bg-white px-1.5 py-0.5 rounded border border-amber-200">
-                              <span className="font-mono text-emerald-800 font-bold truncate max-w-[110px]" title={sponsor.payoutDetails.upiId}>
-                                {sponsor.payoutDetails.upiId}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(sponsor.payoutDetails?.upiId || '');
-                                  alert('स्पॉन्सर UPI ID कॉपी हो गई: ' + sponsor.payoutDetails?.upiId);
-                                }}
-                                className="text-[#2874f0] hover:underline font-bold text-[9px] shrink-0"
-                              >
-                                कॉपी
-                              </button>
-                            </div>
-                          ) : sponsor?.payoutDetails?.accountNumber ? (
-                            <span className="text-[9px] text-slate-600 block font-mono truncate max-w-[130px]">
-                              A/C: {sponsor.payoutDetails.accountNumber} ({sponsor.payoutDetails.bankName})
-                            </span>
-                          ) : sponsor ? (
-                            <span className="text-[9px] text-slate-400 block font-mono">
-                              UPI: {sponsor.mobile}@upi
-                            </span>
-                          ) : null}
-
-                          {/* Commission Status / Action */}
-                          <div className="pt-0.5 flex items-center gap-1">
-                            {m.sponsorCommissionStatus === 'paid' ? (
-                              <span
-                                className="inline-flex items-center gap-0.5 text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold border border-emerald-300"
-                                title={`Paid: ${m.sponsorCommissionPaidAt || ''}`}
-                              >
-                                ✓ ₹150 चुकता
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setCommissionPayMember(m);
-                                  setCommissionUtrInput(`COMM-${Date.now().toString().slice(-8)}`);
-                                }}
-                                className="inline-flex items-center gap-0.5 text-[9px] bg-[#fb641b] hover:bg-[#e85a14] text-white px-1.5 py-0.5 rounded font-bold transition shadow-xs"
-                                title="स्पॉन्सर को ₹150 कमीशन भुगतान दर्ज करें"
-                              >
-                                <span>₹150 पे करें</span>
-                              </button>
-                            )}
-                          </div>
                         </div>
-                      );
-                    })()}
-                  </td>
-
-                  {/* STATUS BADGE */}
-                  <td className="py-2.5 px-3">
-                    {m.status === 'verified' ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-300 px-2 py-0.5 rounded font-bold">
-                        <Check className="w-3 h-3 text-emerald-600" /> सत्यापित
-                      </span>
-                    ) : m.status === 'rejected' ? (
-                      <span 
-                        className="inline-flex items-center gap-1 text-[10px] bg-red-50 text-red-700 border border-red-300 px-2 py-0.5 rounded font-bold cursor-help"
-                        title={m.rejectionReason || 'अमान्य भुगतान'}
-                      >
-                        <X className="w-3 h-3 text-red-600" /> अस्वीकृत
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] bg-amber-50 text-amber-800 border border-amber-300 px-2 py-0.5 rounded font-bold animate-pulse">
-                        ⏳ सत्यापन लंबित
-                      </span>
-                    )}
-                  </td>
-
-                  {/* ACTION BUTTONS: APPROVE / REJECT / DETAILS / SECURITY */}
-                  <td className="py-2.5 px-3 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      {/* One-Click Approve */}
-                      {m.status !== 'verified' && (
-                        <button
-                          onClick={() => handleApproveMember(m)}
-                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold flex items-center gap-1 shadow-xs transition"
-                          title="सत्यापित व स्वीकृत करें (Approve)"
-                        >
-                          <Check className="w-3 h-3" />
-                          <span>अप्रूव</span>
-                        </button>
                       )}
+                    </div>
+                  </div>
 
-                      {/* One-Click Reject */}
-                      {m.status !== 'rejected' && (
-                        <button
-                          onClick={() => handleOpenRejectModal(m)}
-                          className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded text-[11px] font-bold flex items-center gap-1 transition"
-                          title="अस्वीकृत करें (Reject)"
-                        >
-                          <X className="w-3 h-3" />
-                          <span>रिजेक्ट</span>
-                        </button>
-                      )}
+                  {/* All Action Buttons Directly Visible Without Horizontal Scroll or Arrow Keys */}
+                  <div className="space-y-1.5 pt-2 border-t border-gray-100">
+                    {/* Primary Big 360 Database Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedMemberFor360(m);
+                        setMember360ActiveTab('profile_info');
+                      }}
+                      className="w-full py-2 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
+                    >
+                      <Activity className="w-4 h-4 text-purple-200" />
+                      <span>🔍 360° सम्पूर्ण डेटाबेस व एडिट हिस्ट्री</span>
+                    </button>
 
-                      {/* View Full Form Response Button */}
+                    {/* Secondary Actions Row */}
+                    <div className="grid grid-cols-2 gap-1.5">
                       <button
+                        type="button"
                         onClick={() => setFormResponseModalMember(m)}
-                        className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-[#2874f0] border border-blue-200 rounded text-[11px] font-bold flex items-center gap-1 shadow-xs transition"
-                        title="यूजर द्वारा सबमिट किया गया संपूर्ण फॉर्म रिस्पॉन्स देखें"
+                        className="py-1.5 bg-blue-50 hover:bg-blue-100 text-[#2874f0] border border-blue-200 rounded text-xs font-bold flex items-center justify-center gap-1 transition cursor-pointer"
                       >
-                        <FileText className="w-3 h-3 text-[#2874f0]" />
+                        <FileText className="w-3.5 h-3.5" />
                         <span>फॉर्म देखें</span>
                       </button>
 
-                      {/* View Screenshot & Details */}
                       <button
-                        onClick={() => {
-                          setScreenshotModalMember(m);
-                          setZoomLevel(1);
-                        }}
-                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-gray-200 transition"
-                        title="स्क्रीनशॉट व संपूर्ण विवरण देखें"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                      </button>
-
-                      {/* Admin Security & Password Reset Support Button */}
-                      <button
+                        type="button"
                         onClick={() => {
                           setMemberSecurityModal(m);
                           setMemberNewPasswordInput('acc@' + Math.floor(1000 + Math.random() * 9000));
                           setMemberSecurityMsg('');
                         }}
-                        className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded border border-amber-300 transition"
-                        title="पासवर्ड व सुरक्षा सहायता (सुरक्षा उत्तर भूलने पर समाधान)"
+                        className="py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded text-xs font-bold flex items-center justify-center gap-1 transition cursor-pointer"
+                        title="पासवर्ड व सुरक्षा रीसेट"
                       >
-                        <Lock className="w-3.5 h-3.5" />
+                        <Lock className="w-3.5 h-3.5 text-amber-600" />
+                        <span>पासवर्ड सहायता</span>
                       </button>
-
-                      {/* Share App Link Button if verified */}
-                      {m.status === 'verified' && (
-                        <button
-                          onClick={() => setLinkModalMember(m)}
-                          className="p-1.5 bg-blue-50 hover:bg-blue-100 text-[#2874f0] rounded border border-blue-200 transition"
-                          title="Real App Link प्रेषित करें"
-                        >
-                          <Share2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
                     </div>
-                  </td>
+
+                    {/* Approve / Reject Row if pending */}
+                    {m.status !== 'verified' && (
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleApproveMember(m)}
+                          className="py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold flex items-center justify-center gap-1 shadow-xs transition cursor-pointer"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>अप्रूव</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenRejectModal(m)}
+                          className="py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded text-xs font-bold flex items-center justify-center gap-1 transition cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          <span>रिजेक्ट</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* ========================================================================= */
+          /* VIEW 2: TRADITIONAL TABLE VIEW WITH STICKY ACTIONS COLUMN */
+          /* ========================================================================= */
+          <div className="overflow-x-auto border border-gray-200 rounded-lg">
+            <table className="w-full text-left text-xs text-slate-700">
+              <thead className="bg-[#f1f2f4] text-slate-800 uppercase font-bold text-[11px] border-b border-gray-200">
+                <tr>
+                  <th className="py-3 px-3">सदस्य प्रोफाइल</th>
+                  <th className="py-3 px-3">Unique ACC 🆔</th>
+                  <th className="py-3 px-3">सिस्टम</th>
+                  <th className="py-3 px-3">मोबाइल</th>
+                  <th className="py-3 px-3">UTR No. (₹249)</th>
+                  <th className="py-3 px-3">रसीद व QR</th>
+                  <th className="py-3 px-3 bg-amber-50 text-amber-950 border-x border-amber-200">स्पॉन्सर विवरण व ₹150 कमिशन</th>
+                  <th className="py-3 px-3">सत्यापन स्थिति</th>
+                  <th className="py-3 px-3 text-right sticky right-0 bg-[#f1f2f4] z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.08)]">
+                    सत्यापन कार्रवाई / 360° डेटाबेस
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-gray-100 font-sans bg-white">
+                {filteredMembers.map((m) => (
+                  <tr key={m.id || m.accId} className="hover:bg-blue-50/40 transition">
+                    <td className="py-2.5 px-3">
+                      <div className="flex items-center gap-2.5">
+                        {m.avatarUrl ? (
+                          <img
+                            src={m.avatarUrl}
+                            alt={m.fullName}
+                            className="w-9 h-9 rounded-full object-cover border-2 border-[#2874f0] shadow-xs shrink-0"
+                          />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-blue-100 text-[#2874f0] font-bold text-xs flex items-center justify-center shrink-0 border border-blue-200">
+                            {(m.fullName || 'M').substring(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <span className="font-bold text-slate-900 block truncate">{m.fullName}</span>
+                          <span className="text-[10px] text-slate-500 block truncate">{m.city || 'शहर'}, {m.state || 'राज्य'}</span>
+                          {m.profileLink && (
+                            <a
+                              href={m.profileLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[10px] text-[#2874f0] hover:underline"
+                              title="प्रोफाइल लिंक खोलें"
+                            >
+                              <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                              <span className="truncate max-w-[120px]">{m.profileLink.replace(/^https?:\/\//, '')}</span>
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span className="font-mono-acc font-bold text-[#2874f0] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                        {m.accId}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          m.plan === 'SWIS' ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-blue-100 text-blue-800 border border-blue-200'
+                        }`}
+                      >
+                        {m.plan}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 font-mono-acc text-slate-700">
+                      <div className="flex items-center gap-1">
+                        <span>{m.mobile}</span>
+                        <a
+                          href={`https://api.whatsapp.com/send?phone=91${m.mobile}&text=${encodeURIComponent(`नमस्ते ${m.fullName}, मैं Achievers Club Community एडमिन बात कर रहा हूँ।`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-emerald-600 hover:text-emerald-700 p-0.5"
+                          title="WhatsApp चैट"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-3 font-mono-acc text-slate-700 text-[11px]">
+                      <span className="text-emerald-700 font-semibold block">₹249 PAID</span>
+                      <span className="text-[10px] text-slate-500 font-bold">{m.utrNumber || 'N/A'}</span>
+                    </td>
+
+                    {/* PAYMENT SCREENSHOT & PERSONAL QR COLUMN */}
+                    <td className="py-2.5 px-3">
+                      <div className="flex flex-col gap-1">
+                        {m.paymentScreenshotUrl ? (
+                          <button
+                            onClick={() => {
+                              setScreenshotModalMember(m);
+                              setZoomLevel(1);
+                            }}
+                            className="flex items-center gap-1 px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-[#2874f0] border border-blue-200 rounded text-[10px] font-bold shadow-xs transition group w-fit cursor-pointer"
+                            title="स्क्रीनशॉट रसीद देखें"
+                          >
+                            <ImageIcon className="w-3 h-3 text-[#2874f0] group-hover:scale-110 transition-transform" />
+                            <span>रसीद देखें</span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setScreenshotModalMember(m);
+                              setZoomLevel(1);
+                            }}
+                            className="text-[10px] text-slate-400 hover:text-slate-700 flex items-center gap-1 cursor-pointer"
+                            title="रसीद संलग्न नहीं, केवल UTR देखें"
+                          >
+                            <span>कोई रसीद नहीं</span>
+                          </button>
+                        )}
+
+                        {m.personalQrUrl && (
+                          <span className="text-[9px] text-purple-700 font-bold bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 w-fit">
+                            पर्सनल QR उपलब्ध ✓
+                          </span>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* SPONSOR & COMMISSION COLUMN */}
+                    <td className="py-2.5 px-3 bg-amber-50/40 border-x border-amber-100">
+                      {(() => {
+                        const sponsor = members.find(
+                          (s) => (s.accId || '').toUpperCase() === (m.sponsorId || '').toUpperCase() || s.mobile === m.sponsorId
+                        );
+                        const hasSponsor = Boolean(m.sponsorId && m.sponsorId !== 'DIRECT' && m.sponsorId !== 'ADMIN');
+
+                        if (!hasSponsor) {
+                          return (
+                            <div className="space-y-0.5">
+                              <span className="font-semibold text-slate-700 text-[11px] block">🏢 कंपनी डायरेक्ट</span>
+                              <span className="text-[10px] text-slate-400 block">नो स्पॉन्सर (नो कमिशन)</span>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-slate-900 block truncate max-w-[130px]" title={m.sponsorName || sponsor?.fullName}>
+                                {m.sponsorName || sponsor?.fullName || 'स्पॉन्सर'}
+                              </span>
+                              <span className="text-[9px] bg-blue-100 text-[#2874f0] px-1.5 py-0.2 rounded font-mono font-bold">
+                                {m.sponsorId}
+                              </span>
+                            </div>
+
+                            {sponsor && (
+                              <div className="flex items-center gap-1 text-[10px] text-slate-600 font-mono">
+                                <span>{sponsor.mobile}</span>
+                                <a
+                                  href={`https://api.whatsapp.com/send?phone=91${sponsor.mobile}&text=${encodeURIComponent(
+                                    `नमस्ते ${sponsor.fullName}, मैं Achievers Club एडमिन बोल रहा हूँ। आपके रेफरल ${m.fullName} (${m.accId}) का कमिशन विवरण: ₹150।`
+                                  )}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-emerald-600 hover:text-emerald-700 p-0.5"
+                                  title="स्पॉन्सर से WhatsApp चैट"
+                                >
+                                  <MessageCircle className="w-3 h-3" />
+                                </a>
+                              </div>
+                            )}
+
+                            {sponsor?.payoutDetails?.upiId ? (
+                              <div className="flex items-center justify-between gap-1 text-[10px] bg-white px-1.5 py-0.5 rounded border border-amber-200">
+                                <span className="font-mono text-emerald-800 font-bold truncate max-w-[110px]" title={sponsor.payoutDetails.upiId}>
+                                  {sponsor.payoutDetails.upiId}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(sponsor.payoutDetails?.upiId || '');
+                                    alert('स्पॉन्सर UPI ID कॉपी हो गई: ' + sponsor.payoutDetails?.upiId);
+                                  }}
+                                  className="text-[#2874f0] hover:underline font-bold text-[9px] shrink-0"
+                                >
+                                  कॉपी
+                                </button>
+                              </div>
+                            ) : sponsor?.payoutDetails?.accountNumber ? (
+                              <span className="text-[9px] text-slate-600 block font-mono truncate max-w-[130px]">
+                                A/C: {sponsor.payoutDetails.accountNumber} ({sponsor.payoutDetails.bankName})
+                              </span>
+                            ) : sponsor ? (
+                              <span className="text-[9px] text-slate-400 block font-mono">
+                                UPI: {sponsor.mobile}@upi
+                              </span>
+                            ) : null}
+
+                            <div className="pt-0.5 flex items-center gap-1">
+                              {m.sponsorCommissionStatus === 'paid' ? (
+                                <span
+                                  className="inline-flex items-center gap-0.5 text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold border border-emerald-300"
+                                  title={`Paid: ${m.sponsorCommissionPaidAt || ''}`}
+                                >
+                                  ✓ ₹150 चुकता
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCommissionPayMember(m);
+                                    setCommissionUtrInput(`COMM-${Date.now().toString().slice(-8)}`);
+                                  }}
+                                  className="inline-flex items-center gap-0.5 text-[9px] bg-[#fb641b] hover:bg-[#e85a14] text-white px-1.5 py-0.5 rounded font-bold transition shadow-xs cursor-pointer"
+                                  title="स्पॉन्सर को ₹150 कमीशन भुगतान दर्ज करें"
+                                >
+                                  <span>₹150 पे करें</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </td>
+
+                    {/* STATUS BADGE */}
+                    <td className="py-2.5 px-3">
+                      {m.status === 'verified' ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-300 px-2 py-0.5 rounded font-bold">
+                          <Check className="w-3 h-3 text-emerald-600" /> सत्यापित
+                        </span>
+                      ) : m.status === 'rejected' ? (
+                        <span 
+                          className="inline-flex items-center gap-1 text-[10px] bg-red-50 text-red-700 border border-red-300 px-2 py-0.5 rounded font-bold cursor-help"
+                          title={m.rejectionReason || 'अमान्य भुगतान'}
+                        >
+                          <X className="w-3 h-3 text-red-600" /> अस्वीकृत
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] bg-amber-50 text-amber-800 border border-amber-300 px-2 py-0.5 rounded font-bold animate-pulse">
+                          ⏳ सत्यापन लंबित
+                        </span>
+                      )}
+                    </td>
+
+                    {/* ACTION BUTTONS (STICKY ON PC SO ALWAYS VISIBLE WITHOUT SIDE SCROLL) */}
+                    <td className="py-2.5 px-3 text-right sticky right-0 bg-white z-10 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.08)]">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {/* One-Click Approve */}
+                        {m.status !== 'verified' && (
+                          <button
+                            onClick={() => handleApproveMember(m)}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold flex items-center gap-1 shadow-xs transition cursor-pointer"
+                            title="सत्यापित व स्वीकृत करें (Approve)"
+                          >
+                            <Check className="w-3 h-3" />
+                            <span>अप्रूव</span>
+                          </button>
+                        )}
+
+                        {/* One-Click Reject */}
+                        {m.status !== 'rejected' && (
+                          <button
+                            onClick={() => handleOpenRejectModal(m)}
+                            className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
+                            title="अस्वीकृत करें (Reject)"
+                          >
+                            <X className="w-3 h-3" />
+                            <span>रिजेक्ट</span>
+                          </button>
+                        )}
+
+                        {/* 360 Degree Complete User Database & History Inspector */}
+                        <button
+                          onClick={() => {
+                            setSelectedMemberFor360(m);
+                            setMember360ActiveTab('profile_info');
+                          }}
+                          className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-[11px] font-bold flex items-center gap-1 shadow-xs transition cursor-pointer"
+                          title="इस सदस्य का सम्पूर्ण डेटाबेस, प्रोफाइल एडिट हिस्ट्री, आय, वॉलेट, कमीशन व रिकॉर्ड देखें"
+                        >
+                          <Activity className="w-3 h-3 text-purple-200" />
+                          <span>360° डेटाबेस</span>
+                        </button>
+
+                        {/* View Full Form Response Button */}
+                        <button
+                          onClick={() => setFormResponseModalMember(m)}
+                          className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-[#2874f0] border border-blue-200 rounded text-[11px] font-bold flex items-center gap-1 shadow-xs transition cursor-pointer"
+                          title="यूजर द्वारा सबमिट किया गया संपूर्ण फॉर्म रिस्पॉन्स देखें"
+                        >
+                          <FileText className="w-3 h-3 text-[#2874f0]" />
+                          <span>फॉर्म देखें</span>
+                        </button>
+
+                        {/* View Screenshot & Details */}
+                        <button
+                          onClick={() => {
+                            setScreenshotModalMember(m);
+                            setZoomLevel(1);
+                          }}
+                          className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-gray-200 transition cursor-pointer"
+                          title="स्क्रीनशॉट व संपूर्ण विवरण देखें"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+
+                        {/* Admin Security & Password Reset Support Button */}
+                        <button
+                          onClick={() => {
+                            setMemberSecurityModal(m);
+                            setMemberNewPasswordInput('acc@' + Math.floor(1000 + Math.random() * 9000));
+                            setMemberSecurityMsg('');
+                          }}
+                          className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded border border-amber-300 transition cursor-pointer"
+                          title="पासवर्ड व सुरक्षा सहायता (सुरक्षा उत्तर भूलने पर समाधान)"
+                        >
+                          <Lock className="w-3.5 h-3.5" />
+                        </button>
+
+                        {/* Share App Link Button if verified */}
+                        {m.status === 'verified' && (
+                          <button
+                            onClick={() => setLinkModalMember(m)}
+                            className="p-1.5 bg-blue-50 hover:bg-blue-100 text-[#2874f0] rounded border border-blue-200 transition cursor-pointer"
+                            title="Real App Link प्रेषित करें"
+                          >
+                            <Share2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )}
@@ -1666,7 +2051,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                   className="flex-1 py-1.5 bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold text-xs rounded-sm flex items-center justify-center gap-1.5 shadow-xs transition"
                 >
                   <FileText className="w-3.5 h-3.5" />
-                  <span>📋 संपूर्ण फॉर्म रिस्पॉन्स खोलें</span>
+                  <span>📋 फॉर्म रिस्पॉन्स खोलें</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setSelectedMemberFor360(m);
+                    setMember360ActiveTab('profile_info');
+                  }}
+                  className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-300 font-bold text-xs rounded-sm flex items-center justify-center gap-1 shadow-xs transition"
+                  title="इस सदस्य का सम्पूर्ण 360° डेटाबेस, आय, कमीशन, रीचार्ज व ऑडिट हिस्ट्री देखें"
+                >
+                  <Activity className="w-3.5 h-3.5 text-purple-600" />
+                  <span>360° डेटाबेस</span>
                 </button>
 
                 {m.status !== 'verified' && (
@@ -1693,6 +2090,306 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  )}
+
+  {/* ========================================================================= */}
+  {/* TAB: PROFILE EDIT AUDIT LOGS (OLD VS NEW CHANGES) */}
+  {/* ========================================================================= */}
+  {adminTab === 'profile_audits' && (
+    <div className="space-y-6 animate-fadeIn">
+      {/* Banner Notice */}
+      <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-blue-900 text-white p-5 rounded-xl border border-purple-400/30 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <History className="w-5 h-5 text-purple-300" />
+            <h3 className="font-bold text-base sm:text-lg text-white">
+              सदस्य प्रोफाइल एडिट ऑडिट लॉग एवं लाइव ट्रैकर (Profile Edit Audit Logs)
+            </h3>
+          </div>
+          <p className="text-xs text-purple-200 max-w-2xl leading-relaxed">
+            जब भी कोई सदस्य अपना नाम, मोबाइल, ईमेल, शिक्षा/योग्यता, पता, सोशल लिंक, व्यक्तिगत QR या बैंक/UPI विवरण बदलता है, तो उसका <strong>पुराना विवरण (Old Value)</strong> और <strong>नया विवरण (New Value)</strong> सटीक समय और तारीख के साथ यहाँ रिकॉर्ड हो जाता है।
+          </p>
+          <div className="flex items-center gap-2 pt-1 flex-wrap text-[11px] text-amber-200 font-semibold">
+            <span className="flex items-center gap-1 bg-white/10 px-2 py-0.5 rounded border border-white/20">
+              <Lock className="w-3 h-3 text-amber-400" />
+              <span>यूनिक ACC ID: 100% अपरिवर्तनीय व लॉक</span>
+            </span>
+            <span className="flex items-center gap-1 bg-white/10 px-2 py-0.5 rounded border border-white/20">
+              <Lock className="w-3 h-3 text-amber-400" />
+              <span>स्पॉन्सर ID: 100% अपरिवर्तनीय व लॉक</span>
+            </span>
+            <span className="flex items-center gap-1 bg-white/10 px-2 py-0.5 rounded border border-white/20">
+              <ShieldCheck className="w-3 h-3 text-emerald-400" />
+              <span>क्लाउड डेटाबेस सिंक सक्रिय ✓</span>
+            </span>
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <span className="text-[10px] uppercase font-bold text-purple-300 block">कुल एडिट सत्र</span>
+          <span className="font-mono-acc font-black text-3xl text-yellow-300">{auditLogs.length}</span>
+        </div>
+      </div>
+
+      {/* 4 Summary Stat Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-xs">
+          <span className="text-[11px] text-slate-500 block font-medium">कुल एडिट सत्र (Audit Sessions)</span>
+          <span className="font-mono-acc font-black text-2xl text-purple-700">{auditLogs.length}</span>
+          <span className="text-[10px] text-slate-500 block mt-0.5">समय व तारीख सहित पूर्ण रिकॉर्ड</span>
+        </div>
+
+        <div className="bg-white border border-blue-200 rounded-xl p-3.5 shadow-xs bg-blue-50/20">
+          <span className="text-[11px] text-blue-800 font-bold block">संशोधित फ़ील्ड्स (Field Edits)</span>
+          <span className="font-mono-acc font-black text-2xl text-[#2874f0]">
+            {auditLogs.reduce((acc, l) => acc + (l.changes ? l.changes.length : 0), 0)}
+          </span>
+          <span className="text-[10px] text-blue-700 block mt-0.5">नाम, मोबाइल, पता, बैंक आदि परिवर्तन</span>
+        </div>
+
+        <div className="bg-white border border-emerald-200 rounded-xl p-3.5 shadow-xs bg-emerald-50/20">
+          <span className="text-[11px] text-emerald-800 font-bold block">सुरक्षित यूनिक IDs (Immutable)</span>
+          <span className="font-mono-acc font-black text-2xl text-emerald-600">{members.length}</span>
+          <span className="text-[10px] text-emerald-600 block mt-0.5">ACC ID व Sponsor ID सुरक्षित लॉक</span>
+        </div>
+
+        <div className="bg-white border border-amber-200 rounded-xl p-3.5 shadow-xs bg-amber-50/20">
+          <span className="text-[11px] text-amber-800 font-bold block">सक्रिय सदस्य (Active Profiles)</span>
+          <span className="font-mono-acc font-black text-2xl text-amber-600">
+            {members.filter((m) => m.lastEditedAt || (m.editHistory && m.editHistory.length > 0)).length}
+          </span>
+          <span className="text-[10px] text-amber-700 block mt-0.5">कम से कम 1 बार प्रोफाइल एडिट की गई</span>
+        </div>
+      </div>
+
+      {/* Main Audit Logs Container */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 space-y-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+          <div>
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <History className="w-5 h-5 text-purple-600" />
+              <span>ऑडिट लॉग: पुराना विवरण (Old Value) बनाम नया विवरण (New Value)</span>
+            </h3>
+            <p className="text-xs text-slate-500">
+              प्रत्येक सत्र में उपयोगकर्ता ने कौन सा विवरण बदला, उसका पुराना मान और वर्तमान नया मान नीचे स्पष्ट रूप से प्रदर्शित है
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-600">
+              प्रदर्शित: <strong>{auditLogs.filter((l) => {
+                const q = auditSearchQuery.toLowerCase().trim();
+                if (!q) return true;
+                return (
+                  (l.accId || '').toLowerCase().includes(q) ||
+                  (l.memberName || '').toLowerCase().includes(q) ||
+                  (l.changes || []).some(
+                    (c) =>
+                      c.fieldLabel.toLowerCase().includes(q) ||
+                      c.oldValue.toLowerCase().includes(q) ||
+                      c.newValue.toLowerCase().includes(q)
+                  )
+                );
+              }).length}</strong> ऑडिट रिकॉर्ड
+            </span>
+          </div>
+        </div>
+
+        {/* Search & Filter Bar */}
+        <div className="flex flex-col sm:flex-row items-center gap-3">
+          <div className="relative flex-1 w-full">
+            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+            <input
+              type="text"
+              value={auditSearchQuery}
+              onChange={(e) => setAuditSearchQuery(e.target.value)}
+              placeholder="नाम, ACC ID, फ़ील्ड (नाम, मोबाइल, पता, ईमेल, IFSC)..."
+              className="w-full bg-white border border-gray-300 rounded-sm pl-9 pr-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
+            />
+          </div>
+          {auditSearchQuery && (
+            <button
+              onClick={() => setAuditSearchQuery('')}
+              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-sm border border-gray-200 transition"
+            >
+              फ़िल्टर हटाएं
+            </button>
+          )}
+        </div>
+
+        {/* Audit Log Cards List */}
+        {auditLogs.length === 0 ? (
+          <div className="p-12 text-center bg-slate-50 border border-dashed border-gray-200 rounded-xl space-y-3">
+            <div className="w-12 h-12 rounded-full bg-purple-50 text-purple-600 mx-auto flex items-center justify-center">
+              <History className="w-6 h-6" />
+            </div>
+            <h4 className="text-sm font-bold text-slate-800">अभी तक कोई प्रोफाइल एडिट रिकॉर्ड नहीं है</h4>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              जैसे ही कोई पंजीकृत सदस्य यूजर डैशबोर्ड के "प्रोफाइल एडिट [अपडेट]" मेनू में जाकर अपना नाम, मोबाइल, ईमेल, पता, योग्यता, QR या बैंक विवरण बदलेगा, उसका पुराना और नया मान तुरंत यहाँ रिकॉर्ड हो जाएगा।
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {auditLogs
+              .filter((log) => {
+                const q = auditSearchQuery.toLowerCase().trim();
+                if (!q) return true;
+                return (
+                  (log.accId || '').toLowerCase().includes(q) ||
+                  (log.memberName || '').toLowerCase().includes(q) ||
+                  (log.changes || []).some(
+                    (c) =>
+                      c.fieldLabel.toLowerCase().includes(q) ||
+                      c.oldValue.toLowerCase().includes(q) ||
+                      c.newValue.toLowerCase().includes(q)
+                  )
+                );
+              })
+              .map((log) => {
+                const matchedMember = members.find((m) => (m.accId || '').toUpperCase() === (log.accId || '').toUpperCase());
+
+                return (
+                  <div
+                    key={log.id}
+                    className="border border-purple-200 bg-white rounded-xl shadow-xs overflow-hidden transition hover:shadow-sm"
+                  >
+                    {/* Log Card Header */}
+                    <div className="bg-purple-50/70 border-b border-purple-200 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-purple-200 text-purple-800 font-bold text-xs flex items-center justify-center border border-purple-300 shrink-0">
+                          {(log.memberName || 'M').substring(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-slate-900 text-sm">{log.memberName}</span>
+                            <span className="font-mono-acc font-bold text-[#2874f0] bg-blue-50 px-2 py-0.5 rounded border border-blue-200 text-xs">
+                              {log.accId}
+                            </span>
+                            {matchedMember?.plan && (
+                              <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.2 rounded border border-amber-200">
+                                {matchedMember.plan}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
+                            <Clock className="w-3 h-3 text-purple-600" />
+                            <span>
+                              {new Date(log.timestamp).toLocaleString('hi-IN', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                              })}
+                            </span>
+                            <span>•</span>
+                            <span className="font-semibold text-purple-800">
+                              {log.changes.length} फ़ील्ड संशोधित किए गए
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right Header Action Buttons */}
+                      <div className="flex items-center gap-2 flex-wrap justify-end">
+                        {matchedMember && (
+                          <button
+                            onClick={() => {
+                              setSelectedMemberFor360(matchedMember);
+                              setMember360ActiveTab('audit_history');
+                            }}
+                            className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-bold flex items-center gap-1 shadow-xs transition cursor-pointer"
+                            title="इस सदस्य का सम्पूर्ण 360° डेटाबेस व हिस्ट्री खोलें"
+                          >
+                            <Activity className="w-3.5 h-3.5" />
+                            <span>🔍 360° डेटाबेस</span>
+                          </button>
+                        )}
+
+                        {matchedMember && (
+                          <a
+                            href={`https://api.whatsapp.com/send?phone=91${matchedMember.mobile}&text=${encodeURIComponent(
+                              `नमस्ते ${matchedMember.fullName} ji, आपके Achievers Club Community प्रोफाइल में हाल ही में किए गए बदलाव ACC एडमिन पोर्टल पर सुरक्षित रूप से दर्ज हो गए हैं। ID: ${matchedMember.accId}`
+                            )}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1 bg-[#25D366] hover:bg-[#20ba59] text-white rounded text-xs font-bold flex items-center gap-1 transition shadow-xs"
+                            title="WhatsApp पर मैसेज भेजें"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+
+                        {matchedMember && (
+                          <button
+                            onClick={() => setFormResponseModalMember(matchedMember)}
+                            className="p-1 bg-blue-50 hover:bg-blue-100 text-[#2874f0] border border-blue-200 rounded text-xs transition"
+                            title="पंजीकरण फॉर्म देखें"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Detailed Old vs New Comparison Table */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-[#f8f9fa] text-slate-700 border-b border-gray-200 font-bold">
+                            <th className="py-2 px-3 w-1/4">संशोधित फ़ील्ड (Field Name)</th>
+                            <th className="py-2 px-3 w-5/12 bg-red-50/50 text-red-900 border-r border-gray-200">
+                              पुराना मान (Old Value - Before Edit)
+                            </th>
+                            <th className="py-2 px-3 w-5/12 bg-emerald-50/50 text-emerald-900">
+                              नया मान (New Value - Current Updated)
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {log.changes.map((ch, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50 transition">
+                              <td className="py-2.5 px-3 font-semibold text-slate-900">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+                                  <span>{ch.fieldLabel}</span>
+                                </div>
+                                <span className="text-[10px] text-slate-400 font-mono block ml-3">{ch.field}</span>
+                              </td>
+                              <td className="py-2.5 px-3 bg-red-50/20 border-r border-gray-200">
+                                {ch.oldValue ? (
+                                  <span className="text-red-700 bg-red-50 px-2 py-0.5 rounded border border-red-200 font-mono-acc text-[11px] line-through block w-fit">
+                                    {ch.oldValue}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 italic text-[11px]">
+                                    (रिक्त / उपलब्ध नहीं था)
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3 bg-emerald-50/20">
+                                {ch.newValue ? (
+                                  <span className="text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-300 font-bold font-mono-acc text-[11px] block w-fit">
+                                    {ch.newValue}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 italic text-[11px]">
+                                    (हटा दिया गया)
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        )}
       </div>
     </div>
   )}
@@ -3937,10 +4634,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
       {/* COMPREHENSIVE SUBMITTED FORM RESPONSE MODAL (PRINTABLE / INSPECTABLE) */}
       {/* ========================================================================= */}
       {formResponseModalMember && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 animate-fadeIn overflow-y-auto">
-          <div className="bg-white border border-gray-200 rounded-2xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl animate-scaleUp text-slate-800">
+        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-hidden animate-fadeIn">
+          <div className="bg-white border border-gray-200 rounded-2xl max-w-3xl w-full h-[90vh] max-h-[90vh] flex flex-col shadow-2xl animate-scaleUp text-slate-800 overflow-hidden">
             {/* Modal Header */}
-            <div className="sticky top-0 z-10 bg-slate-900 text-white p-4 px-6 rounded-t-2xl flex items-center justify-between border-b border-slate-700">
+            <div className="sticky top-0 z-10 bg-slate-900 text-white p-4 px-6 rounded-t-2xl flex items-center justify-between border-b border-slate-700 shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-[#ffe500] text-[#2874f0] font-black flex items-center justify-center text-sm shadow-xs">
                   ACC
@@ -3979,7 +4676,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
             </div>
 
             {/* Modal Printable Body */}
-            <div className="p-4 sm:p-6 space-y-5 text-xs">
+            <div className="p-4 sm:p-6 space-y-5 text-xs overflow-y-auto flex-1">
               {/* Application Top Summary Banner */}
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
@@ -4361,6 +5058,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                   <span>डेटा कॉपी करें</span>
                 </button>
 
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedMemberFor360(formResponseModalMember);
+                    setMember360ActiveTab('profile_info');
+                    setFormResponseModalMember(null);
+                  }}
+                  className="px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-300 rounded text-xs font-bold flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                >
+                  <Activity className="w-3.5 h-3.5 text-purple-600" />
+                  <span>360° डेटाबेस व हिस्ट्री</span>
+                </button>
+
                 <a
                   href={`https://api.whatsapp.com/send?phone=91${formResponseModalMember.mobile}&text=${encodeURIComponent(
                     `नमस्ते ${formResponseModalMember.fullName} ji,\nAchievers Club Community (ACC) में आपका स्वागत है!\n\n🆔 आपकी Member 🆔: ${formResponseModalMember.accId}\n💼 सिस्टम प्लान: ${formResponseModalMember.plan}\n💳 UTR Ref: ${formResponseModalMember.utrNumber}\n🟢 स्टेटस: ${formResponseModalMember.status === 'verified' ? 'सत्यापित (VERIFIED ✓)' : 'समीक्षा में'}\n\nऑफिशियल वेबसाइट: www.achieversclub.in`
@@ -4407,6 +5117,910 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                   type="button"
                   onClick={() => setFormResponseModalMember(null)}
                   className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded text-xs font-bold transition"
+                >
+                  बंद करें
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: COMPLETE USER 360° INSPECTOR (DATABASE, HISTORY, INCOME, EDITS) */}
+      {/* ========================================================================= */}
+      {selectedMemberFor360 && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-5xl w-full h-[90vh] max-h-[90vh] flex flex-col shadow-2xl border border-purple-300 overflow-hidden animate-scaleUp">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-slate-900 via-purple-950 to-blue-950 text-white p-4 sm:p-5 flex items-center justify-between gap-3 border-b border-purple-800/40 shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                {selectedMemberFor360.avatarUrl ? (
+                  <img
+                    src={selectedMemberFor360.avatarUrl}
+                    alt={selectedMemberFor360.fullName}
+                    className="w-12 h-12 rounded-full object-cover border-2 border-purple-400 shadow-md shrink-0"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-purple-600 text-white font-black text-sm flex items-center justify-center border-2 border-purple-300 shadow-md shrink-0">
+                    {(selectedMemberFor360.fullName || 'M').substring(0, 2).toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base sm:text-lg font-bold text-white truncate">
+                      {selectedMemberFor360.fullName}
+                    </h3>
+                    <span className="font-mono-acc font-black text-xs bg-yellow-400 text-slate-950 px-2 py-0.5 rounded shadow-xs">
+                      {selectedMemberFor360.accId}
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                        selectedMemberFor360.plan === 'SWIS'
+                          ? 'bg-amber-400 text-slate-900'
+                          : 'bg-blue-400 text-slate-900'
+                      }`}
+                    >
+                      {selectedMemberFor360.plan} PLAN
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                        selectedMemberFor360.status === 'verified'
+                          ? 'bg-emerald-500 text-white'
+                          : selectedMemberFor360.status === 'rejected'
+                          ? 'bg-red-500 text-white'
+                          : 'bg-amber-500 text-white animate-pulse'
+                      }`}
+                    >
+                      {selectedMemberFor360.status === 'verified'
+                        ? 'सत्यापित ✓'
+                        : selectedMemberFor360.status === 'rejected'
+                        ? 'अस्वीकृत'
+                        : 'लंबित समीक्षा'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-purple-200 mt-0.5 truncate">
+                    सम्पूर्ण 360° सदस्य रिकॉर्ड, प्रोफाइल एडिट हिस्ट्री (Old vs New), आय, वॉलेट व कमीशन डेटाबेस
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedMemberFor360(null)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition shrink-0 cursor-pointer"
+                title="बंद करें"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Permanent Immutable Identity Guarantee Banner (Locked Keys) */}
+            <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs shrink-0">
+              <div className="flex items-center gap-1.5 text-amber-900 font-bold">
+                <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span>सुरक्षित व लॉक पहचान कुंजियाँ (Immutable Keys):</span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap text-[11px]">
+                <span className="bg-white px-2 py-0.5 rounded border border-amber-300 text-slate-800">
+                  🔒 <strong>यूनिक ACC ID:</strong> <span className="font-mono-acc text-[#2874f0] font-bold">{selectedMemberFor360.accId}</span>
+                </span>
+                <span className="bg-white px-2 py-0.5 rounded border border-amber-300 text-slate-800">
+                  🔒 <strong>स्पॉन्सर ID:</strong> <span className="font-mono-acc font-bold">{selectedMemberFor360.sponsorId || 'DIRECT'}</span> ({selectedMemberFor360.sponsorName || 'कंपनी डायरेक्ट'})
+                </span>
+                <span className="bg-white px-2 py-0.5 rounded border border-amber-300 text-slate-800">
+                  🔒 <strong>प्लान:</strong> <span className="font-bold text-amber-800">{selectedMemberFor360.plan} (₹249)</span>
+                </span>
+                <span className="bg-white px-2 py-0.5 rounded border border-amber-300 text-slate-800">
+                  📅 <strong>पंजीकरण तिथि:</strong> {selectedMemberFor360.createdAt?.split('T')[0] || '2026-10-08'}
+                </span>
+              </div>
+            </div>
+
+            {/* 360 Navigation Sub-Tabs (Responsive Flex-Wrap - 100% Inside Screen) */}
+            <div className="bg-slate-100 border-b border-gray-200 p-2 flex flex-wrap items-center gap-1 sm:gap-1.5 shrink-0 w-full max-w-full">
+              <button
+                onClick={() => setMember360ActiveTab('profile_info')}
+                className={`flex-1 min-w-[110px] sm:min-w-[130px] max-w-full flex items-center justify-center text-center gap-1.5 px-2 py-2 rounded-lg text-xs font-bold transition cursor-pointer truncate ${
+                  member360ActiveTab === 'profile_info'
+                    ? 'bg-white text-[#2874f0] shadow-xs border border-gray-200 ring-1 ring-[#2874f0]/20'
+                    : 'text-slate-600 hover:bg-slate-200 border border-transparent'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">1. प्रोफाइल विवरण</span>
+              </button>
+
+              <button
+                onClick={() => setMember360ActiveTab('audit_history')}
+                className={`flex-1 min-w-[110px] sm:min-w-[130px] max-w-full flex items-center justify-center text-center gap-1.5 px-2 py-2 rounded-lg text-xs font-bold transition cursor-pointer truncate ${
+                  member360ActiveTab === 'audit_history'
+                    ? 'bg-purple-50 text-purple-800 shadow-xs border border-purple-200 ring-1 ring-purple-300'
+                    : 'text-slate-600 hover:bg-slate-200 border border-transparent'
+                }`}
+              >
+                <History className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                <span className="truncate">2. एडिट हिस्ट्री</span>
+                <span className="bg-purple-200 text-purple-900 text-[10px] px-1.5 py-0.2 rounded-full font-mono shrink-0">
+                  {auditLogs.filter((a) => a.accId.toUpperCase() === selectedMemberFor360.accId.toUpperCase()).length}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setMember360ActiveTab('financials')}
+                className={`flex-1 min-w-[110px] sm:min-w-[130px] max-w-full flex items-center justify-center text-center gap-1.5 px-2 py-2 rounded-lg text-xs font-bold transition cursor-pointer truncate ${
+                  member360ActiveTab === 'financials'
+                    ? 'bg-emerald-50 text-emerald-800 shadow-xs border border-emerald-200 ring-1 ring-emerald-300'
+                    : 'text-slate-600 hover:bg-slate-200 border border-transparent'
+                }`}
+              >
+                <Wallet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span className="truncate">3. आय व वॉलेट</span>
+              </button>
+
+              <button
+                onClick={() => setMember360ActiveTab('recharges')}
+                className={`flex-1 min-w-[110px] sm:min-w-[130px] max-w-full flex items-center justify-center text-center gap-1.5 px-2 py-2 rounded-lg text-xs font-bold transition cursor-pointer truncate ${
+                  member360ActiveTab === 'recharges'
+                    ? 'bg-blue-50 text-[#2874f0] shadow-xs border border-blue-200 ring-1 ring-blue-300'
+                    : 'text-slate-600 hover:bg-slate-200 border border-transparent'
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5 text-[#2874f0] shrink-0" />
+                <span className="truncate">4. रिचार्ज</span>
+                <span className="bg-blue-200 text-blue-900 text-[10px] px-1.5 py-0.2 rounded-full font-mono shrink-0">
+                  {transactions.filter((t) => t.accId.toUpperCase() === selectedMemberFor360.accId.toUpperCase()).length}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setMember360ActiveTab('referrals')}
+                className={`flex-1 min-w-[110px] sm:min-w-[130px] max-w-full flex items-center justify-center text-center gap-1.5 px-2 py-2 rounded-lg text-xs font-bold transition cursor-pointer truncate ${
+                  member360ActiveTab === 'referrals'
+                    ? 'bg-amber-50 text-amber-800 shadow-xs border border-amber-200 ring-1 ring-amber-300'
+                    : 'text-slate-600 hover:bg-slate-200 border border-transparent'
+                }`}
+              >
+                <Award className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span className="truncate">5. टीम</span>
+                <span className="bg-amber-200 text-amber-900 text-[10px] px-1.5 py-0.2 rounded-full font-mono shrink-0">
+                  {members.filter((m) => m.sponsorId?.toUpperCase() === selectedMemberFor360.accId.toUpperCase()).length}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setMember360ActiveTab('withdrawals')}
+                className={`flex-1 min-w-[110px] sm:min-w-[130px] max-w-full flex items-center justify-center text-center gap-1.5 px-2 py-2 rounded-lg text-xs font-bold transition cursor-pointer truncate ${
+                  member360ActiveTab === 'withdrawals'
+                    ? 'bg-indigo-50 text-indigo-800 shadow-xs border border-indigo-200 ring-1 ring-indigo-300'
+                    : 'text-slate-600 hover:bg-slate-200 border border-transparent'
+                }`}
+              >
+                <CreditCard className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                <span className="truncate">6. निकासी</span>
+                <span className="bg-indigo-200 text-indigo-900 text-[10px] px-1.5 py-0.2 rounded-full font-mono shrink-0">
+                  {withdrawals.filter((w) => w.accId.toUpperCase() === selectedMemberFor360.accId.toUpperCase()).length}
+                </span>
+              </button>
+            </div>
+
+            {/* Modal Body / Tab Content (Resets to top:0 automatically via ref) */}
+            <div ref={modal360BodyRef} className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+              {/* SUBTAB 1: COMPLETE PROFILE & CONTACT INFO */}
+              {member360ActiveTab === 'profile_info' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Personal Information */}
+                    <div className="bg-slate-50 p-4 rounded-xl border border-gray-200 space-y-2.5">
+                      <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5 border-b border-gray-200 pb-2">
+                        <Users className="w-4 h-4 text-[#2874f0]" />
+                        <span>व्यक्तिगत विवरण (Personal Info)</span>
+                      </h4>
+                      <div className="space-y-1.5 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">पूरा नाम:</span>
+                          <span className="font-bold text-slate-900">{selectedMemberFor360.fullName}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">शिक्षा / योग्यता:</span>
+                          <span className="font-semibold text-slate-800">{selectedMemberFor360.qualification || 'Graduate'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">स्थान (City, State):</span>
+                          <span className="font-semibold text-slate-800">{selectedMemberFor360.city}, {selectedMemberFor360.state}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">पिनकोड:</span>
+                          <span className="font-mono-acc text-slate-800">{selectedMemberFor360.pincode || '452001'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">पूरा पता:</span>
+                          <span className="font-semibold text-slate-800 text-right max-w-[220px]">{selectedMemberFor360.address || 'उपलब्ध नहीं'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">अंतिम प्रोफाइल बदलाव:</span>
+                          <span className="font-mono-acc text-purple-700 font-bold">
+                            {selectedMemberFor360.lastEditedAt ? new Date(selectedMemberFor360.lastEditedAt).toLocaleString('hi-IN') : 'कोई बदलाव नहीं'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Contact & Social Information */}
+                    <div className="bg-slate-50 p-4 rounded-xl border border-gray-200 space-y-2.5">
+                      <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5 border-b border-gray-200 pb-2">
+                        <Phone className="w-4 h-4 text-emerald-600" />
+                        <span>संपर्क व सोशल विवरण (Contact & Links)</span>
+                      </h4>
+                      <div className="space-y-1.5 text-xs">
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-500">मोबाइल नंबर:</span>
+                          <div className="flex items-center gap-1 font-mono-acc font-bold text-slate-900">
+                            <span>{selectedMemberFor360.mobile}</span>
+                            <a
+                              href={`tel:${selectedMemberFor360.mobile}`}
+                              className="text-blue-600 hover:text-blue-800 p-0.5"
+                              title="कॉल करें"
+                            >
+                              <Phone className="w-3 h-3" />
+                            </a>
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-500">WhatsApp नंबर:</span>
+                          <div className="flex items-center gap-1 font-mono-acc font-bold text-emerald-700">
+                            <span>{selectedMemberFor360.whatsapp || selectedMemberFor360.mobile}</span>
+                            <a
+                              href={`https://api.whatsapp.com/send?phone=91${selectedMemberFor360.whatsapp || selectedMemberFor360.mobile}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-emerald-600 hover:text-emerald-800 p-0.5"
+                              title="WhatsApp चैट"
+                            >
+                              <MessageCircle className="w-3 h-3" />
+                            </a>
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-500">ईमेल आईडी:</span>
+                          <span className="text-slate-800 font-mono-acc">{selectedMemberFor360.email}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-500">पर्सनल प्रोफाइल लिंक:</span>
+                          {selectedMemberFor360.profileLink ? (
+                            <a
+                              href={selectedMemberFor360.profileLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[#2874f0] hover:underline flex items-center gap-1 truncate max-w-[180px]"
+                            >
+                              <ExternalLink className="w-3 h-3 shrink-0" />
+                              <span className="truncate">{selectedMemberFor360.profileLink}</span>
+                            </a>
+                          ) : (
+                            <span className="text-slate-400 italic">सेट नहीं</span>
+                          )}
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-500">पर्सनल पेमेंट QR:</span>
+                          {selectedMemberFor360.personalQrUrl ? (
+                            <span className="bg-emerald-50 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-200">
+                              अपलोड किया गया ✓
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 italic">सेट नहीं</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payment, UTR & Bank Details */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Activation & UTR Info */}
+                    <div className="bg-slate-50 p-4 rounded-xl border border-gray-200 space-y-2.5">
+                      <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5 border-b border-gray-200 pb-2">
+                        <CreditCard className="w-4 h-4 text-emerald-600" />
+                        <span>एक्टिवेशन शुल्क व पेमेंट UTR</span>
+                      </h4>
+                      <div className="space-y-1.5 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">एक्टिवेशन चार्ज:</span>
+                          <span className="font-mono-acc font-black text-emerald-600">₹{selectedMemberFor360.activationCharge || 249}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">UPI UTR संदर्भ नंबर:</span>
+                          <span className="font-mono-acc font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-gray-200">
+                            {selectedMemberFor360.utrNumber || 'N/A'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">पेमेंट दिनांक:</span>
+                          <span className="font-mono-acc text-slate-800">{selectedMemberFor360.paymentDate || '2026-10-08'}</span>
+                        </div>
+                        <div className="flex justify-between items-center pt-1">
+                          <span className="text-slate-500">पेमेंट रसीद स्क्रीनशॉट:</span>
+                          {selectedMemberFor360.paymentScreenshotUrl ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setScreenshotModalMember(selectedMemberFor360);
+                                setZoomLevel(1);
+                              }}
+                              className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-[#2874f0] border border-blue-200 rounded text-xs font-bold flex items-center gap-1 cursor-pointer"
+                            >
+                              <ImageIcon className="w-3.5 h-3.5" />
+                              <span>रसीद देखें ✓</span>
+                            </button>
+                          ) : (
+                            <span className="text-slate-400 italic">रसीद संलग्न नहीं</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bank & Payout Details */}
+                    <div className="bg-slate-50 p-4 rounded-xl border border-gray-200 space-y-2.5">
+                      <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5 border-b border-gray-200 pb-2">
+                        <Wallet className="w-4 h-4 text-purple-600" />
+                        <span>पेआउट बैंक / UPI विवरण (Payout Account)</span>
+                      </h4>
+                      <div className="space-y-1.5 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">UPI ID:</span>
+                          <span className="font-mono-acc font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                            {selectedMemberFor360.payoutDetails?.upiId || `${selectedMemberFor360.mobile}@upi`}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">बैंक नाम:</span>
+                          <span className="font-semibold text-slate-800">{selectedMemberFor360.payoutDetails?.bankName || 'SBI / Not Added'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">खाता संख्या:</span>
+                          <span className="font-mono-acc text-slate-800">{selectedMemberFor360.payoutDetails?.accountNumber || 'UPI मोड सक्रिय'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">IFSC कोड:</span>
+                          <span className="font-mono-acc text-slate-800">{selectedMemberFor360.payoutDetails?.ifsc || 'SBIN0001234'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">खाताधारक नाम:</span>
+                          <span className="font-semibold text-slate-800">{selectedMemberFor360.payoutDetails?.holderName || selectedMemberFor360.fullName}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* SUBTAB 2: PROFILE EDIT AUDIT HISTORY (OLD VS NEW DETAILS) */}
+              {member360ActiveTab === 'audit_history' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between bg-purple-50 p-3 rounded-xl border border-purple-200">
+                    <div>
+                      <h4 className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
+                        <History className="w-4 h-4 text-purple-600" />
+                        <span>{selectedMemberFor360.fullName} ({selectedMemberFor360.accId}) का प्रोफाइल ऑडिट इतिहास</span>
+                      </h4>
+                      <p className="text-[11px] text-purple-700 mt-0.5">
+                        छात्र द्वारा समय-समय पर किए गए सभी परिवर्तनों का पुराना मान (Old Value) और नया मान (New Value)
+                      </p>
+                    </div>
+                    <span className="text-xs font-mono-acc font-bold bg-white text-purple-900 px-2.5 py-1 rounded border border-purple-200">
+                      कुल सत्र: {auditLogs.filter((a) => a.accId.toUpperCase() === selectedMemberFor360.accId.toUpperCase()).length}
+                    </span>
+                  </div>
+
+                  {(() => {
+                    const userLogs = auditLogs.filter(
+                      (a) => a.accId.toUpperCase() === selectedMemberFor360.accId.toUpperCase()
+                    );
+
+                    if (userLogs.length === 0) {
+                      return (
+                        <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-gray-300 space-y-2">
+                          <History className="w-8 h-8 text-slate-400 mx-auto" />
+                          <h5 className="text-xs font-bold text-slate-700">इस सदस्य ने अभी तक कोई प्रोफाइल विवरण नहीं बदला है</h5>
+                          <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                            पंजीकरण के बाद जब भी यह सदस्य यूजर डैशबोर्ड के प्रोफाइल एडिट सेक्शन से कोई जानकारी अपडेट करेगा, उसका पुराना और नया मान यहाँ स्वतः सुरक्षित हो जाएगा।
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="space-y-3">
+                        {userLogs.map((log) => (
+                          <div key={log.id} className="border border-purple-200 rounded-xl overflow-hidden shadow-xs">
+                            <div className="bg-purple-100/60 px-3.5 py-2 border-b border-purple-200 flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2">
+                                <Clock className="w-3.5 h-3.5 text-purple-700" />
+                                <span className="font-bold text-slate-900">
+                                  {new Date(log.timestamp).toLocaleString('hi-IN', {
+                                    day: 'numeric',
+                                    month: 'short',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit',
+                                  })}
+                                </span>
+                              </div>
+                              <span className="text-[10px] bg-purple-200 text-purple-900 font-bold px-2 py-0.5 rounded">
+                                {log.changes.length} फ़ील्ड्स बदले गए
+                              </span>
+                            </div>
+
+                            <table className="w-full text-left border-collapse text-xs">
+                              <thead>
+                                <tr className="bg-slate-50 text-slate-600 border-b border-gray-200 font-bold text-[11px]">
+                                  <th className="py-2 px-3 w-1/4">फ़ील्ड</th>
+                                  <th className="py-2 px-3 w-5/12 bg-red-50/40 text-red-800 border-r border-gray-200">पुराना मान (Old Value)</th>
+                                  <th className="py-2 px-3 w-5/12 bg-emerald-50/40 text-emerald-800">नया मान (New Value)</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                {log.changes.map((ch, idx) => (
+                                  <tr key={idx} className="hover:bg-slate-50 transition">
+                                    <td className="py-2 px-3 font-semibold text-slate-900">
+                                      {ch.fieldLabel}
+                                      <span className="text-[10px] text-slate-400 font-mono block">{ch.field}</span>
+                                    </td>
+                                    <td className="py-2 px-3 bg-red-50/20 border-r border-gray-200">
+                                      {ch.oldValue ? (
+                                        <span className="text-red-700 bg-red-50 px-1.5 py-0.5 rounded border border-red-200 text-[11px] line-through font-mono-acc">
+                                          {ch.oldValue}
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-400 italic text-[11px]">(रिक्त था)</span>
+                                      )}
+                                    </td>
+                                    <td className="py-2 px-3 bg-emerald-50/20">
+                                      {ch.newValue ? (
+                                        <span className="text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-300 text-[11px] font-bold font-mono-acc">
+                                          {ch.newValue}
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-400 italic text-[11px]">(हटाया)</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* SUBTAB 3: FINANCIALS, WALLET & COMMISSION DATABASE */}
+              {member360ActiveTab === 'financials' && (
+                <div className="space-y-4">
+                  {/* Financial Stats Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 shadow-xs">
+                      <span className="text-[11px] text-emerald-800 font-medium block">कुल संचित आय (Total Earnings)</span>
+                      <span className="font-mono-acc font-black text-2xl text-emerald-600 block mt-1">
+                        ₹{(selectedMemberFor360.totalEarnings || 0).toFixed(2)}
+                      </span>
+                      <span className="text-[10px] text-emerald-700 block mt-0.5">लाइफटाइम कमीशन व रेफरल</span>
+                    </div>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-3.5 shadow-xs">
+                      <span className="text-[11px] text-blue-800 font-medium block">उपलब्ध वॉलेट बैलेंस</span>
+                      <span className="font-mono-acc font-black text-2xl text-[#2874f0] block mt-1">
+                        ₹{(selectedMemberFor360.walletBalance || 0).toFixed(2)}
+                      </span>
+                      <span className="text-[10px] text-blue-700 block mt-0.5">निकासी हेतु तुरंत उपलब्ध</span>
+                    </div>
+
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 shadow-xs">
+                      <span className="text-[11px] text-amber-800 font-medium block">SWIS 3.30% रिचार्ज कैशबैक</span>
+                      <span className="font-mono-acc font-black text-2xl text-amber-700 block mt-1">
+                        ₹{(selectedMemberFor360.swisEarnings || 0).toFixed(2)}
+                      </span>
+                      <span className="text-[10px] text-amber-700 block mt-0.5">
+                        {selectedMemberFor360.rechargesCount || 0} रिचार्ज पूरे किए
+                      </span>
+                    </div>
+
+                    <div className="bg-purple-50 border border-purple-200 rounded-xl p-3.5 shadow-xs">
+                      <span className="text-[11px] text-purple-800 font-medium block">TWIS ₹150 रेफरल इनकम</span>
+                      <span className="font-mono-acc font-black text-2xl text-purple-700 block mt-1">
+                        ₹{(selectedMemberFor360.twisEarnings || 0).toFixed(2)}
+                      </span>
+                      <span className="text-[10px] text-purple-700 block mt-0.5">
+                        {selectedMemberFor360.referralsCount || 0} सक्रिय रेफरल्स
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Sponsor Commission Status for this user registration */}
+                  <div className="bg-slate-50 border border-gray-200 rounded-xl p-4 space-y-3">
+                    <h4 className="text-xs font-bold text-slate-900 flex items-center justify-between border-b border-gray-200 pb-2">
+                      <span className="flex items-center gap-1.5">
+                        <Award className="w-4 h-4 text-amber-600" />
+                        <span>इस सदस्य के एक्टिवेशन पर स्पॉन्सर को ₹150 कमीशन की स्थिति</span>
+                      </span>
+                      {selectedMemberFor360.sponsorCommissionStatus === 'paid' ? (
+                        <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-300">
+                          ✓ स्पॉन्सर को भुगतान चुकता
+                        </span>
+                      ) : selectedMemberFor360.sponsorId && selectedMemberFor360.sponsorId !== 'DIRECT' ? (
+                        <span className="bg-amber-100 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-300">
+                          ⏳ स्पॉन्सर कमीशन लंबित
+                        </span>
+                      ) : (
+                        <span className="bg-slate-100 text-slate-600 text-[10px] px-2 py-0.5 rounded">
+                          कंपनी डायरेक्ट (नो स्पॉन्सर)
+                        </span>
+                      )}
+                    </h4>
+
+                    {selectedMemberFor360.sponsorId && selectedMemberFor360.sponsorId !== 'DIRECT' ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                        <div className="bg-white p-3 rounded-lg border border-gray-200">
+                          <span className="text-slate-500 block text-[11px]">स्पॉन्सर का नाम व ID:</span>
+                          <strong className="text-slate-900 block mt-0.5">{selectedMemberFor360.sponsorName || 'स्पॉन्सर'}</strong>
+                          <span className="font-mono-acc text-purple-700 font-bold text-[11px]">({selectedMemberFor360.sponsorId})</span>
+                        </div>
+
+                        <div className="bg-white p-3 rounded-lg border border-gray-200">
+                          <span className="text-slate-500 block text-[11px]">कमीशन राशि:</span>
+                          <strong className="text-emerald-700 font-mono-acc text-base block mt-0.5">₹150.00</strong>
+                          <span className="text-[10px] text-slate-400">Direct TWIS Sponsor Bonus</span>
+                        </div>
+
+                        <div className="bg-white p-3 rounded-lg border border-gray-200 flex flex-col justify-between">
+                          <div>
+                            <span className="text-slate-500 block text-[11px]">भुगतान स्थिति / UTR:</span>
+                            <span className="font-mono-acc text-slate-800 text-[11px] block mt-0.5 font-bold">
+                              {selectedMemberFor360.sponsorCommissionUtr || 'लंबित'}
+                            </span>
+                          </div>
+                          {selectedMemberFor360.sponsorCommissionStatus !== 'paid' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCommissionPayMember(selectedMemberFor360);
+                                setCommissionUtrInput(`COMM-${Date.now().toString().slice(-8)}`);
+                              }}
+                              className="mt-2 w-full py-1 bg-[#fb641b] hover:bg-[#e85a14] text-white rounded text-[11px] font-bold shadow-xs transition"
+                            >
+                              ₹150 पे करें
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-500">
+                        यह सदस्य कंपनी डायरेक्ट के अंतर्गत पंजीकृत है, अतः कोई स्पॉन्सर कमीशन देय नहीं है।
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* SUBTAB 4: RECHARGE TRANSACTIONS */}
+              {member360ActiveTab === 'recharges' && (
+                <div className="space-y-4">
+                  {(() => {
+                    const userTxs = transactions.filter(
+                      (t) => t.accId.toUpperCase() === selectedMemberFor360.accId.toUpperCase()
+                    );
+
+                    const totalRechargeAmt = userTxs.reduce((sum, t) => sum + (t.amount || 0), 0);
+                    const totalCashback = userTxs.reduce((sum, t) => sum + (t.commissionEarned || 0), 0);
+
+                    return (
+                      <>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-blue-50 p-3 rounded-xl border border-blue-200 text-xs">
+                          <div>
+                            <strong className="text-blue-900 block">रिचार्ज सारांश (3.30% लाइफटाइम कैशबैक)</strong>
+                            <span className="text-blue-700 text-[11px]">
+                              कुल {userTxs.length} ट्रांजेक्शन • कुल रिचार्ज: ₹{totalRechargeAmt.toFixed(2)}
+                            </span>
+                          </div>
+                          <span className="font-mono-acc font-black text-emerald-700 bg-white px-2.5 py-1 rounded border border-blue-200">
+                            कुल कैशबैक कमाया: ₹{totalCashback.toFixed(2)}
+                          </span>
+                        </div>
+
+                        {userTxs.length === 0 ? (
+                          <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-gray-300">
+                            <Zap className="w-8 h-8 text-slate-400 mx-auto mb-1" />
+                            <p className="text-xs text-slate-600 font-bold">इस सदस्य का कोई रिचार्ज ट्रांजेक्शन नहीं है</p>
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                            <table className="w-full text-left border-collapse text-xs">
+                              <thead>
+                                <tr className="bg-slate-50 text-slate-700 border-b border-gray-200 font-bold">
+                                  <th className="py-2 px-3">सेवा (Service)</th>
+                                  <th className="py-2 px-3">ऑपरेटर व नंबर</th>
+                                  <th className="py-2 px-3">राशि (Amount)</th>
+                                  <th className="py-2 px-3">कमीशन (3.30%)</th>
+                                  <th className="py-2 px-3">दिनांक</th>
+                                  <th className="py-2 px-3">स्थिति</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                {userTxs.map((t) => (
+                                  <tr key={t.id} className="hover:bg-slate-50">
+                                    <td className="py-2.5 px-3 font-semibold text-slate-900">{t.serviceType}</td>
+                                    <td className="py-2.5 px-3">
+                                      <span className="text-slate-800 font-medium block">{t.operator}</span>
+                                      <span className="font-mono-acc text-[11px] text-slate-500">{t.accountNumber}</span>
+                                    </td>
+                                    <td className="py-2.5 px-3 font-mono-acc font-bold text-slate-900">₹{t.amount}</td>
+                                    <td className="py-2.5 px-3 font-mono-acc font-bold text-emerald-600">+₹{t.commissionEarned}</td>
+                                    <td className="py-2.5 px-3 font-mono-acc text-[11px] text-slate-500">{t.timestamp?.split('T')[0] || '2026-10-08'}</td>
+                                    <td className="py-2.5 px-3">
+                                      <span className="bg-emerald-50 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-200">
+                                        सफल (Success)
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* SUBTAB 5: DIRECT REFERRALS & TEAM */}
+              {member360ActiveTab === 'referrals' && (
+                <div className="space-y-4">
+                  {(() => {
+                    const directReferredMembers = members.filter(
+                      (m) => (m.sponsorId || '').toUpperCase() === selectedMemberFor360.accId.toUpperCase()
+                    );
+
+                    return (
+                      <>
+                        <div className="flex items-center justify-between bg-amber-50 p-3 rounded-xl border border-amber-200 text-xs">
+                          <div>
+                            <strong className="text-amber-900 block">डायरेक्ट रेफरल टीम रिकॉर्ड</strong>
+                            <span className="text-amber-700 text-[11px]">
+                              {selectedMemberFor360.fullName} द्वारा रेफर किए गए सभी सदस्य
+                            </span>
+                          </div>
+                          <span className="font-mono-acc font-black text-amber-900 bg-white px-2.5 py-1 rounded border border-amber-200">
+                            कुल डायरेक्ट रेफरल्स: {directReferredMembers.length}
+                          </span>
+                        </div>
+
+                        {directReferredMembers.length === 0 ? (
+                          <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-gray-300">
+                            <Users className="w-8 h-8 text-slate-400 mx-auto mb-1" />
+                            <p className="text-xs text-slate-600 font-bold">इस सदस्य ने अभी तक किसी को रेफर नहीं किया है</p>
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                            <table className="w-full text-left border-collapse text-xs">
+                              <thead>
+                                <tr className="bg-slate-50 text-slate-700 border-b border-gray-200 font-bold">
+                                  <th className="py-2 px-3">रेफरल सदस्य</th>
+                                  <th className="py-2 px-3">यूनिक ACC ID</th>
+                                  <th className="py-2 px-3">मोबाइल</th>
+                                  <th className="py-2 px-3">प्लान</th>
+                                  <th className="py-2 px-3">सत्यापन स्थिति</th>
+                                  <th className="py-2 px-3">रेफरल बोनस</th>
+                                  <th className="py-2 px-3">दिनांक</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                {directReferredMembers.map((rm) => (
+                                  <tr key={rm.accId} className="hover:bg-slate-50">
+                                    <td className="py-2.5 px-3">
+                                      <strong className="text-slate-900 block">{rm.fullName}</strong>
+                                      <span className="text-[10px] text-slate-500">{rm.city}, {rm.state}</span>
+                                    </td>
+                                    <td className="py-2.5 px-3">
+                                      <span className="font-mono-acc font-bold text-[#2874f0] bg-blue-50 px-2 py-0.5 rounded border border-blue-200 text-xs">
+                                        {rm.accId}
+                                      </span>
+                                    </td>
+                                    <td className="py-2.5 px-3 font-mono-acc text-slate-700">{rm.mobile}</td>
+                                    <td className="py-2.5 px-3">
+                                      <span className="bg-amber-100 text-amber-900 font-bold text-[10px] px-1.5 py-0.5 rounded">
+                                        {rm.plan}
+                                      </span>
+                                    </td>
+                                    <td className="py-2.5 px-3">
+                                      {rm.status === 'verified' ? (
+                                        <span className="text-emerald-700 bg-emerald-50 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-200">
+                                          सत्यापित ✓
+                                        </span>
+                                      ) : (
+                                        <span className="text-amber-700 bg-amber-50 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-200">
+                                          लंबित
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="py-2.5 px-3 font-mono-acc font-bold text-emerald-600">+₹150</td>
+                                    <td className="py-2.5 px-3 font-mono-acc text-[11px] text-slate-500">
+                                      {rm.createdAt?.split('T')[0] || '2026-10-08'}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* SUBTAB 6: WITHDRAWALS REQUESTS */}
+              {member360ActiveTab === 'withdrawals' && (
+                <div className="space-y-4">
+                  {(() => {
+                    const userWds = withdrawals.filter(
+                      (w) => w.accId.toUpperCase() === selectedMemberFor360.accId.toUpperCase()
+                    );
+
+                    return (
+                      <>
+                        <div className="flex items-center justify-between bg-indigo-50 p-3 rounded-xl border border-indigo-200 text-xs">
+                          <div>
+                            <strong className="text-indigo-900 block">वॉलेट निकासी इतिहास</strong>
+                            <span className="text-indigo-700 text-[11px]">
+                              {selectedMemberFor360.fullName} द्वारा किए गए सभी पेआउट अनुरोध
+                            </span>
+                          </div>
+                          <span className="font-mono-acc font-black text-indigo-900 bg-white px-2.5 py-1 rounded border border-indigo-200">
+                            कुल निकासी अनुरोध: {userWds.length}
+                          </span>
+                        </div>
+
+                        {userWds.length === 0 ? (
+                          <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-gray-300">
+                            <CreditCard className="w-8 h-8 text-slate-400 mx-auto mb-1" />
+                            <p className="text-xs text-slate-600 font-bold">इस सदस्य ने अभी तक कोई निकासी अनुरोध नहीं किया है</p>
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                            <table className="w-full text-left border-collapse text-xs">
+                              <thead>
+                                <tr className="bg-slate-50 text-slate-700 border-b border-gray-200 font-bold">
+                                  <th className="py-2 px-3">निकासी राशि</th>
+                                  <th className="py-2 px-3">माध्यम व खाता</th>
+                                  <th className="py-2 px-3">अनुरोध दिनांक</th>
+                                  <th className="py-2 px-3">स्थिति</th>
+                                  <th className="py-2 px-3 text-right">कार्रवाई</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                {userWds.map((w) => (
+                                  <tr key={w.id} className="hover:bg-slate-50">
+                                    <td className="py-2.5 px-3 font-mono-acc font-black text-emerald-600 text-sm">
+                                      ₹{w.amount.toFixed(2)}
+                                    </td>
+                                    <td className="py-2.5 px-3">
+                                      <strong className="text-slate-800 block">{w.method}</strong>
+                                      <span className="font-mono-acc text-[11px] text-slate-500">
+                                        {w.upiId || (w.bankDetails ? `${w.bankDetails.bankName} - A/C: ${w.bankDetails.accountNumber}` : 'N/A')}
+                                      </span>
+                                    </td>
+                                    <td className="py-2.5 px-3 font-mono-acc text-[11px] text-slate-500">
+                                      {new Date(w.requestedAt).toLocaleDateString('hi-IN', {
+                                        day: 'numeric',
+                                        month: 'short',
+                                        year: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })}
+                                    </td>
+                                    <td className="py-2.5 px-3">
+                                      {w.status === 'approved' ? (
+                                        <span className="text-emerald-700 bg-emerald-50 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-200">
+                                          स्वीकृत ✓
+                                        </span>
+                                      ) : w.status === 'rejected' ? (
+                                        <span className="text-red-700 bg-red-50 text-[10px] font-bold px-2 py-0.5 rounded border border-red-200">
+                                          अस्वीकृत
+                                        </span>
+                                      ) : (
+                                        <span className="text-amber-800 bg-amber-50 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-200">
+                                          लंबित
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="py-2.5 px-3 text-right">
+                                      {w.status === 'pending' && (
+                                        <div className="flex items-center justify-end gap-1">
+                                          <button
+                                            onClick={() => handleApproveWithdrawal(w.id)}
+                                            className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold shadow-xs"
+                                          >
+                                            स्वीकृत
+                                          </button>
+                                          <button
+                                            onClick={() => handleRejectWithdrawal(w.id)}
+                                            className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded text-[11px] font-bold border border-red-200"
+                                          >
+                                            अस्वीकार
+                                          </button>
+                                        </div>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Bottom Action Bar */}
+            <div className="bg-slate-50 border-t border-gray-200 p-3.5 px-5 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <a
+                  href={`https://api.whatsapp.com/send?phone=91${selectedMemberFor360.mobile}&text=${encodeURIComponent(
+                    `नमस्ते ${selectedMemberFor360.fullName} ji,\nमैं Achievers Club Community (ACC) एडमिन बात कर रहा हूँ।\nआपकी ID: ${selectedMemberFor360.accId}`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 bg-[#25D366] hover:bg-[#20ba59] text-white rounded text-xs font-bold flex items-center gap-1.5 transition shadow-xs"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>WhatsApp चैट</span>
+                </a>
+
+                <a
+                  href={`tel:${selectedMemberFor360.mobile}`}
+                  className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-[#2874f0] border border-blue-200 rounded text-xs font-bold flex items-center gap-1.5 transition"
+                >
+                  <Phone className="w-3.5 h-3.5" />
+                  <span>कॉल करें</span>
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const text = JSON.stringify(selectedMemberFor360, null, 2);
+                    navigator.clipboard.writeText(text);
+                    alert('सदस्य सम्पूर्ण 360° डेटा क्लिपबोर्ड में कॉपी हो गया!');
+                  }}
+                  className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-gray-300 rounded text-xs font-bold flex items-center gap-1.5 transition"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>डेटा कॉपी</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {selectedMemberFor360.status !== 'verified' && (
+                  <button
+                    onClick={() => {
+                      handleApproveMember(selectedMemberFor360);
+                      setSelectedMemberFor360(null);
+                    }}
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold flex items-center gap-1.5 shadow-sm transition"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>सत्यापित करें (Approve)</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setSelectedMemberFor360(null)}
+                  className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded text-xs font-bold transition"
                 >
                   बंद करें
                 </button>
