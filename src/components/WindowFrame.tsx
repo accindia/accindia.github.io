@@ -27,7 +27,7 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
 
   return (
     <div
-      className={`bg-white border border-gray-200 rounded-xl shadow-md overflow-hidden transition-all duration-200 flex flex-col ${
+      className={`bg-white border border-gray-200 rounded-xl shadow-md overflow-hidden transition-shadow duration-200 flex flex-col ${
         isMaximized ? 'fixed inset-3 z-50 rounded-none shadow-2xl' : className
       }`}
     >

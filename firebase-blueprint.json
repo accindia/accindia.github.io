@@ -1,0 +1,122 @@
+{
+  "entities": {
+    "Member": {
+      "title": "Member",
+      "description": "Student community member in Achievers Club Community",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "accId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "mobile": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "email": { "type": "string" },
+        "plan": { "type": "string" },
+        "status": { "type": "string" },
+        "sponsorId": { "type": "string" },
+        "utrNumber": { "type": "string" },
+        "walletBalance": { "type": "number" },
+        "totalEarnings": { "type": "number" },
+        "swisEarnings": { "type": "number" },
+        "twisEarnings": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["accId", "fullName", "mobile", "plan", "status"]
+    },
+    "RechargeTransaction": {
+      "title": "RechargeTransaction",
+      "description": "SWIS 3.30% mobile recharge transaction",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "accId": { "type": "string" },
+        "serviceType": { "type": "string" },
+        "operator": { "type": "string" },
+        "accountNumber": { "type": "string" },
+        "amount": { "type": "number" },
+        "commissionEarned": { "type": "number" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "accId", "amount", "commissionEarned"]
+    },
+    "ReferralRecord": {
+      "title": "ReferralRecord",
+      "description": "TWIS ₹150 referral bonus record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sponsorAccId": { "type": "string" },
+        "referredAccId": { "type": "string" },
+        "referredName": { "type": "string" },
+        "bonusAmount": { "type": "number" },
+        "date": { "type": "string" }
+      },
+      "required": ["id", "sponsorAccId", "referredAccId", "bonusAmount"]
+    },
+    "WithdrawalRequest": {
+      "title": "WithdrawalRequest",
+      "description": "Member wallet payout withdrawal request",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "accId": { "type": "string" },
+        "memberName": { "type": "string" },
+        "amount": { "type": "number" },
+        "method": { "type": "string" },
+        "status": { "type": "string" },
+        "requestedAt": { "type": "string" }
+      },
+      "required": ["id", "accId", "amount", "status"]
+    },
+    "SiteConfig": {
+      "title": "SiteConfig",
+      "description": "Dynamic company announcement, contacts, and configuration",
+      "type": "object",
+      "properties": {
+        "companyName": { "type": "string" },
+        "helplineNumber": { "type": "string" },
+        "whatsappNumber": { "type": "string" },
+        "supportEmail": { "type": "string" }
+      }
+    },
+    "ProfileEditAuditLog": {
+      "title": "ProfileEditAuditLog",
+      "description": "Audit trail of profile edits (old vs new values)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "accId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "changes": { "type": "array" }
+      },
+      "required": ["id", "accId", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/members/{memberId}": {
+      "schema": "Member",
+      "description": "Member registration, profiles, wallet balances, and account status"
+    },
+    "/transactions/{transactionId}": {
+      "schema": "RechargeTransaction",
+      "description": "SWIS 3.30% mobile recharge records and cashbacks"
+    },
+    "/referrals/{referralId}": {
+      "schema": "ReferralRecord",
+      "description": "TWIS ₹150 referral bonus records"
+    },
+    "/withdrawals/{withdrawalId}": {
+      "schema": "WithdrawalRequest",
+      "description": "Wallet payout requests"
+    },
+    "/settings/{settingId}": {
+      "schema": "SiteConfig",
+      "description": "Live company settings, posters, and contact info"
+    },
+    "/profile_audit_logs/{auditId}": {
+      "schema": "ProfileEditAuditLog",
+      "description": "Transparent profile modification audit history"
+    }
+  }
+}

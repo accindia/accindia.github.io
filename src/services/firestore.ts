@@ -506,12 +506,18 @@ export const FirestoreService = {
   // Subscribe to profile audit logs
   subscribeToAuditLogs(onUpdate: (logs: ProfileEditAuditLog[]) => void): () => void {
     try {
-      return onSnapshot(collection(db, 'profile_audit_logs'), (snap) => {
-        const logs = snap.docs
-          .map((d) => d.data() as ProfileEditAuditLog)
-          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-        onUpdate(logs);
-      });
+      return onSnapshot(
+        collection(db, 'profile_audit_logs'),
+        (snap) => {
+          const logs = snap.docs
+            .map((d) => d.data() as ProfileEditAuditLog)
+            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+          onUpdate(logs);
+        },
+        (error) => {
+          console.warn('Firestore subscribeToAuditLogs error (permission or network):', error);
+        }
+      );
     } catch (e) {
       console.warn('Could not subscribe to profile audit logs:', e);
       return () => {};

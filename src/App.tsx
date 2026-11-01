@@ -143,25 +143,22 @@ export default function App() {
     };
   }, []);
 
-  // Scroll to top helper to bring user instantly to the opened section/window
-  const scrollToTopSection = () => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  // Scroll to top helper to bring user directly to the opened section/window right below header
+  const scrollToTopSection = (smooth: boolean = false) => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, left: 0, behavior: smooth ? 'smooth' : 'instant' });
+    }
     if (document.documentElement) document.documentElement.scrollTop = 0;
     if (document.body) document.body.scrollTop = 0;
     const root = document.getElementById('root');
     if (root) root.scrollTop = 0;
-    const main = document.querySelector('main');
-    if (main) {
-      main.scrollTop = 0;
-      main.scrollIntoView({ behavior: 'instant', block: 'start' });
-    }
   };
 
   const handleNavigateWithScroll = (windowName: ActiveWindow) => {
     setActiveWindow(windowName);
-    scrollToTopSection();
+    scrollToTopSection(false);
     requestAnimationFrame(() => {
-      scrollToTopSection();
+      scrollToTopSection(false);
     });
   };
 

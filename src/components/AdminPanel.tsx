@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ShieldCheck,
   Users,
@@ -60,6 +61,7 @@ import {
   Award,
   LayoutGrid,
   Table,
+  ChevronDown,
 } from 'lucide-react';
 import {
   Member,
@@ -98,6 +100,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   const [auditSearchQuery, setAuditSearchQuery] = useState('');
   const [selectedMemberFor360, setSelectedMemberFor360] = useState<Member | null>(null);
   const [member360ActiveTab, setMember360ActiveTab] = useState<'profile_info' | 'audit_history' | 'financials' | 'recharges' | 'referrals' | 'withdrawals'>('profile_info');
+  const [expandedMemberInline360, setExpandedMemberInline360] = useState<string | null>(null);
 
   const [members, setMembers] = useState<Member[]>(StorageService.getMembers());
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>(StorageService.getWithdrawals());
@@ -255,12 +258,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   const [newPassInput, setNewPassInput] = useState('');
   const [passwordModalMsg, setPasswordModalMsg] = useState('');
   const [passwordModalError, setPasswordModalError] = useState('');
-  // View mode for members: 'cards' (optimal for PC & mobile with 0 horizontal scroll) vs 'table'
-  const [memberViewMode, setMemberViewMode] = useState<'cards' | 'table'>('cards');
+  // View mode for members: 'full360' (complete details directly visible on every card, zero popup dependency, works flawlessly without desktop mode) vs 'cards' (compact) vs 'table'
+  const [memberViewMode, setMemberViewMode] = useState<'full360' | 'cards' | 'table'>('full360');
 
-  // Dedicated refs for Modal auto-scroll and background scroll lock preservation
+  // Dedicated refs for Modal auto-scroll and direct section navigation
   const modal360BodyRef = useRef<HTMLDivElement>(null);
-  const savedScrollY = useRef<number>(0);
+  const adminTabContentRef = useRef<HTMLDivElement>(null);
+  const lastFocusedMemberAccId = useRef<string | null>(null);
+
+  // Directly navigate & smoothly scroll admin straight to the target section/tab
+  const handleSelectAdminTab = (tab: 'members' | 'form_responses' | 'profile_audits' | 'withdrawals' | 'website_cms') => {
+    setAdminTab(tab);
+    setTimeout(() => {
+      if (adminTabContentRef.current) {
+        adminTabContentRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 40);
+  };
+
+  // Subtab switcher for 360 inspector modal - smooth scroll to top of details
+  const handleSelect360SubTab = (tab: 'profile_info' | 'audit_history' | 'financials' | 'recharges' | 'referrals' | 'withdrawals') => {
+    setMember360ActiveTab(tab);
+    setTimeout(() => {
+      if (modal360BodyRef.current) {
+        modal360BodyRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }, 20);
+  };
 
   const isAnyModalOpen = Boolean(
     selectedMemberFor360 ||
@@ -276,30 +300,40 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
     linkModalMember
   );
 
-  // Background Scroll Locking & Perfect Restoration (Prevents jumping on open/close at any position)
+  // Clean Background Scroll Locking without position:fixed jumps
   useEffect(() => {
     if (isAnyModalOpen) {
-      savedScrollY.current = window.scrollY || window.pageYOffset || 0;
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${savedScrollY.current}px`;
-      document.body.style.width = '100%';
       document.body.style.overflow = 'hidden';
     } else {
-      const scrollY = savedScrollY.current;
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
       document.body.style.overflow = '';
-      if (scrollY > 0) {
-        window.scrollTo(0, scrollY);
+      if (lastFocusedMemberAccId.current) {
+        const memId = lastFocusedMemberAccId.current;
+        lastFocusedMemberAccId.current = null; // Clear so it only triggers once intentionally
+        setTimeout(() => {
+          const el = document.getElementById(`member-card-${memId}`) || document.getElementById(`member-row-${memId}`);
+          if (el) {
+            el.classList.add('ring-2', 'ring-[#2874f0]');
+            setTimeout(() => el.classList.remove('ring-2', 'ring-[#2874f0]'), 1500);
+          }
+        }, 50);
       }
     }
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [isAnyModalOpen]);
 
   // When 360 modal opens or sub-tab changes, automatically reset modal body to top: 0
   useEffect(() => {
-    if (selectedMemberFor360 && modal360BodyRef.current) {
-      modal360BodyRef.current.scrollTo({ top: 0, behavior: 'instant' });
+    if (selectedMemberFor360) {
+      const resetScroll = () => {
+        if (modal360BodyRef.current) {
+          modal360BodyRef.current.scrollTo({ top: 0, behavior: 'instant' });
+        }
+      };
+      resetScroll();
+      const timer = setTimeout(resetScroll, 20);
+      return () => clearTimeout(timer);
     }
   }, [selectedMemberFor360, member360ActiveTab]);
 
@@ -972,7 +1006,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
       {/* Main Admin Primary Tabs (100% Screen-Fit Flexible Wrap - Zero Overflow) */}
       <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 bg-white border border-gray-200 rounded-xl p-1.5 sm:p-2 shadow-xs w-full max-w-full">
         <button
-          onClick={() => setAdminTab('members')}
+          onClick={() => handleSelectAdminTab('members')}
           className={`flex-1 min-w-[130px] sm:min-w-[160px] max-w-full flex items-center justify-center text-center gap-1.5 p-2 sm:p-2.5 text-xs font-bold rounded-lg transition cursor-pointer ${
             adminTab === 'members'
               ? 'bg-blue-50 text-[#2874f0] border border-blue-200 shadow-xs'
@@ -984,7 +1018,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
         </button>
 
         <button
-          onClick={() => setAdminTab('form_responses')}
+          onClick={() => handleSelectAdminTab('form_responses')}
           className={`flex-1 min-w-[130px] sm:min-w-[160px] max-w-full flex items-center justify-center text-center gap-1.5 p-2 sm:p-2.5 text-xs font-bold rounded-lg transition cursor-pointer ${
             adminTab === 'form_responses'
               ? 'bg-blue-50 text-[#2874f0] border border-blue-200 shadow-xs'
@@ -996,7 +1030,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
         </button>
 
         <button
-          onClick={() => setAdminTab('profile_audits')}
+          onClick={() => handleSelectAdminTab('profile_audits')}
           className={`flex-1 min-w-[130px] sm:min-w-[160px] max-w-full flex items-center justify-center text-center gap-1.5 p-2 sm:p-2.5 text-xs font-bold rounded-lg transition cursor-pointer ${
             adminTab === 'profile_audits'
               ? 'bg-purple-50 text-purple-800 border border-purple-300 shadow-xs'
@@ -1008,7 +1042,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
         </button>
 
         <button
-          onClick={() => setAdminTab('withdrawals')}
+          onClick={() => handleSelectAdminTab('withdrawals')}
           className={`flex-1 min-w-[130px] sm:min-w-[160px] max-w-full flex items-center justify-center text-center gap-1.5 p-2 sm:p-2.5 text-xs font-bold rounded-lg transition cursor-pointer ${
             adminTab === 'withdrawals'
               ? 'bg-amber-50 text-amber-800 border border-amber-300 shadow-xs'
@@ -1020,7 +1054,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
         </button>
 
         <button
-          onClick={() => setAdminTab('website_cms')}
+          onClick={() => handleSelectAdminTab('website_cms')}
           className={`flex-1 min-w-[130px] sm:min-w-[160px] max-w-full flex items-center justify-center text-center gap-1.5 p-2 sm:p-2.5 text-xs font-bold rounded-lg transition cursor-pointer ${
             adminTab === 'website_cms'
               ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-xs'
@@ -1032,8 +1066,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
         </button>
       </div>
 
-      {/* TAB 1: MEMBERS & VERIFICATION */}
-      {adminTab === 'members' && (
+      {/* Target Content Area for Admin Tabs */}
+      <div ref={adminTabContentRef} id="admin-tab-content" className="scroll-mt-28 sm:scroll-mt-36 space-y-6">
+        {/* TAB 1: MEMBERS & VERIFICATION */}
+        {adminTab === 'members' && (
         <div className="space-y-6 animate-fadeIn">
           {/* 4 Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -1146,29 +1182,42 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
             <span className="text-xs text-slate-600 hidden sm:inline">
               कुल: <strong>{filteredMembers.length}</strong> सदस्य
             </span>
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-gray-200">
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-gray-200 overflow-x-auto no-scrollbar">
+              <button
+                type="button"
+                onClick={() => setMemberViewMode('full360')}
+                className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold rounded-md transition cursor-pointer whitespace-nowrap ${
+                  memberViewMode === 'full360'
+                    ? 'bg-purple-900 text-yellow-300 shadow-xs border border-purple-800'
+                    : 'text-purple-900 hover:bg-purple-100'
+                }`}
+                title="बिना डेस्कटॉप मोड के भी प्रत्येक कार्ड पर सम्पूर्ण 360° विवरण सीधा देखें"
+              >
+                <Activity className="w-3.5 h-3.5 text-yellow-400" />
+                <span>🌟 360° सम्पूर्ण प्रोफाइल</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setMemberViewMode('cards')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition cursor-pointer ${
+                className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold rounded-md transition cursor-pointer whitespace-nowrap ${
                   memberViewMode === 'cards'
                     ? 'bg-white text-[#2874f0] shadow-xs border border-gray-200'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
-                title="PC पर बिना साइड स्क्रॉल के सभी विकल्प सीधे देखें"
+                title="संक्षिप्त कार्ड दृश्य"
               >
                 <LayoutGrid className="w-3.5 h-3.5 text-[#2874f0]" />
-                <span>🗂️ स्मार्ट कार्ड (No-Scroll)</span>
+                <span>📱 संक्षिप्त कार्ड</span>
               </button>
               <button
                 type="button"
                 onClick={() => setMemberViewMode('table')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition cursor-pointer ${
+                className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold rounded-md transition cursor-pointer whitespace-nowrap ${
                   memberViewMode === 'table'
                     ? 'bg-white text-[#2874f0] shadow-xs border border-gray-200'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
-                title="पारंपरिक टेबल दृश्य (Sticky Actions के साथ)"
+                title="पारंपरिक टेबल दृश्य"
               >
                 <Table className="w-3.5 h-3.5 text-slate-600" />
                 <span>📋 टेबल दृश्य</span>
@@ -1236,17 +1285,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
         {/* ========================================================================= */}
         {/* VIEW 1: SMART CARDS GRID (PC NO-SCROLL & ALL ACTIONS VISIBLE) */}
         {/* ========================================================================= */}
-        {memberViewMode === 'cards' ? (
+        {memberViewMode !== 'table' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
             {filteredMembers.map((m) => {
               const sponsor = members.find(
                 (s) => (s.accId || '').toUpperCase() === (m.sponsorId || '').toUpperCase() || s.mobile === m.sponsorId
               );
               const hasSponsor = Boolean(m.sponsorId && m.sponsorId !== 'DIRECT' && m.sponsorId !== 'ADMIN');
+              const isCardExpanded =
+                memberViewMode === 'full360'
+                  ? expandedMemberInline360 !== `collapsed_${m.accId}`
+                  : expandedMemberInline360 === m.accId;
 
               return (
                 <div
                   key={m.id || m.accId}
+                  id={`member-card-${m.accId}`}
                   className="bg-white border border-gray-200 hover:border-purple-300 rounded-xl p-4 space-y-3 shadow-xs hover:shadow-md transition flex flex-col justify-between"
                 >
                   <div className="space-y-2.5">
@@ -1398,24 +1452,56 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
 
                   {/* All Action Buttons Directly Visible Without Horizontal Scroll or Arrow Keys */}
                   <div className="space-y-1.5 pt-2 border-t border-gray-100">
-                    {/* Primary Big 360 Database Button */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedMemberFor360(m);
-                        setMember360ActiveTab('profile_info');
-                      }}
-                      className="w-full py-2 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
-                    >
-                      <Activity className="w-4 h-4 text-purple-200" />
-                      <span>🔍 360° सम्पूर्ण डेटाबेस व एडिट हिस्ट्री</span>
-                    </button>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {/* Primary Big 360 Database Modal Button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          lastFocusedMemberAccId.current = m.accId;
+                          setSelectedMemberFor360(m);
+                          setMember360ActiveTab('profile_info');
+                        }}
+                        className="py-2 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer"
+                        title="सम्पूर्ण 360° डेटाबेस व एडिट हिस्ट्री पॉपअप खोलें"
+                      >
+                        <Activity className="w-3.5 h-3.5 text-purple-200" />
+                        <span>360° पॉपअप</span>
+                      </button>
+
+                      {/* Instant Inline 360 Toggle Button - Directly on the Card */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (memberViewMode === 'full360') {
+                            setExpandedMemberInline360((prev) => (prev === `collapsed_${m.accId}` ? null : `collapsed_${m.accId}`));
+                          } else {
+                            setExpandedMemberInline360((prev) => (prev === m.accId ? null : m.accId));
+                          }
+                        }}
+                        className={`py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 border transition cursor-pointer ${
+                          isCardExpanded
+                            ? 'bg-purple-900 text-yellow-300 border-purple-900 shadow-inner'
+                            : 'bg-purple-50 hover:bg-purple-100 text-purple-900 border-purple-300 shadow-xs'
+                        }`}
+                        title="इसी कार्ड में तुरंत सम्पूर्ण 360° विवरण देखें"
+                      >
+                        <ChevronDown
+                          className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                            isCardExpanded ? 'rotate-180 text-yellow-300' : 'text-purple-700'
+                          }`}
+                        />
+                        <span>{isCardExpanded ? '360° संक्षिप्त करें' : '360° विवरण देखें'}</span>
+                      </button>
+                    </div>
 
                     {/* Secondary Actions Row */}
                     <div className="grid grid-cols-2 gap-1.5">
                       <button
                         type="button"
-                        onClick={() => setFormResponseModalMember(m)}
+                        onClick={() => {
+                          lastFocusedMemberAccId.current = m.accId;
+                          setFormResponseModalMember(m);
+                        }}
                         className="py-1.5 bg-blue-50 hover:bg-blue-100 text-[#2874f0] border border-blue-200 rounded text-xs font-bold flex items-center justify-center gap-1 transition cursor-pointer"
                       >
                         <FileText className="w-3.5 h-3.5" />
@@ -1458,6 +1544,169 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                         </button>
                       </div>
                     )}
+
+                    {/* DIRECT INLINE 360 DETAILS ACCORDION - IMMEDIATELY VISIBLE ON THIS CARD */}
+                    {isCardExpanded && (
+                      <div className="mt-3 pt-3 border-t-2 border-purple-200 bg-purple-50/70 rounded-xl p-3 space-y-3 text-xs">
+                        <div className="flex items-center justify-between border-b border-purple-200 pb-2">
+                          <span className="font-bold text-purple-950 flex items-center gap-1.5">
+                            <Activity className="w-4 h-4 text-purple-700" />
+                            <span>सम्पूर्ण 360° यूजर रिकॉर्ड (Direct View)</span>
+                          </span>
+                          <span className="text-[10px] font-mono-acc font-black bg-yellow-400 text-slate-950 px-2 py-0.5 rounded">
+                            {m.accId}
+                          </span>
+                        </div>
+
+                        {/* Quick Personal & Contact */}
+                        <div className="bg-white p-2.5 rounded-lg border border-purple-200 space-y-1.5">
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">पूरा नाम:</span>
+                            <strong className="text-slate-900">{m.fullName}</strong>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-500">मोबाइल / WhatsApp:</span>
+                            <div className="flex items-center gap-1 font-mono-acc font-bold text-slate-900">
+                              <span>{m.mobile}</span>
+                              <a
+                                href={`tel:${m.mobile}`}
+                                className="text-blue-600 hover:text-blue-800 p-0.5"
+                                title="कॉल करें"
+                              >
+                                <Phone className="w-3 h-3" />
+                              </a>
+                              <a
+                                href={`https://api.whatsapp.com/send?phone=91${m.whatsapp || m.mobile}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-emerald-600 hover:text-emerald-800 p-0.5"
+                                title="WhatsApp चैट"
+                              >
+                                <MessageCircle className="w-3 h-3" />
+                              </a>
+                            </div>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">ईमेल:</span>
+                            <span className="font-mono-acc text-slate-800">{m.email}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">शिक्षा / योग्यता:</span>
+                            <span className="font-semibold text-slate-800">{m.qualification || 'Graduate'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">स्थान / पता:</span>
+                            <span className="text-slate-800 text-right max-w-[200px]">
+                              {m.city}, {m.state} ({m.pincode}) - {m.address || 'उपलब्ध नहीं'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Activation & UTR */}
+                        <div className="bg-white p-2.5 rounded-lg border border-purple-200 space-y-1.5">
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-500">₹249 पेमेंट UTR:</span>
+                            <span className="font-mono-acc font-bold text-slate-950 bg-yellow-100 px-2 py-0.5 rounded border border-yellow-300">
+                              {m.utrNumber || 'N/A'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-500">पेमेंट दिनांक:</span>
+                            <span className="font-mono-acc text-slate-700">{m.paymentDate || '2026-10-08'}</span>
+                          </div>
+                          {m.paymentScreenshotUrl && (
+                            <div className="flex justify-between items-center pt-1 border-t border-gray-100">
+                              <span className="text-slate-500">रसीद स्क्रीनशॉट:</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setScreenshotModalMember(m);
+                                  setZoomLevel(1);
+                                }}
+                                className="px-2 py-0.5 bg-blue-50 text-[#2874f0] border border-blue-200 rounded text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                              >
+                                <ImageIcon className="w-3 h-3" />
+                                <span>रसीद देखें</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Bank Payout & UPI Details */}
+                        <div className="bg-white p-2.5 rounded-lg border border-purple-200 space-y-1.5">
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-500">पेआउट UPI ID:</span>
+                            <span className="font-mono-acc font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                              {m.payoutDetails?.upiId || `${m.mobile}@upi`}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">बैंक / खाता:</span>
+                            <span className="text-slate-800">
+                              {m.payoutDetails?.bankName || 'SBI'} - A/C: {m.payoutDetails?.accountNumber || 'UPI Mode'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">IFSC / धारक:</span>
+                            <span className="text-slate-800">
+                              {m.payoutDetails?.ifsc || 'SBIN0001234'} ({m.payoutDetails?.holderName || m.fullName})
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Sponsor & Financials Quick Strip */}
+                        <div className="grid grid-cols-2 gap-2 text-[11px]">
+                          <div className="bg-emerald-50 p-2 rounded-lg border border-emerald-200">
+                            <span className="text-emerald-800 block font-medium">वॉलेट बैलेंस:</span>
+                            <strong className="text-emerald-700 font-mono-acc text-sm">₹{(m.walletBalance || 0).toFixed(2)}</strong>
+                          </div>
+                          <div className="bg-blue-50 p-2 rounded-lg border border-blue-200">
+                            <span className="text-blue-800 block font-medium">कुल संचित आय:</span>
+                            <strong className="text-[#2874f0] font-mono-acc text-sm">₹{(m.totalEarnings || 0).toFixed(2)}</strong>
+                          </div>
+                        </div>
+
+                        {/* Direct Action Buttons inside Inline View */}
+                        <div className="flex items-center gap-1.5 pt-1">
+                          <a
+                            href={`https://api.whatsapp.com/send?phone=91${m.whatsapp || m.mobile}&text=${encodeURIComponent(
+                              `नमस्ते ${m.fullName} ji,\nमैं Achievers Club Community एडमिन बात कर रहा हूँ। आपकी ID: ${m.accId}`
+                            )}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 py-1.5 bg-[#25D366] hover:bg-[#20ba59] text-white rounded text-[11px] font-bold flex items-center justify-center gap-1 transition shadow-xs"
+                          >
+                            <MessageCircle className="w-3 h-3" />
+                            <span>WhatsApp</span>
+                          </a>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const text = JSON.stringify(m, null, 2);
+                              navigator.clipboard.writeText(text);
+                              alert('सदस्य सम्पूर्ण 360° डेटा क्लिपबोर्ड में कॉपी हो गया!');
+                            }}
+                            className="py-1.5 px-2 bg-white text-slate-700 border border-gray-300 rounded text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-slate-50 transition"
+                          >
+                            <Copy className="w-3 h-3" />
+                            <span>डेटा कॉपी</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedMemberFor360(m);
+                              setMember360ActiveTab('profile_info');
+                            }}
+                            className="py-1.5 px-2.5 bg-purple-700 hover:bg-purple-800 text-white rounded text-[11px] font-bold flex items-center justify-center gap-1 transition shadow-xs"
+                          >
+                            <Activity className="w-3 h-3" />
+                            <span>फुल 360° पॉपअप</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -1486,7 +1735,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
               </thead>
               <tbody className="divide-y divide-gray-100 font-sans bg-white">
                 {filteredMembers.map((m) => (
-                  <tr key={m.id || m.accId} className="hover:bg-blue-50/40 transition">
+                  <React.Fragment key={m.id || m.accId}>
+                    <tr id={`member-row-${m.accId}`} className="hover:bg-blue-50/40 transition">
                     <td className="py-2.5 px-3">
                       <div className="flex items-center gap-2.5">
                         {m.avatarUrl ? (
@@ -1736,19 +1986,43 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                         {/* 360 Degree Complete User Database & History Inspector */}
                         <button
                           onClick={() => {
+                            lastFocusedMemberAccId.current = m.accId;
                             setSelectedMemberFor360(m);
                             setMember360ActiveTab('profile_info');
                           }}
                           className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-[11px] font-bold flex items-center gap-1 shadow-xs transition cursor-pointer"
-                          title="इस सदस्य का सम्पूर्ण डेटाबेस, प्रोफाइल एडिट हिस्ट्री, आय, वॉलेट, कमीशन व रिकॉर्ड देखें"
+                          title="इस सदस्य का सम्पूर्ण 360° डेटाबेस व एडिट हिस्ट्री पॉपअप खोलें"
                         >
                           <Activity className="w-3 h-3 text-purple-200" />
                           <span>360° डेटाबेस</span>
                         </button>
 
+                        {/* Inline Expand Toggle for Table */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setExpandedMemberInline360((prev) => (prev === m.accId ? null : m.accId));
+                          }}
+                          className={`p-1 rounded border transition cursor-pointer ${
+                            expandedMemberInline360 === m.accId
+                              ? 'bg-purple-800 text-yellow-300 border-purple-800'
+                              : 'bg-purple-50 hover:bg-purple-100 text-purple-800 border-purple-300'
+                          }`}
+                          title="टेबल में तुरंत 360° विवरण नीचे खोलें"
+                        >
+                          <ChevronDown
+                            className={`w-3.5 h-3.5 transition-transform ${
+                              expandedMemberInline360 === m.accId ? 'rotate-180 text-yellow-300' : 'text-purple-700'
+                            }`}
+                          />
+                        </button>
+
                         {/* View Full Form Response Button */}
                         <button
-                          onClick={() => setFormResponseModalMember(m)}
+                          onClick={() => {
+                            lastFocusedMemberAccId.current = m.accId;
+                            setFormResponseModalMember(m);
+                          }}
                           className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-[#2874f0] border border-blue-200 rounded text-[11px] font-bold flex items-center gap-1 shadow-xs transition cursor-pointer"
                           title="यूजर द्वारा सबमिट किया गया संपूर्ण फॉर्म रिस्पॉन्स देखें"
                         >
@@ -1794,6 +2068,122 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                       </div>
                     </td>
                   </tr>
+
+                  {/* DIRECT INLINE 360 ACCORDION ROW FOR TABLE VIEW */}
+                  {expandedMemberInline360 === m.accId && (
+                    <tr className="bg-purple-50/70 border-b-2 border-purple-300">
+                      <td colSpan={9} className="p-4">
+                        <div className="bg-white rounded-xl border border-purple-200 p-4 shadow-xs space-y-3">
+                          <div className="flex items-center justify-between border-b border-purple-200 pb-2.5">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono-acc font-black text-xs bg-yellow-400 text-slate-950 px-2 py-0.5 rounded">
+                                {m.accId}
+                              </span>
+                              <strong className="text-slate-900 text-sm">{m.fullName}</strong>
+                              <span className="text-xs text-purple-700 font-bold">({m.plan} Plan)</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedMemberInline360(null)}
+                              className="text-xs text-slate-500 hover:text-slate-800 font-bold px-2 py-0.5 rounded bg-slate-100 cursor-pointer"
+                            >
+                              ✕ बंद करें
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                            {/* Personal & Contact */}
+                            <div className="bg-slate-50 p-3 rounded-lg border border-gray-200 space-y-1.5">
+                              <h5 className="font-bold text-slate-800 border-b border-gray-200 pb-1">व्यक्तिगत व संपर्क</h5>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">मोबाइल:</span>
+                                <span className="font-mono-acc font-bold text-slate-900">{m.mobile}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">WhatsApp:</span>
+                                <span className="font-mono-acc text-emerald-700 font-bold">{m.whatsapp || m.mobile}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">ईमेल:</span>
+                                <span className="text-slate-800">{m.email}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">स्थान:</span>
+                                <span className="text-slate-800">{m.city}, {m.state} ({m.pincode})</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">पता:</span>
+                                <span className="text-slate-800 text-right max-w-[160px] truncate">{m.address || 'उपलब्ध नहीं'}</span>
+                              </div>
+                            </div>
+
+                            {/* UTR & Bank Payout */}
+                            <div className="bg-slate-50 p-3 rounded-lg border border-gray-200 space-y-1.5">
+                              <h5 className="font-bold text-slate-800 border-b border-gray-200 pb-1">₹249 UTR व पेआउट बैंक</h5>
+                              <div className="flex justify-between items-center">
+                                <span className="text-slate-500">UTR No:</span>
+                                <span className="font-mono-acc font-bold text-slate-900 bg-white px-1.5 py-0.5 rounded border border-gray-200">
+                                  {m.utrNumber || 'N/A'}
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-slate-500">पेआउट UPI:</span>
+                                <span className="font-mono-acc font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                  {m.payoutDetails?.upiId || `${m.mobile}@upi`}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">बैंक खाता:</span>
+                                <span className="text-slate-800">{m.payoutDetails?.bankName || 'SBI'} ({m.payoutDetails?.accountNumber || 'UPI'})</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">IFSC कोड:</span>
+                                <span className="font-mono-acc text-slate-800">{m.payoutDetails?.ifsc || 'SBIN0001234'}</span>
+                              </div>
+                            </div>
+
+                            {/* Sponsor & Financials */}
+                            <div className="bg-slate-50 p-3 rounded-lg border border-gray-200 space-y-1.5">
+                              <h5 className="font-bold text-slate-800 border-b border-gray-200 pb-1">स्पॉन्सर व आय स्थिति</h5>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">स्पॉन्सर:</span>
+                                <span className="font-semibold text-slate-800">{m.sponsorName || 'कंपनी डायरेक्ट'} ({m.sponsorId || 'DIRECT'})</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">₹150 कमीशन:</span>
+                                <span className={`font-bold ${m.sponsorCommissionStatus === 'paid' ? 'text-emerald-700' : 'text-amber-700'}`}>
+                                  {m.sponsorCommissionStatus === 'paid' ? '✓ चुकता' : 'लंबित'}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">वॉलेट बैलेंस:</span>
+                                <span className="font-mono-acc font-black text-emerald-700">₹{(m.walletBalance || 0).toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">कुल संचित आय:</span>
+                                <span className="font-mono-acc font-black text-[#2874f0]">₹{(m.totalEarnings || 0).toFixed(2)}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-end gap-2 pt-1 border-t border-gray-100">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedMemberFor360(m);
+                                setMember360ActiveTab('profile_info');
+                              }}
+                              className="px-3 py-1.5 bg-purple-700 hover:bg-purple-800 text-white rounded text-xs font-bold flex items-center gap-1 shadow-xs cursor-pointer"
+                            >
+                              <Activity className="w-3.5 h-3.5" />
+                              <span>सम्पूर्ण 360° पॉपअप (6 टैब्स) खोलें</span>
+                            </button>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
@@ -3025,13 +3415,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
       </div>
     </div>
   )}
-
+      </div>
 
       {/* ========================================================================= */}
       {/* SCREENSHOT PREVIEW & VERIFICATION MODAL (HIGH RESOLUTION & APPROVE/REJECT) */}
       {/* ========================================================================= */}
-      {screenshotModalMember && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
+      {screenshotModalMember && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
           <div className="bg-white border border-gray-200 rounded-xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-scaleUp">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3.5 bg-[#f1f2f4]">
@@ -3470,14 +3860,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================================= */}
       {/* REJECTION REASON MODAL */}
       {/* ========================================================================= */}
-      {rejectionModalMember && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+      {rejectionModalMember && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-white border border-gray-200 rounded-xl max-w-md w-full p-5 space-y-4 shadow-2xl animate-scaleUp">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2 text-red-600">
@@ -3549,14 +3940,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================================= */}
       {/* CHANGE ADMIN PASSWORD MODAL */}
       {/* ========================================================================= */}
-      {showPasswordModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+      {showPasswordModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-white border border-gray-200 rounded-xl max-w-sm w-full p-5 space-y-4 shadow-xl animate-scaleUp">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2 text-[#2874f0]">
@@ -3631,12 +4023,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Real App Link Share Modal */}
-      {linkModalMember && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+      {linkModalMember && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[99999] bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white border border-gray-200 rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl animate-scaleUp">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2">
@@ -3739,12 +4132,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Member Details Modal */}
-      {selectedMember && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+      {selectedMember && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[99999] bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white border border-gray-200 rounded-xl max-w-lg w-full p-5 space-y-4 shadow-xl animate-scaleUp">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h3 className="text-sm font-bold text-slate-900">सदस्य संपूर्ण रिकॉर्ड (Full Details)</h3>
@@ -4027,14 +4421,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================================= */}
       {/* ADD / EDIT SERVICE MODAL */}
       {/* ========================================================================= */}
-      {showServiceModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+      {showServiceModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-white border border-gray-200 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 space-y-4 shadow-2xl animate-scaleUp">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2 text-emerald-600">
@@ -4213,14 +4608,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================================= */}
       {/* ADD / EDIT PROMOTIONAL POSTER MODAL */}
       {/* ========================================================================= */}
-      {showPosterModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+      {showPosterModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-white border border-gray-200 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 space-y-4 shadow-2xl animate-scaleUp">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2 text-[#fb641b]">
@@ -4356,14 +4752,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================================= */}
       {/* COMMISSION PAY MODAL (Record ₹150 Commission to Sponsor) */}
       {/* ========================================================================= */}
-      {commissionPayMember && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+      {commissionPayMember && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-white border border-gray-200 rounded-xl max-w-md w-full p-5 space-y-4 shadow-2xl animate-scaleUp">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2 text-emerald-700">
@@ -4497,14 +4894,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
               );
             })()}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================================= */}
       {/* MEMBER SECURITY & PASSWORD RESET MODAL (Admin Support For Users Who Forgot Security Answer) */}
       {/* ========================================================================= */}
-      {memberSecurityModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+      {memberSecurityModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-white border border-gray-200 rounded-xl max-w-md w-full p-5 space-y-4 shadow-2xl animate-scaleUp">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2 text-amber-800">
@@ -4627,14 +5025,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
               </form>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================================= */}
       {/* COMPREHENSIVE SUBMITTED FORM RESPONSE MODAL (PRINTABLE / INSPECTABLE) */}
       {/* ========================================================================= */}
-      {formResponseModalMember && (
-        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-hidden animate-fadeIn">
+      {formResponseModalMember && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[99999] bg-black/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-hidden animate-fadeIn">
           <div className="bg-white border border-gray-200 rounded-2xl max-w-3xl w-full h-[90vh] max-h-[90vh] flex flex-col shadow-2xl animate-scaleUp text-slate-800 overflow-hidden">
             {/* Modal Header */}
             <div className="sticky top-0 z-10 bg-slate-900 text-white p-4 px-6 rounded-t-2xl flex items-center justify-between border-b border-slate-700 shrink-0">
@@ -5123,194 +5522,289 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================================= */}
       {/* MODAL: COMPLETE USER 360° INSPECTOR (DATABASE, HISTORY, INCOME, EDITS) */}
       {/* ========================================================================= */}
-      {selectedMemberFor360 && (
-        <div className="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden animate-fadeIn">
-          <div className="bg-white rounded-2xl max-w-5xl w-full h-[90vh] max-h-[90vh] flex flex-col shadow-2xl border border-purple-300 overflow-hidden animate-scaleUp">
-            {/* Modal Header */}
-            <div className="bg-gradient-to-r from-slate-900 via-purple-950 to-blue-950 text-white p-4 sm:p-5 flex items-center justify-between gap-3 border-b border-purple-800/40 shrink-0">
-              <div className="flex items-center gap-3 min-w-0">
-                {selectedMemberFor360.avatarUrl ? (
-                  <img
-                    src={selectedMemberFor360.avatarUrl}
-                    alt={selectedMemberFor360.fullName}
-                    className="w-12 h-12 rounded-full object-cover border-2 border-purple-400 shadow-md shrink-0"
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded-full bg-purple-600 text-white font-black text-sm flex items-center justify-center border-2 border-purple-300 shadow-md shrink-0">
-                    {(selectedMemberFor360.fullName || 'M').substring(0, 2).toUpperCase()}
+      {selectedMemberFor360 && (() => {
+        const activeM = members.find((x) => (x.accId || '').toUpperCase() === (selectedMemberFor360.accId || '').toUpperCase()) || selectedMemberFor360;
+        const modalContent = (
+          <div
+            className="fixed inset-0 z-[99999] bg-slate-950/85 backdrop-blur-xs flex items-center justify-center p-0 sm:p-3 md:p-6 overflow-hidden"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setSelectedMemberFor360(null);
+              }
+            }}
+          >
+            <div className="bg-white w-full h-full sm:h-[92dvh] sm:max-h-[92dvh] max-w-5xl sm:rounded-2xl flex flex-col shadow-2xl border border-purple-300 overflow-hidden">
+              {/* Modal Header */}
+              <div className="bg-gradient-to-r from-slate-900 via-purple-950 to-blue-950 text-white px-3 py-2.5 sm:px-5 sm:py-3 flex items-center justify-between gap-2.5 border-b border-purple-800/40 shrink-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  {activeM.avatarUrl ? (
+                    <img
+                      src={activeM.avatarUrl}
+                      alt={activeM.fullName}
+                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-purple-400 shadow-md shrink-0"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-purple-600 text-white font-black text-xs sm:text-sm flex items-center justify-center border-2 border-purple-300 shadow-md shrink-0">
+                      {(activeM.fullName || 'M').substring(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                      <h3 className="text-sm sm:text-base font-bold text-white truncate">
+                        {activeM.fullName}
+                      </h3>
+                      <span className="font-mono-acc font-black text-[11px] sm:text-xs bg-yellow-400 text-slate-950 px-2 py-0.5 rounded shadow-xs">
+                        {activeM.accId}
+                      </span>
+                      <span
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                          activeM.plan === 'SWIS'
+                            ? 'bg-amber-400 text-slate-900'
+                            : 'bg-blue-400 text-slate-900'
+                        }`}
+                      >
+                        {activeM.plan}
+                      </span>
+                      <span
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                          activeM.status === 'verified'
+                            ? 'bg-emerald-500 text-white'
+                            : activeM.status === 'rejected'
+                            ? 'bg-red-500 text-white'
+                            : 'bg-amber-500 text-white animate-pulse'
+                        }`}
+                      >
+                        {activeM.status === 'verified'
+                          ? 'सत्यापित ✓'
+                          : activeM.status === 'rejected'
+                          ? 'अस्वीकृत'
+                          : 'लंबित समीक्षा'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-purple-200 mt-0.5 truncate hidden sm:block">
+                      सम्पूर्ण 360° सदस्य रिकॉर्ड, प्रोफाइल एडिट हिस्ट्री, आय, वॉलेट व कमीशन डेटाबेस
+                    </p>
                   </div>
-                )}
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-base sm:text-lg font-bold text-white truncate">
-                      {selectedMemberFor360.fullName}
-                    </h3>
-                    <span className="font-mono-acc font-black text-xs bg-yellow-400 text-slate-950 px-2 py-0.5 rounded shadow-xs">
-                      {selectedMemberFor360.accId}
-                    </span>
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                        selectedMemberFor360.plan === 'SWIS'
-                          ? 'bg-amber-400 text-slate-900'
-                          : 'bg-blue-400 text-slate-900'
-                      }`}
-                    >
-                      {selectedMemberFor360.plan} PLAN
-                    </span>
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                        selectedMemberFor360.status === 'verified'
-                          ? 'bg-emerald-500 text-white'
-                          : selectedMemberFor360.status === 'rejected'
-                          ? 'bg-red-500 text-white'
-                          : 'bg-amber-500 text-white animate-pulse'
-                      }`}
-                    >
-                      {selectedMemberFor360.status === 'verified'
-                        ? 'सत्यापित ✓'
-                        : selectedMemberFor360.status === 'rejected'
-                        ? 'अस्वीकृत'
-                        : 'लंबित समीक्षा'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-purple-200 mt-0.5 truncate">
-                    सम्पूर्ण 360° सदस्य रिकॉर्ड, प्रोफाइल एडिट हिस्ट्री (Old vs New), आय, वॉलेट व कमीशन डेटाबेस
-                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedMemberFor360(null)}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition shrink-0 cursor-pointer"
+                  title="बंद करें"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Permanent Immutable Identity Guarantee Banner (Locked Keys) */}
+              <div className="bg-amber-50/90 border-b border-amber-200 px-3 py-1.5 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0 text-xs">
+                <div className="flex items-center gap-1 text-amber-900 font-bold shrink-0">
+                  <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span className="text-[11px]">सुरक्षित व लॉक पहचान:</span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0 text-[11px]">
+                  <span className="bg-white px-2 py-0.5 rounded border border-amber-200 text-slate-800 whitespace-nowrap">
+                    🔒 <strong>ACC ID:</strong> <span className="font-mono-acc text-[#2874f0] font-bold">{activeM.accId}</span>
+                  </span>
+                  <span className="bg-white px-2 py-0.5 rounded border border-amber-200 text-slate-800 whitespace-nowrap">
+                    🔒 <strong>स्पॉन्सर:</strong> <span className="font-mono-acc font-bold">{activeM.sponsorId || 'DIRECT'}</span> ({activeM.sponsorName || 'कंपनी डायरेक्ट'})
+                  </span>
+                  <span className="bg-white px-2 py-0.5 rounded border border-amber-200 text-slate-800 whitespace-nowrap">
+                    🔒 <strong>प्लान:</strong> <span className="font-bold text-amber-800">{activeM.plan} (₹249)</span>
+                  </span>
+                  <span className="bg-white px-2 py-0.5 rounded border border-amber-200 text-slate-800 whitespace-nowrap">
+                    📅 <strong>पंजीकरण:</strong> {activeM.createdAt?.split('T')[0] || '2026-10-08'}
+                  </span>
                 </div>
               </div>
 
-              <button
-                onClick={() => setSelectedMemberFor360(null)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition shrink-0 cursor-pointer"
-                title="बंद करें"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+              {/* 360 Navigation Sub-Tabs - Sleek Horizontal Scrollable Pills */}
+              <div className="bg-slate-100 border-b border-gray-200 px-2.5 py-1.5 sm:px-4 sm:py-2 flex items-center gap-1.5 sm:gap-2 shrink-0 overflow-x-auto no-scrollbar w-full">
+                <button
+                  type="button"
+                  onClick={() => handleSelect360SubTab('profile_info')}
+                  className={`shrink-0 flex items-center justify-center text-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+                    member360ActiveTab === 'profile_info'
+                      ? 'bg-white text-[#2874f0] shadow-xs border border-gray-200 ring-1 ring-[#2874f0]/20'
+                      : 'text-slate-600 hover:bg-slate-200 border border-transparent'
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5 shrink-0" />
+                  <span>1. प्रोफाइल विवरण</span>
+                </button>
 
-            {/* Permanent Immutable Identity Guarantee Banner (Locked Keys) */}
-            <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs shrink-0">
-              <div className="flex items-center gap-1.5 text-amber-900 font-bold">
-                <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                <span>सुरक्षित व लॉक पहचान कुंजियाँ (Immutable Keys):</span>
+                <button
+                  type="button"
+                  onClick={() => handleSelect360SubTab('audit_history')}
+                  className={`shrink-0 flex items-center justify-center text-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+                    member360ActiveTab === 'audit_history'
+                      ? 'bg-purple-50 text-purple-800 shadow-xs border border-purple-200 ring-1 ring-purple-300'
+                      : 'text-slate-600 hover:bg-slate-200 border border-transparent'
+                  }`}
+                >
+                  <History className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                  <span>2. एडिट हिस्ट्री</span>
+                  <span className="bg-purple-200 text-purple-900 text-[10px] px-1.5 py-0.2 rounded-full font-mono shrink-0">
+                    {auditLogs.filter((a) => (a.accId || '').toUpperCase() === (activeM?.accId || '').toUpperCase()).length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSelect360SubTab('financials')}
+                  className={`shrink-0 flex items-center justify-center text-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+                    member360ActiveTab === 'financials'
+                      ? 'bg-emerald-50 text-emerald-800 shadow-xs border border-emerald-200 ring-1 ring-emerald-300'
+                      : 'text-slate-600 hover:bg-slate-200 border border-transparent'
+                  }`}
+                >
+                  <Wallet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>3. आय व वॉलेट</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSelect360SubTab('recharges')}
+                  className={`shrink-0 flex items-center justify-center text-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+                    member360ActiveTab === 'recharges'
+                      ? 'bg-blue-50 text-[#2874f0] shadow-xs border border-blue-200 ring-1 ring-blue-300'
+                      : 'text-slate-600 hover:bg-slate-200 border border-transparent'
+                  }`}
+                >
+                  <Zap className="w-3.5 h-3.5 text-[#2874f0] shrink-0" />
+                  <span>4. रिचार्ज</span>
+                  <span className="bg-blue-200 text-blue-900 text-[10px] px-1.5 py-0.2 rounded-full font-mono shrink-0">
+                    {transactions.filter((t) => (t.accId || '').toUpperCase() === (activeM?.accId || '').toUpperCase()).length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSelect360SubTab('referrals')}
+                  className={`shrink-0 flex items-center justify-center text-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+                    member360ActiveTab === 'referrals'
+                      ? 'bg-amber-50 text-amber-800 shadow-xs border border-amber-200 ring-1 ring-amber-300'
+                      : 'text-slate-600 hover:bg-slate-200 border border-transparent'
+                  }`}
+                >
+                  <Award className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>5. टीम</span>
+                  <span className="bg-amber-200 text-amber-900 text-[10px] px-1.5 py-0.2 rounded-full font-mono shrink-0">
+                    {members.filter((m) => (m.sponsorId || '').toUpperCase() === (activeM?.accId || '').toUpperCase()).length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSelect360SubTab('withdrawals')}
+                  className={`shrink-0 flex items-center justify-center text-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+                    member360ActiveTab === 'withdrawals'
+                      ? 'bg-indigo-50 text-indigo-800 shadow-xs border border-indigo-200 ring-1 ring-indigo-300'
+                      : 'text-slate-600 hover:bg-slate-200 border border-transparent'
+                  }`}
+                >
+                  <CreditCard className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                  <span>6. निकासी</span>
+                  <span className="bg-indigo-200 text-indigo-900 text-[10px] px-1.5 py-0.2 rounded-full font-mono shrink-0">
+                    {withdrawals.filter((w) => (w.accId || '').toUpperCase() === (activeM?.accId || '').toUpperCase()).length}
+                  </span>
+                </button>
               </div>
-              <div className="flex items-center gap-2 flex-wrap text-[11px]">
-                <span className="bg-white px-2 py-0.5 rounded border border-amber-300 text-slate-800">
-                  🔒 <strong>यूनिक ACC ID:</strong> <span className="font-mono-acc text-[#2874f0] font-bold">{selectedMemberFor360.accId}</span>
-                </span>
-                <span className="bg-white px-2 py-0.5 rounded border border-amber-300 text-slate-800">
-                  🔒 <strong>स्पॉन्सर ID:</strong> <span className="font-mono-acc font-bold">{selectedMemberFor360.sponsorId || 'DIRECT'}</span> ({selectedMemberFor360.sponsorName || 'कंपनी डायरेक्ट'})
-                </span>
-                <span className="bg-white px-2 py-0.5 rounded border border-amber-300 text-slate-800">
-                  🔒 <strong>प्लान:</strong> <span className="font-bold text-amber-800">{selectedMemberFor360.plan} (₹249)</span>
-                </span>
-                <span className="bg-white px-2 py-0.5 rounded border border-amber-300 text-slate-800">
-                  📅 <strong>पंजीकरण तिथि:</strong> {selectedMemberFor360.createdAt?.split('T')[0] || '2026-10-08'}
-                </span>
-              </div>
-            </div>
 
-            {/* 360 Navigation Sub-Tabs (Responsive Flex-Wrap - 100% Inside Screen) */}
-            <div className="bg-slate-100 border-b border-gray-200 p-2 flex flex-wrap items-center gap-1 sm:gap-1.5 shrink-0 w-full max-w-full">
-              <button
-                onClick={() => setMember360ActiveTab('profile_info')}
-                className={`flex-1 min-w-[110px] sm:min-w-[130px] max-w-full flex items-center justify-center text-center gap-1.5 px-2 py-2 rounded-lg text-xs font-bold transition cursor-pointer truncate ${
-                  member360ActiveTab === 'profile_info'
-                    ? 'bg-white text-[#2874f0] shadow-xs border border-gray-200 ring-1 ring-[#2874f0]/20'
-                    : 'text-slate-600 hover:bg-slate-200 border border-transparent'
-                }`}
-              >
-                <Users className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">1. प्रोफाइल विवरण</span>
-              </button>
-
-              <button
-                onClick={() => setMember360ActiveTab('audit_history')}
-                className={`flex-1 min-w-[110px] sm:min-w-[130px] max-w-full flex items-center justify-center text-center gap-1.5 px-2 py-2 rounded-lg text-xs font-bold transition cursor-pointer truncate ${
-                  member360ActiveTab === 'audit_history'
-                    ? 'bg-purple-50 text-purple-800 shadow-xs border border-purple-200 ring-1 ring-purple-300'
-                    : 'text-slate-600 hover:bg-slate-200 border border-transparent'
-                }`}
-              >
-                <History className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                <span className="truncate">2. एडिट हिस्ट्री</span>
-                <span className="bg-purple-200 text-purple-900 text-[10px] px-1.5 py-0.2 rounded-full font-mono shrink-0">
-                  {auditLogs.filter((a) => a.accId.toUpperCase() === selectedMemberFor360.accId.toUpperCase()).length}
-                </span>
-              </button>
-
-              <button
-                onClick={() => setMember360ActiveTab('financials')}
-                className={`flex-1 min-w-[110px] sm:min-w-[130px] max-w-full flex items-center justify-center text-center gap-1.5 px-2 py-2 rounded-lg text-xs font-bold transition cursor-pointer truncate ${
-                  member360ActiveTab === 'financials'
-                    ? 'bg-emerald-50 text-emerald-800 shadow-xs border border-emerald-200 ring-1 ring-emerald-300'
-                    : 'text-slate-600 hover:bg-slate-200 border border-transparent'
-                }`}
-              >
-                <Wallet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <span className="truncate">3. आय व वॉलेट</span>
-              </button>
-
-              <button
-                onClick={() => setMember360ActiveTab('recharges')}
-                className={`flex-1 min-w-[110px] sm:min-w-[130px] max-w-full flex items-center justify-center text-center gap-1.5 px-2 py-2 rounded-lg text-xs font-bold transition cursor-pointer truncate ${
-                  member360ActiveTab === 'recharges'
-                    ? 'bg-blue-50 text-[#2874f0] shadow-xs border border-blue-200 ring-1 ring-blue-300'
-                    : 'text-slate-600 hover:bg-slate-200 border border-transparent'
-                }`}
-              >
-                <Zap className="w-3.5 h-3.5 text-[#2874f0] shrink-0" />
-                <span className="truncate">4. रिचार्ज</span>
-                <span className="bg-blue-200 text-blue-900 text-[10px] px-1.5 py-0.2 rounded-full font-mono shrink-0">
-                  {transactions.filter((t) => t.accId.toUpperCase() === selectedMemberFor360.accId.toUpperCase()).length}
-                </span>
-              </button>
-
-              <button
-                onClick={() => setMember360ActiveTab('referrals')}
-                className={`flex-1 min-w-[110px] sm:min-w-[130px] max-w-full flex items-center justify-center text-center gap-1.5 px-2 py-2 rounded-lg text-xs font-bold transition cursor-pointer truncate ${
-                  member360ActiveTab === 'referrals'
-                    ? 'bg-amber-50 text-amber-800 shadow-xs border border-amber-200 ring-1 ring-amber-300'
-                    : 'text-slate-600 hover:bg-slate-200 border border-transparent'
-                }`}
-              >
-                <Award className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                <span className="truncate">5. टीम</span>
-                <span className="bg-amber-200 text-amber-900 text-[10px] px-1.5 py-0.2 rounded-full font-mono shrink-0">
-                  {members.filter((m) => m.sponsorId?.toUpperCase() === selectedMemberFor360.accId.toUpperCase()).length}
-                </span>
-              </button>
-
-              <button
-                onClick={() => setMember360ActiveTab('withdrawals')}
-                className={`flex-1 min-w-[110px] sm:min-w-[130px] max-w-full flex items-center justify-center text-center gap-1.5 px-2 py-2 rounded-lg text-xs font-bold transition cursor-pointer truncate ${
-                  member360ActiveTab === 'withdrawals'
-                    ? 'bg-indigo-50 text-indigo-800 shadow-xs border border-indigo-200 ring-1 ring-indigo-300'
-                    : 'text-slate-600 hover:bg-slate-200 border border-transparent'
-                }`}
-              >
-                <CreditCard className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                <span className="truncate">6. निकासी</span>
-                <span className="bg-indigo-200 text-indigo-900 text-[10px] px-1.5 py-0.2 rounded-full font-mono shrink-0">
-                  {withdrawals.filter((w) => w.accId.toUpperCase() === selectedMemberFor360.accId.toUpperCase()).length}
-                </span>
-              </button>
-            </div>
-
-            {/* Modal Body / Tab Content (Resets to top:0 automatically via ref) */}
-            <div ref={modal360BodyRef} className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+              {/* Modal Body / Tab Content (Resets to top:0 automatically via ref) */}
+              <div ref={modal360BodyRef} className="p-3 sm:p-5 md:p-6 overflow-y-auto overscroll-contain min-h-0 flex-1 space-y-4 bg-slate-50/40">
               {/* SUBTAB 1: COMPLETE PROFILE & CONTACT INFO */}
               {member360ActiveTab === 'profile_info' && (
                 <div className="space-y-4">
+                  {/* DIRECT HIGH-VISIBILITY USER MASTER SNAPSHOT CARD - 100% VISIBLE IMMEDIATELY */}
+                  <div className="bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 text-white rounded-xl p-3.5 sm:p-4 shadow-sm border border-purple-400/40 space-y-3">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-[#ffe500] text-[#2874f0] font-black flex items-center justify-center text-sm shrink-0 shadow-sm border border-yellow-300">
+                          ACC
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <strong className="text-white text-base sm:text-lg">{activeM.fullName}</strong>
+                            <span className="font-mono-acc font-black text-xs bg-yellow-400 text-slate-950 px-2 py-0.5 rounded shadow-xs">
+                              {activeM.accId}
+                            </span>
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                activeM.plan === 'SWIS' ? 'bg-amber-400 text-slate-900' : 'bg-blue-400 text-slate-900'
+                              }`}
+                            >
+                              {activeM.plan} PLAN
+                            </span>
+                          </div>
+                          <span className="text-xs text-purple-200 block mt-0.5">
+                            📱 {activeM.mobile} • ✉️ {activeM.email} • 📍 {activeM.city || 'शहर'}, {activeM.state || 'राज्य'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap text-xs">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (activeM.utrNumber) {
+                              navigator.clipboard.writeText(activeM.utrNumber);
+                              alert('UTR नंबर कॉपी हो गया!');
+                            }
+                          }}
+                          className="bg-white/10 hover:bg-white/20 px-2.5 py-1 rounded text-purple-100 font-mono-acc border border-white/20 cursor-pointer flex items-center gap-1"
+                          title="UTR कॉपी करें"
+                        >
+                          <span>UTR:</span>
+                          <strong className="text-yellow-300">{activeM.utrNumber || 'N/A'}</strong>
+                          <Copy className="w-3 h-3 text-purple-200" />
+                        </button>
+                        <span className="bg-emerald-500/25 text-emerald-300 border border-emerald-400/40 px-2.5 py-1 rounded font-bold font-mono-acc">
+                          वॉलेट: ₹{(activeM.walletBalance || 0).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Quick 4-Pill Info Bar */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-purple-800/60 text-xs">
+                      <div className="bg-white/5 rounded-lg p-2 border border-white/10">
+                        <span className="text-[10px] text-purple-300 block">सत्यापन स्थिति</span>
+                        <strong className="text-white">
+                          {activeM.status === 'verified' ? '✓ सत्यापित (Active)' : activeM.status === 'rejected' ? 'अस्वीकृत' : 'लंबित समीक्षा'}
+                        </strong>
+                      </div>
+                      <div className="bg-white/5 rounded-lg p-2 border border-white/10">
+                        <span className="text-[10px] text-purple-300 block">स्पॉन्सर विवरण</span>
+                        <strong className="text-white truncate block">
+                          {activeM.sponsorName || 'कंपनी डायरेक्ट'} ({activeM.sponsorId || 'DIRECT'})
+                        </strong>
+                      </div>
+                      <div className="bg-white/5 rounded-lg p-2 border border-white/10">
+                        <span className="text-[10px] text-purple-300 block">पेआउट UPI</span>
+                        <strong className="text-emerald-300 font-mono-acc truncate block">
+                          {activeM.payoutDetails?.upiId || `${activeM.mobile}@upi`}
+                        </strong>
+                      </div>
+                      <div className="bg-white/5 rounded-lg p-2 border border-white/10">
+                        <span className="text-[10px] text-purple-300 block">कुल संचित आय</span>
+                        <strong className="text-yellow-300 font-mono-acc block">
+                          ₹{(activeM.totalEarnings || 0).toFixed(2)}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Personal Information */}
-                    <div className="bg-slate-50 p-4 rounded-xl border border-gray-200 space-y-2.5">
+                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs space-y-2.5">
                       <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5 border-b border-gray-200 pb-2">
                         <Users className="w-4 h-4 text-[#2874f0]" />
                         <span>व्यक्तिगत विवरण (Personal Info)</span>
@@ -5318,35 +5812,35 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                       <div className="space-y-1.5 text-xs">
                         <div className="flex justify-between">
                           <span className="text-slate-500">पूरा नाम:</span>
-                          <span className="font-bold text-slate-900">{selectedMemberFor360.fullName}</span>
+                          <span className="font-bold text-slate-900">{activeM.fullName}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-500">शिक्षा / योग्यता:</span>
-                          <span className="font-semibold text-slate-800">{selectedMemberFor360.qualification || 'Graduate'}</span>
+                          <span className="font-semibold text-slate-800">{activeM.qualification || 'Graduate'}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-500">स्थान (City, State):</span>
-                          <span className="font-semibold text-slate-800">{selectedMemberFor360.city}, {selectedMemberFor360.state}</span>
+                          <span className="font-semibold text-slate-800">{activeM.city || 'शहर'}, {activeM.state || 'राज्य'}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-500">पिनकोड:</span>
-                          <span className="font-mono-acc text-slate-800">{selectedMemberFor360.pincode || '452001'}</span>
+                          <span className="font-mono-acc text-slate-800">{activeM.pincode || '452001'}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-500">पूरा पता:</span>
-                          <span className="font-semibold text-slate-800 text-right max-w-[220px]">{selectedMemberFor360.address || 'उपलब्ध नहीं'}</span>
+                          <span className="font-semibold text-slate-800 text-right max-w-[220px]">{activeM.address || 'उपलब्ध नहीं'}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-500">अंतिम प्रोफाइल बदलाव:</span>
                           <span className="font-mono-acc text-purple-700 font-bold">
-                            {selectedMemberFor360.lastEditedAt ? new Date(selectedMemberFor360.lastEditedAt).toLocaleString('hi-IN') : 'कोई बदलाव नहीं'}
+                            {activeM.lastEditedAt ? new Date(activeM.lastEditedAt).toLocaleString('hi-IN') : 'कोई बदलाव नहीं'}
                           </span>
                         </div>
                       </div>
                     </div>
 
                     {/* Contact & Social Information */}
-                    <div className="bg-slate-50 p-4 rounded-xl border border-gray-200 space-y-2.5">
+                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs space-y-2.5">
                       <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5 border-b border-gray-200 pb-2">
                         <Phone className="w-4 h-4 text-emerald-600" />
                         <span>संपर्क व सोशल विवरण (Contact & Links)</span>
@@ -5355,9 +5849,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                         <div className="flex justify-between items-center">
                           <span className="text-slate-500">मोबाइल नंबर:</span>
                           <div className="flex items-center gap-1 font-mono-acc font-bold text-slate-900">
-                            <span>{selectedMemberFor360.mobile}</span>
+                            <span>{activeM.mobile}</span>
                             <a
-                              href={`tel:${selectedMemberFor360.mobile}`}
+                              href={`tel:${activeM.mobile}`}
                               className="text-blue-600 hover:text-blue-800 p-0.5"
                               title="कॉल करें"
                             >
@@ -5368,9 +5862,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                         <div className="flex justify-between items-center">
                           <span className="text-slate-500">WhatsApp नंबर:</span>
                           <div className="flex items-center gap-1 font-mono-acc font-bold text-emerald-700">
-                            <span>{selectedMemberFor360.whatsapp || selectedMemberFor360.mobile}</span>
+                            <span>{activeM.whatsapp || activeM.mobile}</span>
                             <a
-                              href={`https://api.whatsapp.com/send?phone=91${selectedMemberFor360.whatsapp || selectedMemberFor360.mobile}`}
+                              href={`https://api.whatsapp.com/send?phone=91${activeM.whatsapp || activeM.mobile}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-emerald-600 hover:text-emerald-800 p-0.5"
@@ -5382,19 +5876,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-slate-500">ईमेल आईडी:</span>
-                          <span className="text-slate-800 font-mono-acc">{selectedMemberFor360.email}</span>
+                          <span className="text-slate-800 font-mono-acc">{activeM.email}</span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-slate-500">पर्सनल प्रोफाइल लिंक:</span>
-                          {selectedMemberFor360.profileLink ? (
+                          {activeM.profileLink ? (
                             <a
-                              href={selectedMemberFor360.profileLink}
+                              href={activeM.profileLink}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-[#2874f0] hover:underline flex items-center gap-1 truncate max-w-[180px]"
                             >
                               <ExternalLink className="w-3 h-3 shrink-0" />
-                              <span className="truncate">{selectedMemberFor360.profileLink}</span>
+                              <span className="truncate">{activeM.profileLink}</span>
                             </a>
                           ) : (
                             <span className="text-slate-400 italic">सेट नहीं</span>
@@ -5402,7 +5896,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-slate-500">पर्सनल पेमेंट QR:</span>
-                          {selectedMemberFor360.personalQrUrl ? (
+                          {activeM.personalQrUrl ? (
                             <span className="bg-emerald-50 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-200">
                               अपलोड किया गया ✓
                             </span>
@@ -5417,7 +5911,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                   {/* Payment, UTR & Bank Details */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Activation & UTR Info */}
-                    <div className="bg-slate-50 p-4 rounded-xl border border-gray-200 space-y-2.5">
+                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs space-y-2.5">
                       <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5 border-b border-gray-200 pb-2">
                         <CreditCard className="w-4 h-4 text-emerald-600" />
                         <span>एक्टिवेशन शुल्क व पेमेंट UTR</span>
@@ -5425,25 +5919,40 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                       <div className="space-y-1.5 text-xs">
                         <div className="flex justify-between">
                           <span className="text-slate-500">एक्टिवेशन चार्ज:</span>
-                          <span className="font-mono-acc font-black text-emerald-600">₹{selectedMemberFor360.activationCharge || 249}</span>
+                          <span className="font-mono-acc font-black text-emerald-600">₹{activeM.activationCharge || 249}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between items-center">
                           <span className="text-slate-500">UPI UTR संदर्भ नंबर:</span>
-                          <span className="font-mono-acc font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-gray-200">
-                            {selectedMemberFor360.utrNumber || 'N/A'}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono-acc font-bold text-slate-900 bg-amber-50 px-2 py-0.5 rounded border border-amber-300">
+                              {activeM.utrNumber || 'N/A'}
+                            </span>
+                            {activeM.utrNumber && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(activeM.utrNumber || '');
+                                  alert('UTR कॉपी हो गया!');
+                                }}
+                                className="text-[#2874f0] hover:text-blue-800 p-0.5 cursor-pointer"
+                                title="कॉपी करें"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-500">पेमेंट दिनांक:</span>
-                          <span className="font-mono-acc text-slate-800">{selectedMemberFor360.paymentDate || '2026-10-08'}</span>
+                          <span className="font-mono-acc text-slate-800">{activeM.paymentDate || '2026-10-08'}</span>
                         </div>
                         <div className="flex justify-between items-center pt-1">
                           <span className="text-slate-500">पेमेंट रसीद स्क्रीनशॉट:</span>
-                          {selectedMemberFor360.paymentScreenshotUrl ? (
+                          {activeM.paymentScreenshotUrl ? (
                             <button
                               type="button"
                               onClick={() => {
-                                setScreenshotModalMember(selectedMemberFor360);
+                                setScreenshotModalMember(activeM);
                                 setZoomLevel(1);
                               }}
                               className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-[#2874f0] border border-blue-200 rounded text-xs font-bold flex items-center gap-1 cursor-pointer"
@@ -5459,7 +5968,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                     </div>
 
                     {/* Bank & Payout Details */}
-                    <div className="bg-slate-50 p-4 rounded-xl border border-gray-200 space-y-2.5">
+                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs space-y-2.5">
                       <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5 border-b border-gray-200 pb-2">
                         <Wallet className="w-4 h-4 text-purple-600" />
                         <span>पेआउट बैंक / UPI विवरण (Payout Account)</span>
@@ -5468,24 +5977,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                         <div className="flex justify-between">
                           <span className="text-slate-500">UPI ID:</span>
                           <span className="font-mono-acc font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                            {selectedMemberFor360.payoutDetails?.upiId || `${selectedMemberFor360.mobile}@upi`}
+                            {activeM.payoutDetails?.upiId || `${activeM.mobile}@upi`}
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-500">बैंक नाम:</span>
-                          <span className="font-semibold text-slate-800">{selectedMemberFor360.payoutDetails?.bankName || 'SBI / Not Added'}</span>
+                          <span className="font-semibold text-slate-800">{activeM.payoutDetails?.bankName || 'SBI / Not Added'}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-500">खाता संख्या:</span>
-                          <span className="font-mono-acc text-slate-800">{selectedMemberFor360.payoutDetails?.accountNumber || 'UPI मोड सक्रिय'}</span>
+                          <span className="font-mono-acc text-slate-800">{activeM.payoutDetails?.accountNumber || 'UPI मोड सक्रिय'}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-500">IFSC कोड:</span>
-                          <span className="font-mono-acc text-slate-800">{selectedMemberFor360.payoutDetails?.ifsc || 'SBIN0001234'}</span>
+                          <span className="font-mono-acc text-slate-800">{activeM.payoutDetails?.ifsc || 'SBIN0001234'}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-500">खाताधारक नाम:</span>
-                          <span className="font-semibold text-slate-800">{selectedMemberFor360.payoutDetails?.holderName || selectedMemberFor360.fullName}</span>
+                          <span className="font-semibold text-slate-800">{activeM.payoutDetails?.holderName || activeM.fullName}</span>
                         </div>
                       </div>
                     </div>
@@ -5500,25 +6009,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                     <div>
                       <h4 className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
                         <History className="w-4 h-4 text-purple-600" />
-                        <span>{selectedMemberFor360.fullName} ({selectedMemberFor360.accId}) का प्रोफाइल ऑडिट इतिहास</span>
+                        <span>{activeM.fullName} ({activeM.accId}) का प्रोफाइल ऑडिट इतिहास</span>
                       </h4>
                       <p className="text-[11px] text-purple-700 mt-0.5">
                         छात्र द्वारा समय-समय पर किए गए सभी परिवर्तनों का पुराना मान (Old Value) और नया मान (New Value)
                       </p>
                     </div>
                     <span className="text-xs font-mono-acc font-bold bg-white text-purple-900 px-2.5 py-1 rounded border border-purple-200">
-                      कुल सत्र: {auditLogs.filter((a) => a.accId.toUpperCase() === selectedMemberFor360.accId.toUpperCase()).length}
+                      कुल सत्र: {auditLogs.filter((a) => (a.accId || '').toUpperCase() === (activeM?.accId || '').toUpperCase()).length}
                     </span>
                   </div>
 
                   {(() => {
                     const userLogs = auditLogs.filter(
-                      (a) => a.accId.toUpperCase() === selectedMemberFor360.accId.toUpperCase()
+                      (a) => (a.accId || '').toUpperCase() === (activeM?.accId || '').toUpperCase()
                     );
 
                     if (userLogs.length === 0) {
                       return (
-                        <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-gray-300 space-y-2">
+                        <div className="p-8 text-center bg-white rounded-xl border border-dashed border-gray-300 space-y-2">
                           <History className="w-8 h-8 text-slate-400 mx-auto" />
                           <h5 className="text-xs font-bold text-slate-700">इस सदस्य ने अभी तक कोई प्रोफाइल विवरण नहीं बदला है</h5>
                           <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
@@ -5531,7 +6040,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                     return (
                       <div className="space-y-3">
                         {userLogs.map((log) => (
-                          <div key={log.id} className="border border-purple-200 rounded-xl overflow-hidden shadow-xs">
+                          <div key={log.id} className="border border-purple-200 rounded-xl overflow-hidden shadow-xs bg-white">
                             <div className="bg-purple-100/60 px-3.5 py-2 border-b border-purple-200 flex items-center justify-between text-xs">
                               <div className="flex items-center gap-2">
                                 <Clock className="w-3.5 h-3.5 text-purple-700" />
@@ -5604,7 +6113,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                     <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 shadow-xs">
                       <span className="text-[11px] text-emerald-800 font-medium block">कुल संचित आय (Total Earnings)</span>
                       <span className="font-mono-acc font-black text-2xl text-emerald-600 block mt-1">
-                        ₹{(selectedMemberFor360.totalEarnings || 0).toFixed(2)}
+                        ₹{(activeM.totalEarnings || 0).toFixed(2)}
                       </span>
                       <span className="text-[10px] text-emerald-700 block mt-0.5">लाइफटाइम कमीशन व रेफरल</span>
                     </div>
@@ -5612,7 +6121,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                     <div className="bg-blue-50 border border-blue-200 rounded-xl p-3.5 shadow-xs">
                       <span className="text-[11px] text-blue-800 font-medium block">उपलब्ध वॉलेट बैलेंस</span>
                       <span className="font-mono-acc font-black text-2xl text-[#2874f0] block mt-1">
-                        ₹{(selectedMemberFor360.walletBalance || 0).toFixed(2)}
+                        ₹{(activeM.walletBalance || 0).toFixed(2)}
                       </span>
                       <span className="text-[10px] text-blue-700 block mt-0.5">निकासी हेतु तुरंत उपलब्ध</span>
                     </div>
@@ -5620,36 +6129,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 shadow-xs">
                       <span className="text-[11px] text-amber-800 font-medium block">SWIS 3.30% रिचार्ज कैशबैक</span>
                       <span className="font-mono-acc font-black text-2xl text-amber-700 block mt-1">
-                        ₹{(selectedMemberFor360.swisEarnings || 0).toFixed(2)}
+                        ₹{(activeM.swisEarnings || 0).toFixed(2)}
                       </span>
                       <span className="text-[10px] text-amber-700 block mt-0.5">
-                        {selectedMemberFor360.rechargesCount || 0} रिचार्ज पूरे किए
+                        {activeM.rechargesCount || 0} रिचार्ज पूरे किए
                       </span>
                     </div>
 
                     <div className="bg-purple-50 border border-purple-200 rounded-xl p-3.5 shadow-xs">
                       <span className="text-[11px] text-purple-800 font-medium block">TWIS ₹150 रेफरल इनकम</span>
                       <span className="font-mono-acc font-black text-2xl text-purple-700 block mt-1">
-                        ₹{(selectedMemberFor360.twisEarnings || 0).toFixed(2)}
+                        ₹{(activeM.twisEarnings || 0).toFixed(2)}
                       </span>
                       <span className="text-[10px] text-purple-700 block mt-0.5">
-                        {selectedMemberFor360.referralsCount || 0} सक्रिय रेफरल्स
+                        {activeM.referralsCount || 0} सक्रिय रेफरल्स
                       </span>
                     </div>
                   </div>
 
                   {/* Sponsor Commission Status for this user registration */}
-                  <div className="bg-slate-50 border border-gray-200 rounded-xl p-4 space-y-3">
+                  <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 shadow-xs">
                     <h4 className="text-xs font-bold text-slate-900 flex items-center justify-between border-b border-gray-200 pb-2">
                       <span className="flex items-center gap-1.5">
                         <Award className="w-4 h-4 text-amber-600" />
                         <span>इस सदस्य के एक्टिवेशन पर स्पॉन्सर को ₹150 कमीशन की स्थिति</span>
                       </span>
-                      {selectedMemberFor360.sponsorCommissionStatus === 'paid' ? (
+                      {activeM.sponsorCommissionStatus === 'paid' ? (
                         <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-300">
                           ✓ स्पॉन्सर को भुगतान चुकता
                         </span>
-                      ) : selectedMemberFor360.sponsorId && selectedMemberFor360.sponsorId !== 'DIRECT' ? (
+                      ) : activeM.sponsorId && activeM.sponsorId !== 'DIRECT' ? (
                         <span className="bg-amber-100 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-300">
                           ⏳ स्पॉन्सर कमीशन लंबित
                         </span>
@@ -5660,32 +6169,32 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                       )}
                     </h4>
 
-                    {selectedMemberFor360.sponsorId && selectedMemberFor360.sponsorId !== 'DIRECT' ? (
+                    {activeM.sponsorId && activeM.sponsorId !== 'DIRECT' ? (
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                        <div className="bg-white p-3 rounded-lg border border-gray-200">
+                        <div className="bg-slate-50 p-3 rounded-lg border border-gray-200">
                           <span className="text-slate-500 block text-[11px]">स्पॉन्सर का नाम व ID:</span>
-                          <strong className="text-slate-900 block mt-0.5">{selectedMemberFor360.sponsorName || 'स्पॉन्सर'}</strong>
-                          <span className="font-mono-acc text-purple-700 font-bold text-[11px]">({selectedMemberFor360.sponsorId})</span>
+                          <strong className="text-slate-900 block mt-0.5">{activeM.sponsorName || 'स्पॉन्सर'}</strong>
+                          <span className="font-mono-acc text-purple-700 font-bold text-[11px]">({activeM.sponsorId})</span>
                         </div>
 
-                        <div className="bg-white p-3 rounded-lg border border-gray-200">
+                        <div className="bg-slate-50 p-3 rounded-lg border border-gray-200">
                           <span className="text-slate-500 block text-[11px]">कमीशन राशि:</span>
                           <strong className="text-emerald-700 font-mono-acc text-base block mt-0.5">₹150.00</strong>
                           <span className="text-[10px] text-slate-400">Direct TWIS Sponsor Bonus</span>
                         </div>
 
-                        <div className="bg-white p-3 rounded-lg border border-gray-200 flex flex-col justify-between">
+                        <div className="bg-slate-50 p-3 rounded-lg border border-gray-200 flex flex-col justify-between">
                           <div>
                             <span className="text-slate-500 block text-[11px]">भुगतान स्थिति / UTR:</span>
                             <span className="font-mono-acc text-slate-800 text-[11px] block mt-0.5 font-bold">
-                              {selectedMemberFor360.sponsorCommissionUtr || 'लंबित'}
+                              {activeM.sponsorCommissionUtr || 'लंबित'}
                             </span>
                           </div>
-                          {selectedMemberFor360.sponsorCommissionStatus !== 'paid' && (
+                          {activeM.sponsorCommissionStatus !== 'paid' && (
                             <button
                               type="button"
                               onClick={() => {
-                                setCommissionPayMember(selectedMemberFor360);
+                                setCommissionPayMember(activeM);
                                 setCommissionUtrInput(`COMM-${Date.now().toString().slice(-8)}`);
                               }}
                               className="mt-2 w-full py-1 bg-[#fb641b] hover:bg-[#e85a14] text-white rounded text-[11px] font-bold shadow-xs transition"
@@ -5709,7 +6218,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                 <div className="space-y-4">
                   {(() => {
                     const userTxs = transactions.filter(
-                      (t) => t.accId.toUpperCase() === selectedMemberFor360.accId.toUpperCase()
+                      (t) => (t.accId || '').toUpperCase() === (activeM?.accId || '').toUpperCase()
                     );
 
                     const totalRechargeAmt = userTxs.reduce((sum, t) => sum + (t.amount || 0), 0);
@@ -5730,12 +6239,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                         </div>
 
                         {userTxs.length === 0 ? (
-                          <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-gray-300">
+                          <div className="p-8 text-center bg-white rounded-xl border border-dashed border-gray-300">
                             <Zap className="w-8 h-8 text-slate-400 mx-auto mb-1" />
                             <p className="text-xs text-slate-600 font-bold">इस सदस्य का कोई रिचार्ज ट्रांजेक्शन नहीं है</p>
                           </div>
                         ) : (
-                          <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                          <div className="overflow-x-auto border border-gray-200 rounded-xl bg-white">
                             <table className="w-full text-left border-collapse text-xs">
                               <thead>
                                 <tr className="bg-slate-50 text-slate-700 border-b border-gray-200 font-bold">
@@ -5780,7 +6289,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                 <div className="space-y-4">
                   {(() => {
                     const directReferredMembers = members.filter(
-                      (m) => (m.sponsorId || '').toUpperCase() === selectedMemberFor360.accId.toUpperCase()
+                      (m) => (m.sponsorId || '').toUpperCase() === (activeM?.accId || '').toUpperCase()
                     );
 
                     return (
@@ -5789,7 +6298,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                           <div>
                             <strong className="text-amber-900 block">डायरेक्ट रेफरल टीम रिकॉर्ड</strong>
                             <span className="text-amber-700 text-[11px]">
-                              {selectedMemberFor360.fullName} द्वारा रेफर किए गए सभी सदस्य
+                              {activeM.fullName} द्वारा रेफर किए गए सभी सदस्य
                             </span>
                           </div>
                           <span className="font-mono-acc font-black text-amber-900 bg-white px-2.5 py-1 rounded border border-amber-200">
@@ -5798,12 +6307,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                         </div>
 
                         {directReferredMembers.length === 0 ? (
-                          <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-gray-300">
+                          <div className="p-8 text-center bg-white rounded-xl border border-dashed border-gray-300">
                             <Users className="w-8 h-8 text-slate-400 mx-auto mb-1" />
                             <p className="text-xs text-slate-600 font-bold">इस सदस्य ने अभी तक किसी को रेफर नहीं किया है</p>
                           </div>
                         ) : (
-                          <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                          <div className="overflow-x-auto border border-gray-200 rounded-xl bg-white">
                             <table className="w-full text-left border-collapse text-xs">
                               <thead>
                                 <tr className="bg-slate-50 text-slate-700 border-b border-gray-200 font-bold">
@@ -5866,7 +6375,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                 <div className="space-y-4">
                   {(() => {
                     const userWds = withdrawals.filter(
-                      (w) => w.accId.toUpperCase() === selectedMemberFor360.accId.toUpperCase()
+                      (w) => (w.accId || '').toUpperCase() === (activeM?.accId || '').toUpperCase()
                     );
 
                     return (
@@ -5875,7 +6384,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                           <div>
                             <strong className="text-indigo-900 block">वॉलेट निकासी इतिहास</strong>
                             <span className="text-indigo-700 text-[11px]">
-                              {selectedMemberFor360.fullName} द्वारा किए गए सभी पेआउट अनुरोध
+                              {activeM.fullName} द्वारा किए गए सभी पेआउट अनुरोध
                             </span>
                           </div>
                           <span className="font-mono-acc font-black text-indigo-900 bg-white px-2.5 py-1 rounded border border-indigo-200">
@@ -5884,12 +6393,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                         </div>
 
                         {userWds.length === 0 ? (
-                          <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-gray-300">
+                          <div className="p-8 text-center bg-white rounded-xl border border-dashed border-gray-300">
                             <CreditCard className="w-8 h-8 text-slate-400 mx-auto mb-1" />
                             <p className="text-xs text-slate-600 font-bold">इस सदस्य ने अभी तक कोई निकासी अनुरोध नहीं किया है</p>
                           </div>
                         ) : (
-                          <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                          <div className="overflow-x-auto border border-gray-200 rounded-xl bg-white">
                             <table className="w-full text-left border-collapse text-xs">
                               <thead>
                                 <tr className="bg-slate-50 text-slate-700 border-b border-gray-200 font-bold">
@@ -5941,13 +6450,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                                         <div className="flex items-center justify-end gap-1">
                                           <button
                                             onClick={() => handleApproveWithdrawal(w.id)}
-                                            className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold shadow-xs"
+                                            className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold shadow-xs cursor-pointer"
                                           >
                                             स्वीकृत
                                           </button>
                                           <button
                                             onClick={() => handleRejectWithdrawal(w.id)}
-                                            className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded text-[11px] font-bold border border-red-200"
+                                            className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded text-[11px] font-bold border border-red-200 cursor-pointer"
                                           >
                                             अस्वीकार
                                           </button>
@@ -5968,23 +6477,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
             </div>
 
             {/* Modal Bottom Action Bar */}
-            <div className="bg-slate-50 border-t border-gray-200 p-3.5 px-5 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+            <div className="bg-slate-50 border-t border-gray-200 p-3 sm:px-5 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <a
-                  href={`https://api.whatsapp.com/send?phone=91${selectedMemberFor360.mobile}&text=${encodeURIComponent(
-                    `नमस्ते ${selectedMemberFor360.fullName} ji,\nमैं Achievers Club Community (ACC) एडमिन बात कर रहा हूँ।\nआपकी ID: ${selectedMemberFor360.accId}`
+                  href={`https://api.whatsapp.com/send?phone=91${activeM.whatsapp || activeM.mobile}&text=${encodeURIComponent(
+                    `नमस्ते ${activeM.fullName} ji,\nमैं Achievers Club Community (ACC) एडमिन बात कर रहा हूँ।\nआपकी ID: ${activeM.accId}`
                   )}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-3 py-1.5 bg-[#25D366] hover:bg-[#20ba59] text-white rounded text-xs font-bold flex items-center gap-1.5 transition shadow-xs"
+                  className="px-3 py-1.5 bg-[#25D366] hover:bg-[#20ba59] text-white rounded text-xs font-bold flex items-center gap-1.5 transition shadow-xs cursor-pointer"
                 >
                   <MessageCircle className="w-3.5 h-3.5" />
                   <span>WhatsApp चैट</span>
                 </a>
 
                 <a
-                  href={`tel:${selectedMemberFor360.mobile}`}
-                  className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-[#2874f0] border border-blue-200 rounded text-xs font-bold flex items-center gap-1.5 transition"
+                  href={`tel:${activeM.mobile}`}
+                  className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-[#2874f0] border border-blue-200 rounded text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
                 >
                   <Phone className="w-3.5 h-3.5" />
                   <span>कॉल करें</span>
@@ -5993,11 +6502,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                 <button
                   type="button"
                   onClick={() => {
-                    const text = JSON.stringify(selectedMemberFor360, null, 2);
+                    const text = JSON.stringify(activeM, null, 2);
                     navigator.clipboard.writeText(text);
                     alert('सदस्य सम्पूर्ण 360° डेटा क्लिपबोर्ड में कॉपी हो गया!');
                   }}
-                  className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-gray-300 rounded text-xs font-bold flex items-center gap-1.5 transition"
+                  className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-gray-300 rounded text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
                 >
                   <Copy className="w-3.5 h-3.5" />
                   <span>डेटा कॉपी</span>
@@ -6005,13 +6514,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
               </div>
 
               <div className="flex items-center gap-2">
-                {selectedMemberFor360.status !== 'verified' && (
+                {activeM.status !== 'verified' && (
                   <button
                     onClick={() => {
-                      handleApproveMember(selectedMemberFor360);
+                      handleApproveMember(activeM);
                       setSelectedMemberFor360(null);
                     }}
-                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold flex items-center gap-1.5 shadow-sm transition"
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold flex items-center gap-1.5 shadow-sm transition cursor-pointer"
                   >
                     <Check className="w-3.5 h-3.5" />
                     <span>सत्यापित करें (Approve)</span>
@@ -6020,7 +6529,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
 
                 <button
                   onClick={() => setSelectedMemberFor360(null)}
-                  className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded text-xs font-bold transition"
+                  className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded text-xs font-bold transition cursor-pointer"
                 >
                   बंद करें
                 </button>
@@ -6028,7 +6537,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
             </div>
           </div>
         </div>
-      )}
+      );
+      return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
+    })()}
     </div>
   );
 };

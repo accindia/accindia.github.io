@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import {
   Smartphone,
@@ -73,6 +73,18 @@ interface UserDashboardProps {
 
 export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpdateUser, onNavigateToPromotions }) => {
   const [activeTab, setActiveTab] = useState<'applink' | 'twis' | 'swis' | 'idcard' | 'kit' | 'courses' | 'profile'>('applink');
+  const tabContentRef = useRef<HTMLDivElement>(null);
+
+  // Directly navigate & smoothly scroll user straight to the target section/tab
+  const handleSelectTab = (tab: 'applink' | 'twis' | 'swis' | 'idcard' | 'kit' | 'courses' | 'profile') => {
+    setActiveTab(tab);
+    setTimeout(() => {
+      if (tabContentRef.current) {
+        tabContentRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 40);
+  };
+
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
@@ -1060,9 +1072,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
   // Only accessible when status === 'verified'
   // =========================================================================
   return (
-    <div className="max-w-6xl mx-auto space-y-6 animate-fadeIn">
-      {/* Top Welcome Bar - Flipkart Style Blue Banner */}
-      <div className="bg-gradient-to-r from-[#2874f0] via-[#1c52b8] to-[#124296] text-white rounded-xl p-4 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4 shadow-sm border border-blue-400/20">
+    <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6 animate-fadeIn">
+      {/* Top Welcome Bar - Flipkart Style Blue Banner (100% Responsive for All Devices) */}
+      <div className="bg-gradient-to-r from-[#2874f0] via-[#1c52b8] to-[#124296] text-white rounded-xl p-3.5 sm:p-5 md:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4 shadow-sm border border-blue-400/20">
         <div className="flex items-center gap-3 sm:gap-4 min-w-0 w-full md:w-auto">
           <div className="relative shrink-0">
             {currentUser.avatarUrl ? (
@@ -1072,7 +1084,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                 className="w-13 h-13 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-white shadow-sm"
               />
             ) : (
-              <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-full bg-[#ffe500] text-[#2874f0] flex items-center justify-center font-black text-lg sm:text-xl shadow-sm border-2 border-white">
+              <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-full bg-[#ffe500] text-[#2874f0] flex items-center justify-center font-black text-base sm:text-xl shadow-sm border-2 border-white">
                 {currentUser.fullName.substring(0, 2).toUpperCase()}
               </div>
             )}
@@ -1086,100 +1098,129 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-              <h2 className="text-base sm:text-xl font-bold text-white tracking-wide truncate">
+              <h2 className="text-base sm:text-xl font-black text-white tracking-wide truncate">
                 {currentUser.fullName}
               </h2>
-              <span className="text-[11px] sm:text-xs text-blue-200 font-medium">
-                · {currentUser.qualification || 'छात्र सदस्य'}
+              <span className="text-[10px] sm:text-xs text-blue-100 bg-blue-900/60 px-2 py-0.5 rounded font-medium border border-blue-400/30 truncate">
+                {currentUser.qualification || 'छात्र सदस्य'}
               </span>
             </div>
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-1">
-              <span className="text-[11px] sm:text-xs text-blue-200">🆔:</span>
-              <span className="font-mono-acc font-bold text-[#ffe500] text-[11px] sm:text-xs bg-blue-900/60 px-1.5 py-0.5 rounded border border-blue-400/30">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-1.5 text-xs">
+              <span className="text-blue-200 text-[11px] font-bold">🆔:</span>
+              <span className="font-mono-acc font-black text-[#ffe500] text-[11px] sm:text-xs bg-blue-950/70 px-2 py-0.5 rounded border border-yellow-300/40">
                 {currentUser.accId}
               </span>
               <button
+                type="button"
                 onClick={handleCopyId}
-                className="text-blue-200 hover:text-white p-0.5 sm:p-1"
+                className="text-blue-200 hover:text-white p-1 rounded hover:bg-white/10 transition cursor-pointer"
                 title="Copy ID"
               >
                 {copiedId ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
               </button>
-              <span className="text-blue-300">·</span>
-              <span className="text-[10px] sm:text-[11px] font-bold text-emerald-300 flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> {currentUser.plan} Plan
+              <span className="text-blue-300/60">|</span>
+              <span className="text-[10px] sm:text-[11px] font-black text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-400/30 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3 shrink-0" /> {currentUser.plan} Plan
               </span>
             </div>
           </div>
         </div>
 
-        {/* Real App Status Card */}
-        <div className="bg-blue-900/60 border border-blue-400/30 rounded-lg p-3 w-full md:w-auto flex items-center justify-between md:justify-start gap-3">
-          <div className="w-9 h-9 rounded-md flex items-center justify-center shrink-0 bg-emerald-500 text-white">
-            <CheckCircle2 className="w-5 h-5" />
+        {/* Real App Status Card with Direct Link Switch */}
+        <div className="bg-blue-950/70 border border-blue-400/30 rounded-xl p-2.5 sm:p-3 w-full md:w-auto flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-emerald-500 text-white shadow-xs">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] text-blue-200 uppercase font-bold tracking-wider block">Real App स्थिति</span>
+              <span className="text-xs font-bold text-emerald-300 truncate block">
+                सक्रिय (Verified ✓)
+              </span>
+            </div>
           </div>
-          <div>
-            <span className="text-[10px] text-blue-200 uppercase font-semibold block">Real App स्थिति</span>
-            <span className="text-xs font-bold text-emerald-300">
-              Real App Link सक्रिय (Verified)
-            </span>
-          </div>
+          <button
+            type="button"
+            onClick={() => handleSelectTab('applink')}
+            className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded text-[11px] font-bold border border-white/20 transition cursor-pointer shrink-0"
+          >
+            ऐप लिंक खोलें
+          </button>
         </div>
       </div>
 
-      {/* 4 Clean White Metric Cards */}
+      {/* 4 Clean White High-Visibility Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
-          <span className="text-[11px] text-slate-500 block font-medium">🆔 एक्टिवेशन स्थिति</span>
-          <span className="font-bold text-sm text-emerald-700 flex items-center gap-1 mt-1">
-            <CheckCircle2 className="w-4 h-4 shrink-0" /> ₹249 ONE-TIME PAID
-          </span>
-          <span className="text-[10px] text-slate-500 block mt-1 font-mono-acc truncate">
-            UTR: {currentUser.utrNumber || 'N/A'}
-          </span>
+        {/* Card 1: Activation Status */}
+        <div className="bg-white border border-gray-200 rounded-xl p-3.5 sm:p-4 shadow-xs flex flex-col justify-between">
+          <div>
+            <span className="text-[11px] text-slate-500 block font-bold uppercase tracking-wider">🆔 एक्टिवेशन स्थिति</span>
+            <span className="font-bold text-sm text-emerald-700 flex items-center gap-1 mt-1">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" /> ₹249 ONE-TIME PAID
+            </span>
+          </div>
+          <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between text-[10px] text-slate-500 font-mono-acc">
+            <span className="truncate">UTR: {currentUser.utrNumber || 'N/A'}</span>
+            {currentUser.utrNumber && (
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(currentUser.utrNumber);
+                  alert('UTR कॉपी हो गया: ' + currentUser.utrNumber);
+                }}
+                className="text-[#2874f0] hover:underline shrink-0 p-0.5"
+                title="UTR कॉपी करें"
+              >
+                <Copy className="w-3 h-3" />
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
+        {/* Card 2: Wallet Balance */}
+        <div className="bg-white border border-gray-200 rounded-xl p-3.5 sm:p-4 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] text-slate-500 font-medium">वॉलेट बैलेंस</span>
+            <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">👛 वॉलेट बैलेंस</span>
             <button
+              type="button"
               onClick={() => setShowWithdrawModal(true)}
-              className="text-[11px] font-bold text-[#2874f0] hover:underline flex items-center gap-0.5"
+              className="text-[11px] font-bold text-[#2874f0] hover:bg-blue-50 px-2 py-0.5 rounded border border-blue-200 flex items-center gap-1 transition cursor-pointer"
             >
               <span>निकासी</span>
               <ArrowUpRight className="w-3 h-3" />
             </button>
           </div>
-          <span className="font-mono-acc font-black text-xl text-emerald-600 block mt-1 tabular-nums">
+          <span className="font-mono-acc font-black text-2xl text-emerald-600 block mt-1 tabular-nums">
             ₹{currentUser.walletBalance.toFixed(2)}
           </span>
-          <span className="text-[10px] text-slate-500 block mt-1">UPI द्वारा सीधे बैंक खाते में ट्रांसफर</span>
+          <span className="text-[10px] text-slate-500 block mt-1">UPI / बैंक खाते में तुरंत निकासी योग्य</span>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs flex flex-col justify-between">
+        {/* Card 3: TWIS Referral Income */}
+        <div className="bg-white border border-gray-200 rounded-xl p-3.5 sm:p-4 shadow-xs flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] text-slate-500 font-medium">TWIS रेफरल आय (₹150/दोस्त)</span>
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider truncate">👥 TWIS रेफरल (₹150)</span>
               <button
                 type="button"
                 onClick={() => {
                   setReferralModalTab('members');
                   setShowReferralsPrivacyModal(true);
                 }}
-                className="text-[11px] font-bold text-[#2874f0] hover:text-[#1258c7] flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded border border-blue-200 transition shadow-xs cursor-pointer"
+                className="text-[10px] font-bold text-[#2874f0] hover:text-[#1258c7] flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded border border-blue-200 transition shadow-xs cursor-pointer shrink-0"
                 title="रेफरल सदस्य देखें (मास्क्ड प्राइवेसी के साथ)"
               >
-                <span>सदस्य देखें</span>
+                <span>सदस्य</span>
                 <Eye className="w-3 h-3" />
               </button>
             </div>
-            <span className="font-mono-acc font-bold text-xl text-[#2874f0] block mt-1 tabular-nums">
+            <span className="font-mono-acc font-black text-2xl text-[#2874f0] block mt-1 tabular-nums">
               ₹{currentUser.twisEarnings.toFixed(2)}
             </span>
           </div>
 
           <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100 text-[10px]">
-            <span className="text-slate-500">{currentUser.referralsCount} सक्रिय छात्र जुड़े</span>
+            <span className="text-slate-600 font-medium">{currentUser.referralsCount} सक्रिय छात्र</span>
             <button
               type="button"
               onClick={() => {
@@ -1190,49 +1231,63 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
               title="पब्लिक / प्राइवेट सेटिंग्स चुनें"
             >
               <ShieldCheck className="w-3 h-3 text-emerald-600" />
-              <span>प्राइवेसी कंट्रोल ⚙️</span>
+              <span>प्राइवेसी ⚙️</span>
             </button>
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
-          <span className="text-[11px] text-slate-500 block font-medium">Sponsor विवरण</span>
-          <span className="font-bold text-sm text-slate-900 block mt-1 truncate">
-            {currentUser.sponsorName || 'ACC Core Team'}
-          </span>
-          <span className="text-[10px] text-slate-500 block mt-1 font-mono-acc truncate">
-            ID: {currentUser.sponsorId || 'ACC-ADMIN'}
-          </span>
+        {/* Card 4: Sponsor Info */}
+        <div className="bg-white border border-gray-200 rounded-xl p-3.5 sm:p-4 shadow-xs flex flex-col justify-between">
+          <div>
+            <span className="text-[11px] text-slate-500 block font-bold uppercase tracking-wider">🤝 Sponsor विवरण</span>
+            <span className="font-bold text-sm text-slate-900 block mt-1 truncate">
+              {currentUser.sponsorName || 'ACC Core Team'}
+            </span>
+          </div>
+          <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between text-[10px]">
+            <span className="font-mono-acc text-[#2874f0] font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 truncate">
+              {currentUser.sponsorId || 'ACC-ADMIN'}
+            </span>
+            <button
+              type="button"
+              onClick={() => handleSelectTab('twis')}
+              className="text-slate-500 hover:text-slate-900 font-medium hover:underline"
+            >
+              नेटवर्क देखें →
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Redesigned Clean Dashboard Menu System */}
-      <div className="bg-white border border-gray-200 rounded-xl p-2.5 shadow-xs space-y-2">
-        <div className="flex items-center justify-between px-2 pt-1 border-b border-gray-100 pb-2">
+      {/* Redesigned Clean Dashboard Menu System (Flawless on Mobile, Tablet & Desktop) */}
+      <div className="bg-white border border-gray-200 rounded-xl p-2.5 sm:p-3 shadow-xs space-y-2">
+        <div className="flex items-center justify-between px-1.5 pt-0.5 border-b border-gray-100 pb-2">
           <div className="flex items-center gap-2">
             <div className="w-2.5 h-2.5 rounded-full bg-[#2874f0] animate-pulse"></div>
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
-              डैशबोर्ड मुख्य मेनू (Select Services & Actions)
+            <span className="text-xs font-black uppercase tracking-wider text-slate-900">
+              डैशबोर्ड मुख्य सेवाएं (Services & Tools)
             </span>
           </div>
-          <span className="text-[11px] text-[#2874f0] font-bold bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
-            {activeTab === 'applink' && '📱 Real App डिलीवरी लिंक'}
-            {activeTab === 'kit' && '📚 मेरी किट व ट्रेनिंग'}
-            {activeTab === 'twis' && '👥 TWIS रेफरल (₹150/दोस्त)'}
-            {activeTab === 'swis' && '⚡ SWIS रिचार्ज (3.30% कमीशन)'}
+          <span className="text-[10px] sm:text-[11px] text-[#2874f0] font-bold bg-blue-50 px-2 sm:px-2.5 py-0.5 rounded-full border border-blue-200">
+            {activeTab === 'applink' && '📱 Real App APK'}
+            {activeTab === 'kit' && '📚 किट व ट्रेनिंग'}
+            {activeTab === 'twis' && '👥 TWIS रेफरल (₹150)'}
+            {activeTab === 'swis' && '⚡ SWIS रिचार्ज (3.30%)'}
             {activeTab === 'idcard' && '🪪 डिजिटल ID कार्ड'}
-            {activeTab === 'profile' && '✏️ प्रोफाइल व विवरण एडिट'}
+            {activeTab === 'profile' && '✏️ प्रोफाइल एडिट'}
             {activeTab === 'courses' && '🎓 स्टूडेंट अकेडमी'}
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-1.5 sm:gap-2 bg-slate-50/80 p-1.5 rounded-lg w-full max-w-full">
+        {/* 7 Clean Touch-Friendly Buttons Grid: Perfectly Symmetrical on Mobile (7th spans 2 cols) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-1.5 sm:gap-2 bg-slate-50/90 p-1.5 rounded-lg w-full max-w-full">
           <button
-            onClick={() => setActiveTab('applink')}
-            className={`flex items-center justify-center gap-1.5 px-2.5 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+            type="button"
+            onClick={() => handleSelectTab('applink')}
+            className={`min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'applink'
-                ? 'bg-[#2874f0] text-white shadow-xs ring-1 ring-[#2874f0]'
-                : 'bg-white text-slate-700 hover:text-[#2874f0] hover:bg-blue-50/50 border border-gray-200/80'
+                ? 'bg-[#2874f0] text-white shadow-xs ring-2 ring-[#2874f0]'
+                : 'bg-white text-slate-700 hover:text-[#2874f0] hover:bg-blue-50/50 border border-gray-200'
             }`}
           >
             <Smartphone className="w-4 h-4 shrink-0" />
@@ -1240,11 +1295,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
           </button>
 
           <button
-            onClick={() => setActiveTab('twis')}
-            className={`flex items-center justify-center gap-1.5 px-2.5 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+            type="button"
+            onClick={() => handleSelectTab('twis')}
+            className={`min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'twis'
-                ? 'bg-[#2874f0] text-white shadow-xs ring-1 ring-[#2874f0]'
-                : 'bg-white text-slate-700 hover:text-[#2874f0] hover:bg-blue-50/50 border border-gray-200/80'
+                ? 'bg-[#2874f0] text-white shadow-xs ring-2 ring-[#2874f0]'
+                : 'bg-white text-slate-700 hover:text-[#2874f0] hover:bg-blue-50/50 border border-gray-200'
             }`}
           >
             <Users className="w-4 h-4 shrink-0" />
@@ -1252,35 +1308,38 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
           </button>
 
           <button
-            onClick={() => setActiveTab('swis')}
-            className={`flex items-center justify-center gap-1.5 px-2.5 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+            type="button"
+            onClick={() => handleSelectTab('swis')}
+            className={`min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'swis'
-                ? 'bg-emerald-600 text-white shadow-xs ring-1 ring-emerald-600'
-                : 'bg-white text-slate-700 hover:text-emerald-700 hover:bg-emerald-50/50 border border-gray-200/80'
+                ? 'bg-emerald-600 text-white shadow-xs ring-2 ring-emerald-600'
+                : 'bg-white text-slate-700 hover:text-emerald-700 hover:bg-emerald-50/50 border border-gray-200'
             }`}
           >
-            <Zap className="w-4 h-4 shrink-0 text-emerald-500" />
+            <Zap className={`w-4 h-4 shrink-0 ${activeTab === 'swis' ? 'text-white' : 'text-emerald-600'}`} />
             <span className="truncate">SWIS (3.30%)</span>
           </button>
 
           <button
-            onClick={() => setActiveTab('idcard')}
-            className={`flex items-center justify-center gap-1.5 px-2.5 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+            type="button"
+            onClick={() => handleSelectTab('idcard')}
+            className={`min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'idcard'
-                ? 'bg-amber-600 text-white shadow-xs ring-1 ring-amber-600'
-                : 'bg-white text-slate-700 hover:text-amber-800 hover:bg-amber-50/50 border border-gray-200/80'
+                ? 'bg-amber-600 text-white shadow-xs ring-2 ring-amber-600'
+                : 'bg-white text-slate-700 hover:text-amber-800 hover:bg-amber-50/50 border border-gray-200'
             }`}
           >
-            <CreditCard className="w-4 h-4 shrink-0 text-amber-500" />
+            <CreditCard className={`w-4 h-4 shrink-0 ${activeTab === 'idcard' ? 'text-white' : 'text-amber-600'}`} />
             <span className="truncate">डिजिटल ID</span>
           </button>
 
           <button
-            onClick={() => setActiveTab('profile')}
-            className={`flex items-center justify-center gap-1.5 px-2.5 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+            type="button"
+            onClick={() => handleSelectTab('profile')}
+            className={`min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'profile'
                 ? 'bg-[#fb641b] text-white shadow-xs ring-2 ring-[#fb641b]'
-                : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-300 font-extrabold shadow-xs'
+                : 'bg-amber-50 text-amber-950 hover:bg-amber-100 border border-amber-300 font-extrabold shadow-xs'
             }`}
           >
             <Edit3 className={`w-4 h-4 shrink-0 ${activeTab === 'profile' ? 'text-white' : 'text-[#fb641b]'}`} />
@@ -1288,33 +1347,38 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
           </button>
 
           <button
-            onClick={() => setActiveTab('kit')}
-            className={`flex items-center justify-center gap-1.5 px-2.5 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+            type="button"
+            onClick={() => handleSelectTab('kit')}
+            className={`min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'kit'
-                ? 'bg-indigo-600 text-white shadow-xs ring-1 ring-indigo-600'
-                : 'bg-white text-slate-700 hover:text-indigo-700 hover:bg-indigo-50/50 border border-gray-200/80'
+                ? 'bg-indigo-600 text-white shadow-xs ring-2 ring-indigo-600'
+                : 'bg-white text-slate-700 hover:text-indigo-700 hover:bg-indigo-50/50 border border-gray-200'
             }`}
           >
-            <BookOpen className="w-4 h-4 shrink-0 text-indigo-500" />
-            <span className="truncate">📚 किट & ट्रेनिंग</span>
+            <BookOpen className={`w-4 h-4 shrink-0 ${activeTab === 'kit' ? 'text-white' : 'text-indigo-600'}`} />
+            <span className="truncate">📚 किट व गाइड</span>
           </button>
 
+          {/* 7th item: spans full 2 columns on mobile so it looks balanced and purposeful */}
           <button
-            onClick={() => setActiveTab('courses')}
-            className={`flex items-center justify-center gap-1.5 px-2.5 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+            type="button"
+            onClick={() => handleSelectTab('courses')}
+            className={`col-span-2 sm:col-span-1 min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'courses'
-                ? 'bg-purple-600 text-white shadow-xs ring-1 ring-purple-600'
-                : 'bg-white text-slate-700 hover:text-purple-700 hover:bg-purple-50/50 border border-gray-200/80'
+                ? 'bg-purple-600 text-white shadow-xs ring-2 ring-purple-600'
+                : 'bg-white text-slate-700 hover:text-purple-700 hover:bg-purple-50/50 border border-gray-200'
             }`}
           >
-            <GraduationCap className="w-4 h-4 shrink-0 text-purple-500" />
-            <span className="truncate">स्टूडेंट अकेडमी</span>
+            <GraduationCap className={`w-4 h-4 shrink-0 ${activeTab === 'courses' ? 'text-white' : 'text-purple-600'}`} />
+            <span className="truncate">🎓 स्टूडेंट अकेडमी</span>
           </button>
         </div>
       </div>
 
-      {/* TAB 1: Real App Link Section */}
-      {activeTab === 'applink' && (
+      {/* Target Content Area - Scroll Destination */}
+      <div ref={tabContentRef} id="dashboard-tab-content" className="scroll-mt-28 sm:scroll-mt-36 space-y-6">
+        {/* TAB 1: Real App Link Section */}
+        {activeTab === 'applink' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-7 bg-white border border-gray-200 rounded-xl p-5 sm:p-6 space-y-4 shadow-xs">
             <div className="border-b border-gray-100 pb-3">
@@ -2944,6 +3008,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
           </div>
         </div>
       )}
+      </div>
 
       {/* Withdrawal Modal - Flipkart Style */}
       {showWithdrawModal && (
