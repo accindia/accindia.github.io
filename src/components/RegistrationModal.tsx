@@ -29,6 +29,7 @@ import {
   Building2,
   Users,
   Smartphone,
+  Send,
 } from 'lucide-react';
 import { Member, PlanType, SiteConfig } from '../types';
 import { StorageService, generateAccId } from '../services/storage';
@@ -59,6 +60,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
   const [mobile, setMobile] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [sameAsMobile, setSameAsMobile] = useState(true);
+  const [telegram, setTelegram] = useState('');
   const [email, setEmail] = useState('');
   const [qualification, setQualification] = useState('Graduate');
   const [state, setState] = useState('Madhya Pradesh');
@@ -353,6 +355,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
         fullName: fullName.trim(),
         mobile: mobile.trim(),
         whatsapp: sameAsMobile ? mobile.trim() : (whatsapp.trim() || mobile.trim()),
+        telegram: telegram.trim() || undefined,
         email: email.trim(),
         qualification,
         state,
@@ -528,8 +531,24 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
             className="w-full sm:w-auto px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-sm shadow flex items-center justify-center gap-2 transition text-xs"
           >
             <MessageCircle className="w-4 h-4" />
-            <span>WhatsApp पर UTR भेजें ({siteConfig.whatsappNumber || '+91 8877490845'})</span>
+            <span>WhatsApp पर UTR भेजें</span>
           </a>
+
+          <a
+            href={siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE'}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full sm:w-auto px-5 py-3 bg-[#229ED9] hover:bg-[#1a85b9] text-white font-bold rounded-sm shadow flex items-center justify-center gap-2 transition text-xs"
+          >
+            <Send className="w-4 h-4" />
+            <span>Telegram हेल्पडेस्क (@NEWUSERHELPLINE)</span>
+          </a>
+        </div>
+
+        {/* Support Helpdesk Notice */}
+        <div className="bg-slate-50 border border-gray-200 rounded-lg p-3 text-xs text-slate-600 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <span>📧 <strong>Full Support Desk:</strong> <a href={`mailto:${siteConfig.officialEmail || 'newuserhelpline@gmail.com'}`} className="text-[#2874f0] font-bold underline">{siteConfig.officialEmail || 'newuserhelpline@gmail.com'}</a></span>
+          <span>✈️ <strong>Telegram:</strong> <a href={siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE'} target="_blank" rel="noopener noreferrer" className="text-sky-600 font-bold underline">https://t.me/NEWUSERHELPLINE</a></span>
         </div>
       </div>
     );
@@ -711,6 +730,32 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                   className="w-full bg-white border border-gray-300 rounded-sm px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-[#2874f0]"
                 />
               )}
+            </div>
+
+            {/* Optional Telegram ID/Link - Not Required */}
+            <div className="bg-sky-50/50 border border-sky-100 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Send className="w-3.5 h-3.5 text-sky-500" />
+                  <span>टेलीग्राम यूज़रनेम / लिंक (Telegram Username / Link)</span>
+                </label>
+                <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded border border-emerald-300">
+                  वैकल्पिक (Optional - भरना अनिवार्य नहीं है)
+                </span>
+              </div>
+              <div className="relative">
+                <Send className="w-4 h-4 absolute left-3 top-3 text-sky-400" />
+                <input
+                  type="text"
+                  value={telegram}
+                  onChange={(e) => setTelegram(e.target.value)}
+                  placeholder="उदा. @username या https://t.me/username (वैकल्पिक)"
+                  className="w-full bg-white border border-gray-300 rounded-sm pl-9 pr-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-[#2874f0] focus:ring-1 focus:ring-[#2874f0]"
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                यदि आपके पास टेलीग्राम अकाउंट है तो आप यहाँ जोड़ सकते हैं। यह भरना अनिवार्य नहीं है, आप इसे खाली भी छोड़ सकते हैं।
+              </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

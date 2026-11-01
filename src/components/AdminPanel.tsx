@@ -62,6 +62,8 @@ import {
   LayoutGrid,
   Table,
   ChevronDown,
+  AlertCircle,
+  Save,
 } from 'lucide-react';
 import {
   Member,
@@ -78,6 +80,7 @@ import {
 } from '../types';
 import { StorageService, subscribeToSync, SEED_MEMBERS } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
+import { downloadPremiumIdCard } from '../utils/idCardGenerator';
 
 interface AdminPanelProps {
   onRefresh: () => void;
@@ -111,10 +114,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   // Contact & Helpline settings form
   const [helplinePhoneInput, setHelplinePhoneInput] = useState(siteConfig.helplinePhone || '+91 8877490845');
   const [whatsappNumberInput, setWhatsappNumberInput] = useState(siteConfig.whatsappNumber || '+91 8877490845');
-  const [officialEmailInput, setOfficialEmailInput] = useState(siteConfig.officialEmail || 'santosh09patidar@gmail.com');
-  const [telegramLinkInput, setTelegramLinkInput] = useState(siteConfig.telegramLink || 'https://t.me/achieversclub');
-  const [showCallToggle, setShowCallToggle] = useState<boolean>(siteConfig.showHelplineCallButton !== false);
-  const [showWhatsAppToggle, setShowWhatsAppToggle] = useState<boolean>(siteConfig.showHelplineWhatsAppButton !== false);
+  const [officialEmailInput, setOfficialEmailInput] = useState(siteConfig.officialEmail || 'newuserhelpline@gmail.com');
+  const [telegramLinkInput, setTelegramLinkInput] = useState(siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE');
+  const [showCallToggle, setShowCallToggle] = useState<boolean>(Boolean(siteConfig.showCallSupport || siteConfig.showHelplineCallButton));
+  const [showWhatsAppToggle, setShowWhatsAppToggle] = useState<boolean>(siteConfig.showWhatsAppSupport === true);
+  const [showTelegramToggle, setShowTelegramToggle] = useState<boolean>(siteConfig.showTelegramSupport !== false);
+  const [showEmailToggle, setShowEmailToggle] = useState<boolean>(siteConfig.showEmailSupport !== false);
 
   // Address & Legal settings form
   const [officialAddressInput, setOfficialAddressInput] = useState(siteConfig.officialAddress || 'Scheme No. 54, Vijay Nagar, Indore, Madhya Pradesh - 452001');
@@ -258,6 +263,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   const [newPassInput, setNewPassInput] = useState('');
   const [passwordModalMsg, setPasswordModalMsg] = useState('');
   const [passwordModalError, setPasswordModalError] = useState('');
+
+  // Plan Change / Update State for User Inspector (SWIS ↔ TWIS ↔ COMBO)
+  const [planUpdateState, setPlanUpdateState] = useState<{
+    newPlan: PlanType;
+    reason: string;
+    isSaving: boolean;
+    successMsg: string;
+    errorMsg: string;
+  }>({
+    newPlan: 'SWIS',
+    reason: '',
+    isSaving: false,
+    successMsg: '',
+    errorMsg: '',
+  });
+
   // View mode for members: 'full360' (complete details directly visible on every card, zero popup dependency, works flawlessly without desktop mode) vs 'cards' (compact) vs 'table'
   const [memberViewMode, setMemberViewMode] = useState<'full360' | 'cards' | 'table'>('full360');
 
@@ -575,6 +596,66 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
     }, 3500);
   };
 
+  // Admin Plan Change & Update Handler (SWIS ↔ TWIS ↔ COMBO) with Audit Log
+  const handleUpdateMemberPlan = async (memberAccId: string, currentPlan: PlanType) => {
+    if (planUpdateState.newPlan === currentPlan) {
+      setPlanUpdateState((p) => ({ ...p, errorMsg: 'कृपया भिन्न नया प्लान चुनें (यह प्लान पहले से सेट है)' }));
+      return;
+    }
+    setPlanUpdateState((p) => ({ ...p, isSaving: true, errorMsg: '', successMsg: '' }));
+    try {
+      const activeMemberObj = members.find((x) => x.accId.toUpperCase() === memberAccId.toUpperCase());
+      const changes: ProfileFieldChange[] = [
+        {
+          field: 'plan',
+          fieldLabel: 'सिस्टम प्लान परिवर्तन (Admin Plan Update)',
+          oldValue: `${currentPlan} Plan`,
+          newValue: `${planUpdateState.newPlan} Plan${planUpdateState.reason.trim() ? ` (कारण: ${planUpdateState.reason.trim()})` : ''}`,
+        },
+      ];
+
+      const auditLog: ProfileEditAuditLog = {
+        id: `audit-plan-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        accId: memberAccId,
+        memberName: activeMemberObj?.fullName || selectedMemberFor360?.fullName || 'सदस्य',
+        timestamp: new Date().toISOString(),
+        changes: changes,
+      };
+      StorageService.saveAuditLog(auditLog);
+
+      const updates: Partial<Member> = {
+        plan: planUpdateState.newPlan,
+        lastEditedAt: new Date().toISOString(),
+      };
+
+      StorageService.updateMember(memberAccId, updates);
+      await FirestoreService.updateMember(memberAccId, updates);
+
+      // Refresh members list and current modal view
+      setMembers((prev) =>
+        prev.map((m) => (m.accId.toUpperCase() === memberAccId.toUpperCase() ? { ...m, ...updates } : m))
+      );
+      if (selectedMemberFor360 && selectedMemberFor360.accId.toUpperCase() === memberAccId.toUpperCase()) {
+        setSelectedMemberFor360({ ...selectedMemberFor360, ...updates });
+      }
+
+      setPlanUpdateState((p) => ({
+        ...p,
+        isSaving: false,
+        reason: '',
+        successMsg: `✓ प्लान सफलतापूर्वक ${currentPlan} से बदलकर ${planUpdateState.newPlan} कर दिया गया है! एडिट हिस्ट्री में भी सुरक्षित हो गया।`,
+      }));
+      setActionSuccess(`सदस्य ${memberAccId} का प्लान सफलतापूर्वक बदलकर ${planUpdateState.newPlan} किया गया!`);
+      setTimeout(() => {
+        setPlanUpdateState((p) => ({ ...p, successMsg: '' }));
+        setActionSuccess('');
+      }, 4500);
+    } catch (err) {
+      console.warn('Plan update failed:', err);
+      setPlanUpdateState((p) => ({ ...p, isSaving: false, errorMsg: 'प्लान अपडेट करने में तकनीकी त्रुटि आई।' }));
+    }
+  };
+
   const handleApproveWithdrawal = (id: string) => {
     StorageService.approveWithdrawal(id);
     refreshData();
@@ -633,10 +714,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
       officialEmail: officialEmailInput.trim(),
       telegramLink: telegramLinkInput.trim(),
       showHelplineCallButton: showCallToggle,
+      showCallSupport: showCallToggle,
       showHelplineWhatsAppButton: showWhatsAppToggle,
+      showWhatsAppButton: showWhatsAppToggle,
+      showWhatsAppSupport: showWhatsAppToggle,
+      showTelegramSupport: showTelegramToggle,
+      showEmailSupport: showEmailToggle,
     });
     setSiteConfig(updated);
-    setActionSuccess('हेल्पलाइन व संपर्क बटन सेटिंग्स सफलतापूर्वक अपडेट व सुरक्षित हो गईं!');
+    setActionSuccess('हेल्प सेक्शन व सपोर्ट डेस्क सेटिंग्स (ईमेल, टेलीग्राम, व्हाट्सएप) सफलतापूर्वक अपडेट हो गईं!');
     setTimeout(() => setActionSuccess(''), 3000);
   };
 
@@ -1453,22 +1539,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                   {/* All Action Buttons Directly Visible Without Horizontal Scroll or Arrow Keys */}
                   <div className="space-y-1.5 pt-2 border-t border-gray-100">
                     <div className="grid grid-cols-2 gap-1.5">
-                      {/* Primary Big 360 Database Modal Button */}
+                      {/* Primary Big User Details Master Database Modal Button */}
                       <button
                         type="button"
                         onClick={() => {
                           lastFocusedMemberAccId.current = m.accId;
                           setSelectedMemberFor360(m);
+                          setPlanUpdateState({
+                            newPlan: m.plan,
+                            reason: '',
+                            isSaving: false,
+                            successMsg: '',
+                            errorMsg: '',
+                          });
                           setMember360ActiveTab('profile_info');
                         }}
-                        className="py-2 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer"
-                        title="सम्पूर्ण 360° डेटाबेस व एडिट हिस्ट्री पॉपअप खोलें"
+                        className="py-2 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer truncate px-2"
+                        title={`${m.fullName} का सम्पूर्ण मास्टर रिकॉर्ड, प्रोफाइल व प्लान प्रबंधन खोलें`}
                       >
-                        <Activity className="w-3.5 h-3.5 text-purple-200" />
-                        <span>360° पॉपअप</span>
+                        <Activity className="w-3.5 h-3.5 text-purple-200 shrink-0" />
+                        <span className="truncate">{m.fullName} - रिकॉर्ड</span>
                       </button>
 
-                      {/* Instant Inline 360 Toggle Button - Directly on the Card */}
+                      {/* Instant Inline Details Toggle Button - Directly on the Card */}
                       <button
                         type="button"
                         onClick={() => {
@@ -1478,19 +1571,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                             setExpandedMemberInline360((prev) => (prev === m.accId ? null : m.accId));
                           }
                         }}
-                        className={`py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 border transition cursor-pointer ${
+                        className={`py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 border transition cursor-pointer truncate px-2 ${
                           isCardExpanded
                             ? 'bg-purple-900 text-yellow-300 border-purple-900 shadow-inner'
                             : 'bg-purple-50 hover:bg-purple-100 text-purple-900 border-purple-300 shadow-xs'
                         }`}
-                        title="इसी कार्ड में तुरंत सम्पूर्ण 360° विवरण देखें"
+                        title={`इसी कार्ड में तुरंत ${m.fullName} का सम्पूर्ण विवरण देखें`}
                       >
                         <ChevronDown
-                          className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                          className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${
                             isCardExpanded ? 'rotate-180 text-yellow-300' : 'text-purple-700'
                           }`}
                         />
-                        <span>{isCardExpanded ? '360° संक्षिप्त करें' : '360° विवरण देखें'}</span>
+                        <span className="truncate">{isCardExpanded ? 'संक्षिप्त करें' : `${m.fullName} - विवरण`}</span>
                       </button>
                     </div>
 
@@ -1983,18 +2076,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                           </button>
                         )}
 
-                        {/* 360 Degree Complete User Database & History Inspector */}
+                        {/* Complete User Master Records & Plan Inspector */}
                         <button
                           onClick={() => {
                             lastFocusedMemberAccId.current = m.accId;
                             setSelectedMemberFor360(m);
+                            setPlanUpdateState({
+                              newPlan: m.plan,
+                              reason: '',
+                              isSaving: false,
+                              successMsg: '',
+                              errorMsg: '',
+                            });
                             setMember360ActiveTab('profile_info');
                           }}
-                          className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-[11px] font-bold flex items-center gap-1 shadow-xs transition cursor-pointer"
-                          title="इस सदस्य का सम्पूर्ण 360° डेटाबेस व एडिट हिस्ट्री पॉपअप खोलें"
+                          className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-[11px] font-bold flex items-center gap-1 shadow-xs transition cursor-pointer whitespace-nowrap"
+                          title={`${m.fullName} का सम्पूर्ण मास्टर रिकॉर्ड व प्रोफाइल प्रबंधन खोलें`}
                         >
                           <Activity className="w-3 h-3 text-purple-200" />
-                          <span>360° डेटाबेस</span>
+                          <span>{m.fullName} - रिकॉर्ड</span>
                         </button>
 
                         {/* Inline Expand Toggle for Table */}
@@ -2929,38 +3029,69 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
       {/* Grid: Helpline Contacts & Address System */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* SECTION 1: HELPLINE & CONTACT BUTTONS */}
-        <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4 shadow-sm">
           <div className="border-b border-gray-100 pb-3">
-            <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase font-black bg-blue-100 text-[#2874f0] px-2 py-0.5 rounded border border-blue-200">
+                HELP SECTION CONTROLS
+              </span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${showWhatsAppToggle ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'}`}>
+                {showWhatsAppToggle ? '🟢 WhatsApp एक्टिव' : '⚪ WhatsApp ऑफ (डिफ़ॉल्ट)'}
+              </span>
+            </div>
+            <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2 mt-1">
               <Phone className="w-4 h-4 text-emerald-600" />
-              <span>📞 हेल्पलाइन व संपर्क बटन कंट्रोल (Helpline & Contacts)</span>
+              <span>📞 हेल्प सेक्शन एवं सपोर्ट डेस्क नियंत्रण केंद्र</span>
             </h4>
-            <p className="text-xs text-slate-500">
-              वेबसाइट व मोबाइल मोड में दिखने वाले आधिकारिक संपर्क विवरण एवं फ्लोटिंग बटन
+            <p className="text-xs text-slate-500 mt-0.5">
+              यहाँ से आप सहायता सेक्शन, फुटर और हेडर के सभी सपोर्ट माध्यमों (Email, Telegram, WhatsApp) को सीधे नियंत्रित कर सकते हैं।
             </p>
           </div>
 
           <form onSubmit={handleSaveContactSettings} className="space-y-3.5">
+            {/* Primary Channel 1: Support Email */}
             <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1">
-                हेल्पलाइन कॉलिंग नंबर (Phone Number):
+              <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center justify-between">
+                <span>आधिकारिक सपोर्ट ईमेल (Official Email ID):</span>
+                <span className="text-[10px] text-blue-600 font-normal">प्राथमिक सपोर्ट माध्यम</span>
               </label>
               <div className="relative">
-                <Phone className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
+                <Mail className="w-3.5 h-3.5 absolute left-3 top-3 text-blue-600" />
                 <input
-                  type="text"
-                  value={helplinePhoneInput}
-                  onChange={(e) => setHelplinePhoneInput(e.target.value)}
-                  placeholder="+91 8877490845"
-                  className="w-full bg-white border border-gray-300 rounded-sm pl-8 pr-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0] font-mono-acc font-bold"
+                  type="email"
+                  value={officialEmailInput}
+                  onChange={(e) => setOfficialEmailInput(e.target.value)}
+                  placeholder="newuserhelpline@gmail.com"
+                  className="w-full bg-white border border-gray-300 rounded-xl pl-8 pr-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0] font-mono-acc font-bold"
                   required
                 />
               </div>
             </div>
 
+            {/* Primary Channel 2: Telegram Link */}
             <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1">
-                व्हाट्सएप सपोर्ट नंबर (WhatsApp Number):
+              <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center justify-between">
+                <span>टेलीग्राम हेल्पडेस्क लिंक (Telegram Helpdesk Link):</span>
+                <span className="text-[10px] text-sky-600 font-normal">प्राथमिक सपोर्ट माध्यम</span>
+              </label>
+              <div className="relative">
+                <Send className="w-3.5 h-3.5 absolute left-3 top-3 text-sky-500" />
+                <input
+                  type="text"
+                  value={telegramLinkInput}
+                  onChange={(e) => setTelegramLinkInput(e.target.value)}
+                  placeholder="https://t.me/NEWUSERHELPLINE"
+                  className="w-full bg-white border border-gray-300 rounded-xl pl-8 pr-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0] font-mono-acc font-bold"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* WhatsApp Number (Optional / Controlled) */}
+            <div>
+              <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center justify-between">
+                <span>व्हाट्सएप सपोर्ट नंबर (WhatsApp Number):</span>
+                <span className="text-[10px] text-emerald-700 font-normal">टॉगल ऑन होने पर ही दिखेगा</span>
               </label>
               <div className="relative">
                 <MessageCircle className="w-3.5 h-3.5 absolute left-3 top-3 text-emerald-600" />
@@ -2969,59 +3100,49 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                   value={whatsappNumberInput}
                   onChange={(e) => setWhatsappNumberInput(e.target.value)}
                   placeholder="+91 8877490845"
-                  className="w-full bg-white border border-gray-300 rounded-sm pl-8 pr-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0] font-mono-acc font-bold"
-                  required
+                  className="w-full bg-white border border-gray-300 rounded-xl pl-8 pr-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0] font-mono-acc font-bold"
                 />
               </div>
             </div>
 
+            {/* Helpline Calling Phone */}
             <div>
               <label className="block text-xs font-bold text-slate-800 mb-1">
-                आधिकारिक सपोर्ट ईमेल (Official Email ID):
+                हेल्पलाइन कॉलिंग नंबर (Helpline Phone):
               </label>
               <div className="relative">
-                <Mail className="w-3.5 h-3.5 absolute left-3 top-3 text-blue-600" />
-                <input
-                  type="email"
-                  value={officialEmailInput}
-                  onChange={(e) => setOfficialEmailInput(e.target.value)}
-                  placeholder="santosh09patidar@gmail.com"
-                  className="w-full bg-white border border-gray-300 rounded-sm pl-8 pr-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0]"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1">
-                टेलीग्राम ग्रुप / चैनल लिंक (Telegram Link):
-              </label>
-              <div className="relative">
-                <Send className="w-3.5 h-3.5 absolute left-3 top-3 text-sky-500" />
+                <Phone className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
                 <input
                   type="text"
-                  value={telegramLinkInput}
-                  onChange={(e) => setTelegramLinkInput(e.target.value)}
-                  placeholder="https://t.me/achieversclub"
-                  className="w-full bg-white border border-gray-300 rounded-sm pl-8 pr-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0] font-mono-acc"
+                  value={helplinePhoneInput}
+                  onChange={(e) => setHelplinePhoneInput(e.target.value)}
+                  placeholder="+91 8877490845"
+                  className="w-full bg-white border border-gray-300 rounded-xl pl-8 pr-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0] font-mono-acc font-bold"
                 />
               </div>
             </div>
 
-            {/* Toggles */}
-            <div className="bg-[#f1f2f4] p-3 rounded-lg border border-gray-200 space-y-2 text-xs">
-              <label className="flex items-center justify-between cursor-pointer">
-                <span className="font-semibold text-slate-800">कॉलिंग हेल्पलाइन बटन सक्रिय रखें (Show Call Button)</span>
-                <input
-                  type="checkbox"
-                  checked={showCallToggle}
-                  onChange={(e) => setShowCallToggle(e.target.checked)}
-                  className="w-4 h-4 text-[#2874f0] rounded"
-                />
-              </label>
+            {/* Dynamic Helpdesk Toggles Box */}
+            <div className="bg-[#f1f2f4] p-3.5 rounded-xl border border-gray-200 space-y-2.5 text-xs">
+              <span className="font-black text-slate-900 block text-[11px] uppercase tracking-wider">
+                सपोर्ट डिस्प्ले टॉगल (Show / Hide Buttons):
+              </span>
 
-              <label className="flex items-center justify-between cursor-pointer">
-                <span className="font-semibold text-slate-800">व्हाट्सएप फ्लोटिंग सपोर्ट सक्रिय रखें (Show WhatsApp Float)</span>
+              {/* WHATSAPP TOGGLE - User requested explicit control */}
+              <label className="flex items-center justify-between cursor-pointer p-2 rounded-lg bg-white border border-emerald-200 hover:bg-emerald-50/50 transition">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-md bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                    <MessageCircle className="w-3 h-3" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-900 block leading-tight">
+                      व्हाट्सएप सपोर्ट बटन ऑन रखें (Show WhatsApp Button)
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      चेक करने पर ही वेबसाइट व हेल्प सेक्शन में WhatsApp बटन दिखाई देगा
+                    </span>
+                  </div>
+                </div>
                 <input
                   type="checkbox"
                   checked={showWhatsAppToggle}
@@ -3029,14 +3150,84 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                   className="w-4 h-4 text-emerald-600 rounded"
                 />
               </label>
+
+              {/* TELEGRAM TOGGLE */}
+              <label className="flex items-center justify-between cursor-pointer p-2 rounded-lg bg-white border border-sky-200 hover:bg-sky-50/50 transition">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-md bg-[#229ED9] text-white flex items-center justify-center shrink-0">
+                    <Send className="w-3 h-3" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-900 block leading-tight">
+                      टेलीग्राम सपोर्ट सक्रिय रखें (Show Telegram Support)
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      हेल्प सेक्शन व बार पर Telegram (@NEWUSERHELPLINE) बटन दिखाएं
+                    </span>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={showTelegramToggle}
+                  onChange={(e) => setShowTelegramToggle(e.target.checked)}
+                  className="w-4 h-4 text-sky-600 rounded"
+                />
+              </label>
+
+              {/* EMAIL TOGGLE */}
+              <label className="flex items-center justify-between cursor-pointer p-2 rounded-lg bg-white border border-blue-200 hover:bg-blue-50/50 transition">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-md bg-blue-600 text-white flex items-center justify-center shrink-0">
+                    <Mail className="w-3 h-3" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-900 block leading-tight">
+                      ईमेल सपोर्ट सक्रिय रखें (Show Email Support)
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      newuserhelpline@gmail.com सहायता केंद्र पर हमेशा सक्रिय रहता है
+                    </span>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={showEmailToggle}
+                  onChange={(e) => setShowEmailToggle(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 rounded"
+                />
+              </label>
+
+              {/* CALLING TOGGLE */}
+              <label className="flex items-center justify-between cursor-pointer p-2 rounded-lg bg-white border border-gray-200 hover:bg-slate-50 transition">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-md bg-slate-700 text-white flex items-center justify-center shrink-0">
+                    <Phone className="w-3 h-3" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-900 block leading-tight">
+                      कॉलिंग हेल्पलाइन बटन सक्रिय रखें (Show Calling Button)
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      डायरेक्ट फोन कॉल हेल्पलाइन विकल्प
+                    </span>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={showCallToggle}
+                  onChange={(e) => setShowCallToggle(e.target.checked)}
+                  className="w-4 h-4 text-[#2874f0] rounded"
+                />
+              </label>
             </div>
 
+            {/* 3D Tactile Save Button */}
             <button
               type="submit"
-              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-sm shadow-sm flex items-center justify-center gap-1.5 transition"
+              className="w-full py-3 bg-gradient-to-b from-[#2874f0] to-[#1258c7] hover:from-[#1e63d8] hover:to-[#0f4bb0] text-white font-black text-xs rounded-xl shadow-[0_3px_8px_rgba(40,116,240,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)] active:translate-y-0.5 flex items-center justify-center gap-2 transition cursor-pointer"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>हेल्पलाइन व संपर्क सेटिंग्स सुरक्षित करें</span>
+              <span>सपोर्ट सेटिंग्स सुरक्षित करें (Save Help Controls)</span>
             </button>
           </form>
         </div>
@@ -3334,6 +3525,32 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
             <PlusCircle className="w-4 h-4" />
             <span>➕ नई सर्विस जोड़ें (Add New Service)</span>
           </button>
+        </div>
+
+        {/* Clear Step-by-Step Service Help Guide */}
+        <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3.5 text-xs text-slate-700 space-y-2">
+          <div className="flex items-center gap-2 text-emerald-900 font-bold">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>सर्विस प्रबंधन गाइड (How to Add, Edit & Remove Services Easily):</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-[11px]">
+            <div className="bg-white p-2.5 rounded-lg border border-emerald-200">
+              <strong className="text-emerald-800 block">1. ➕ नई सर्विस जोड़ें:</strong>
+              <span className="text-slate-600">ऊपर 'नई सर्विस जोड़ें' पर क्लिक करें। शीर्षक, श्रेणी और कमीशन दर्ज करें।</span>
+            </div>
+            <div className="bg-white p-2.5 rounded-lg border border-emerald-200">
+              <strong className="text-blue-800 block">2. ✏️ सर्विस संपादित करें:</strong>
+              <span className="text-slate-600">कार्ड पर पेंसिल (Edit) आइकन दबाकर विवरण, कमीशन या बटन तुरंत बदलें।</span>
+            </div>
+            <div className="bg-white p-2.5 rounded-lg border border-emerald-200">
+              <strong className="text-purple-800 block">3. 🔄 ऑन/ऑफ टॉगल:</strong>
+              <span className="text-slate-600">सर्विस को बिना हटाए अस्थायी रूप से छुपाने के लिए 'सक्रिय/निष्क्रिय' बटन दबाएं।</span>
+            </div>
+            <div className="bg-white p-2.5 rounded-lg border border-emerald-200">
+              <strong className="text-red-800 block">4. 🗑️ सर्विस हटाएं:</strong>
+              <span className="text-slate-600">लाल डस्टबिन आइकन दबाकर किसी भी अनावश्यक सर्विस को पूरी तरह डिलीट करें।</span>
+            </div>
+          </div>
         </div>
 
         {siteConfig.services.length === 0 ? (
@@ -5767,6 +5984,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                           <strong className="text-yellow-300">{activeM.utrNumber || 'N/A'}</strong>
                           <Copy className="w-3 h-3 text-purple-200" />
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => downloadPremiumIdCard(activeM)}
+                          className="bg-amber-500/25 hover:bg-amber-500/40 text-amber-300 border border-amber-400/40 px-2.5 py-1 rounded font-bold cursor-pointer flex items-center gap-1 shadow-xs"
+                          title="सदस्य का डिजिटल ID कार्ड (HD PNG) डाउनलोड करें"
+                        >
+                          <Download className="w-3 h-3 text-amber-300" />
+                          <span>ID कार्ड डाउनलोड</span>
+                        </button>
                         <span className="bg-emerald-500/25 text-emerald-300 border border-emerald-400/40 px-2.5 py-1 rounded font-bold font-mono-acc">
                           वॉलेट: ₹{(activeM.walletBalance || 0).toFixed(2)}
                         </span>
@@ -5799,6 +6025,129 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                           ₹{(activeM.totalEarnings || 0).toFixed(2)}
                         </strong>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* PLAN CHANGE & UPGRADE HUB - DEDICATED SECTION */}
+                  <div className="bg-gradient-to-r from-amber-50 via-yellow-50 to-orange-50 border-2 border-amber-300 rounded-xl p-4 sm:p-5 shadow-xs space-y-3">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-amber-200 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center font-bold shadow-xs">
+                          <Zap className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs sm:text-sm font-black text-amber-950 flex items-center gap-2">
+                            <span>{activeM.fullName} का प्लान प्रबंधन व अपग्रेड (Plan Change & Upgrade Hub)</span>
+                          </h4>
+                          <p className="text-[11px] text-amber-800">
+                            यहाँ से एडमिन छात्र का प्लान बदल सकता है (SWIS ↔ TWIS ↔ COMBO)। प्रत्येक बदलाव एडिट हिस्ट्री व ऑडिट लॉग में सुरक्षित दर्ज होगा।
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-[10px] text-slate-600 font-bold">वर्तमान प्लान:</span>
+                        <span className="font-mono-acc font-black text-xs bg-amber-600 text-white px-2.5 py-0.5 rounded shadow-xs">
+                          {activeM.plan} PLAN
+                        </span>
+                      </div>
+                    </div>
+
+                    {planUpdateState.successMsg && (
+                      <div className="p-3 bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs font-bold rounded-lg flex items-center gap-2 animate-fadeIn">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+                        <span>{planUpdateState.successMsg}</span>
+                      </div>
+                    )}
+
+                    {planUpdateState.errorMsg && (
+                      <div className="p-3 bg-red-100 border border-red-300 text-red-900 text-xs font-bold rounded-lg flex items-center gap-2 animate-shake">
+                        <AlertCircle className="w-4 h-4 text-red-700 shrink-0" />
+                        <span>{planUpdateState.errorMsg}</span>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                      {[
+                        {
+                          id: 'SWIS' as PlanType,
+                          name: 'SWIS (सेल्फ वर्क प्लान)',
+                          desc: 'सभी मोबाइल रिचार्ज पर 3.30% फिक्स्ड कमीशन',
+                          badge: '3.30% Recharge Commission',
+                        },
+                        {
+                          id: 'TWIS' as PlanType,
+                          name: 'TWIS (टीम वर्क प्लान)',
+                          desc: 'प्रति छात्र ₹150 डायरेक्ट रेफरल इनकम',
+                          badge: '₹150 Referral Bonus',
+                        },
+                        {
+                          id: 'COMBO' as PlanType,
+                          name: 'COMBO (ऑल-इन-वन)',
+                          desc: '3.30% रिचार्ज कमीशन + ₹150 रेफरल बोनस दोनों लाभ',
+                          badge: 'Full Dual Benefits',
+                        },
+                      ].map((p) => {
+                        const isSelected = planUpdateState.newPlan === p.id;
+                        const isCurrent = activeM.plan === p.id;
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => setPlanUpdateState((prev) => ({ ...prev, newPlan: p.id, errorMsg: '' }))}
+                            className={`p-3 rounded-xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
+                              isSelected
+                                ? 'border-[#2874f0] bg-white ring-2 ring-[#2874f0]/30 shadow-sm'
+                                : 'border-amber-200 bg-white/70 hover:bg-white'
+                            }`}
+                          >
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <strong className="text-xs font-bold text-slate-900">{p.name}</strong>
+                                {isCurrent && (
+                                  <span className="text-[9px] bg-slate-900 text-white px-1.5 py-0.2 rounded font-bold">
+                                    सक्रिय (Current)
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-600 leading-snug">{p.desc}</p>
+                            </div>
+                            <div className="mt-2 pt-1 border-t border-gray-100 flex items-center justify-between text-[10px]">
+                              <span className="font-bold text-[#2874f0] font-mono-acc">{p.badge}</span>
+                              <span className={isSelected ? 'text-[#2874f0] font-bold' : 'text-slate-400'}>
+                                {isSelected ? '✓ चयनित' : 'चुनें'}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-center gap-2 pt-2">
+                      <div className="w-full sm:flex-1">
+                        <input
+                          type="text"
+                          value={planUpdateState.reason}
+                          onChange={(e) => setPlanUpdateState((prev) => ({ ...prev, reason: e.target.value }))}
+                          placeholder="प्लान बदलने का संदर्भ / कारण (उदा. छात्र की मांग पर TWIS से SWIS किया गया)"
+                          className="w-full bg-white border border-amber-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0]"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={planUpdateState.isSaving || planUpdateState.newPlan === activeM.plan}
+                        onClick={() => handleUpdateMemberPlan(activeM.accId, activeM.plan)}
+                        className="w-full sm:w-auto px-5 py-2.5 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold text-xs rounded-lg shadow-sm flex items-center justify-center gap-1.5 transition disabled:opacity-50 cursor-pointer shrink-0"
+                      >
+                        {planUpdateState.isSaving ? (
+                          <span>सहेज रहे हैं...</span>
+                        ) : (
+                          <>
+                            <Save className="w-3.5 h-3.5" />
+                            <span>💾 {activeM.fullName} का प्लान अपडेट करें</span>
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
 
@@ -5873,6 +6222,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                               <MessageCircle className="w-3 h-3" />
                             </a>
                           </div>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-500">टेलीग्राम (Telegram):</span>
+                          {activeM.telegram ? (
+                            <a
+                              href={activeM.telegram.startsWith('http') ? activeM.telegram : `https://t.me/${activeM.telegram.replace('@', '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sky-600 hover:underline flex items-center gap-1 font-mono-acc font-bold truncate max-w-[180px]"
+                            >
+                              <Send className="w-3 h-3 text-sky-500 shrink-0" />
+                              <span className="truncate">{activeM.telegram}</span>
+                            </a>
+                          ) : (
+                            <span className="text-slate-400 italic">दर्ज नहीं (वैकल्पिक)</span>
+                          )}
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-slate-500">ईमेल आईडी:</span>

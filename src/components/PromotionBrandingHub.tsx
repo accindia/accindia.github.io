@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Share2,
   Download,
@@ -30,6 +31,8 @@ import {
   TrendingUp,
   Image as ImageIcon,
   Sliders,
+  X,
+  Maximize2,
 } from 'lucide-react';
 import { Member } from '../types';
 import { StorageService } from '../services/storage';
@@ -97,6 +100,8 @@ export const PromotionBrandingHub: React.FC<PromotionBrandingHubProps> = ({
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [showVisitingCardModal, setShowVisitingCardModal] = useState(false);
+  const [showPosterModal, setShowPosterModal] = useState(false);
 
   // Canvas Refs for Rendering
   const cardCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -899,9 +904,24 @@ export const PromotionBrandingHub: React.FC<PromotionBrandingHubProps> = ({
               </div>
 
               {/* CARD PREVIEW CONTAINER */}
-              <div className="p-3 sm:p-5 bg-slate-200/60 rounded-2xl border border-gray-300 flex items-center justify-center">
+              <div className="p-2 sm:p-5 bg-slate-200/60 rounded-2xl border border-gray-300 flex flex-col items-center justify-center gap-2">
+                <div className="w-full max-w-[620px] flex items-center justify-between text-[11px] text-slate-600 px-1">
+                  <span className="flex items-center gap-1 font-semibold text-[#2874f0]">
+                    <Maximize2 className="w-3.5 h-3.5" />
+                    <span>विजिटिंग कार्ड पर क्लिक करें: <strong>फुल-स्क्रीन पॉप-अप विंडो</strong></span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowVisitingCardModal(true)}
+                    className="text-[10px] bg-[#2874f0] text-white px-2 py-0.5 rounded font-bold hover:bg-blue-700 transition cursor-pointer"
+                  >
+                    पॉप-अप में बड़ा देखें ↗
+                  </button>
+                </div>
+
                 <div
-                  className={`w-full max-w-[620px] aspect-[1.75/1] rounded-2xl p-4 sm:p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between text-white transition-all ${
+                  onClick={() => setShowVisitingCardModal(true)}
+                  className={`w-full max-w-[620px] min-h-[290px] sm:min-h-0 sm:aspect-[1.75/1] rounded-2xl p-4 sm:p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between text-white transition-all cursor-pointer group hover:scale-[1.01] ${
                     cardTheme === 'airtel_mitra'
                       ? 'bg-gradient-to-br from-[#1a4bb0] via-[#2874f0] to-[#0c2d7a] border-2 border-blue-300/40'
                       : cardTheme === 'spice_money_gold'
@@ -910,6 +930,7 @@ export const PromotionBrandingHub: React.FC<PromotionBrandingHubProps> = ({
                       ? 'bg-gradient-to-br from-[#0057b8] via-[#00479e] to-[#002f6c] border-2 border-blue-400/50'
                       : 'bg-gradient-to-br from-[#064e3b] via-[#047857] to-[#022c22] border-2 border-emerald-400/40'
                   }`}
+                  title="विजिटिंग कार्ड को पॉप-अप में बड़ा देखने हेतु क्लिक करें"
                 >
                   {/* Top Header Row */}
                   <div className="flex items-center justify-between border-b border-white/20 pb-2.5">
@@ -929,7 +950,7 @@ export const PromotionBrandingHub: React.FC<PromotionBrandingHubProps> = ({
                       </div>
                     </div>
 
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                       <span className="text-[9px] sm:text-[10px] bg-white/20 px-2 py-0.5 rounded font-bold uppercase tracking-wider block">
                         ISO 9001:2015 ✓
                       </span>
@@ -937,14 +958,14 @@ export const PromotionBrandingHub: React.FC<PromotionBrandingHubProps> = ({
                   </div>
 
                   {/* Middle Content: Partner Details & Live QR */}
-                  <div className="grid grid-cols-12 gap-3 items-center my-auto py-1">
-                    {/* Left details (8 cols) */}
-                    <div className="col-span-8 space-y-1.5 min-w-0">
+                  <div className="grid grid-cols-12 gap-2 sm:gap-3 items-center my-auto py-1">
+                    {/* Left details (7 cols on mobile, 8 cols on desktop) */}
+                    <div className="col-span-7 sm:col-span-8 space-y-1.5 min-w-0">
                       <div>
-                        <h4 className="font-black text-lg sm:text-2xl text-white tracking-tight truncate drop-shadow-xs">
+                        <h4 className="font-black text-base sm:text-2xl text-white tracking-tight truncate drop-shadow-xs">
                           {partnerName}
                         </h4>
-                        <p className={`text-[11px] sm:text-xs font-semibold truncate ${
+                        <p className={`text-[10px] sm:text-xs font-semibold truncate ${
                           cardTheme === 'spice_money_gold' ? 'text-amber-300' : 'text-blue-200'
                         }`}>
                           {shopName} • अधिकृत डिस्ट्रीब्यूटर
@@ -952,13 +973,13 @@ export const PromotionBrandingHub: React.FC<PromotionBrandingHubProps> = ({
                       </div>
 
                       {/* Sponsor ID Badge */}
-                      <div className="inline-flex items-center gap-1.5 bg-black/40 px-2.5 py-1 rounded border border-white/30 text-white font-mono font-bold text-xs">
-                        <span className="text-[10px] text-yellow-300">AGENT 🆔:</span>
+                      <div className="inline-flex items-center gap-1.5 bg-black/40 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded border border-white/30 text-white font-mono font-bold text-[10px] sm:text-xs">
+                        <span className="text-[9px] sm:text-[10px] text-yellow-300">AGENT 🆔:</span>
                         <span className="tracking-wider">{cleanSponsorId}</span>
                       </div>
 
                       {/* Contacts list */}
-                      <div className="space-y-0.5 text-[10px] sm:text-[11px] text-slate-100 font-medium pt-1">
+                      <div className="space-y-0.5 text-[9.5px] sm:text-[11px] text-slate-100 font-medium pt-0.5">
                         <p className="flex items-center gap-1.5 truncate">
                           <Phone className="w-3 h-3 text-[#ffe500] shrink-0" />
                           <span>+91 {partnerMobile}</span>
@@ -974,24 +995,24 @@ export const PromotionBrandingHub: React.FC<PromotionBrandingHubProps> = ({
                       </div>
                     </div>
 
-                    {/* Right side: Live Dynamic QR code (4 cols) */}
-                    <div className="col-span-4 flex flex-col items-center justify-center text-center">
-                      <div className="bg-white p-1.5 rounded-xl shadow-lg border border-white/60">
+                    {/* Right side: Live Dynamic QR code */}
+                    <div className="col-span-5 sm:col-span-4 flex flex-col items-center justify-center text-center">
+                      <div className="bg-white p-1 rounded-xl shadow-lg border border-white/60">
                         <img
                           src={qrCodeImageUrl}
                           alt="Referral QR"
-                          className="w-20 h-20 sm:w-28 sm:h-28 object-contain"
+                          className="w-16 h-16 sm:w-24 sm:h-24 object-contain"
                         />
                       </div>
-                      <span className="text-[9px] sm:text-[10px] font-bold text-white mt-1 leading-tight block">
+                      <span className="text-[8.5px] sm:text-[10px] font-bold text-white mt-1 leading-tight block">
                         स्कैन करके सीधे जॉइन करें
                       </span>
                     </div>
                   </div>
 
                   {/* Bottom Footer Row */}
-                  <div className="border-t border-white/20 pt-1.5 flex items-center justify-between text-[9px] sm:text-[10px] text-blue-100 font-semibold">
-                    <span>⚡ SWIS 3.30% रिचार्ज • 👥 TWIS ₹150 रेफरल</span>
+                  <div className="border-t border-white/20 pt-1.5 flex items-center justify-between text-[8.5px] sm:text-[10px] text-blue-100 font-semibold">
+                    <span>⚡ SWIS 3.30% • 👥 TWIS ₹150</span>
                     <span className="font-mono text-white">WWW.ACHIEVERSCLUB.IN</span>
                   </div>
                 </div>
@@ -1005,21 +1026,173 @@ export const PromotionBrandingHub: React.FC<PromotionBrandingHubProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <button
+                    type="button"
+                    onClick={() => setShowVisitingCardModal(true)}
+                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-[#2874f0] font-bold rounded-lg border border-blue-200 flex items-center gap-1 transition cursor-pointer"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                    <span>बड़ा प्रिव्यू</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={handlePrint}
-                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg border border-gray-300 flex items-center gap-1 transition"
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg border border-gray-300 flex items-center gap-1 transition cursor-pointer"
                   >
                     <Printer className="w-3.5 h-3.5" />
                     <span>प्रिंट करें</span>
                   </button>
                   <button
+                    type="button"
                     onClick={handleDownloadCardImage}
-                    className="px-4 py-1.5 bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold rounded-lg shadow-sm flex items-center gap-1 transition"
+                    disabled={isDownloading}
+                    className="px-4 py-1.5 bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold rounded-lg shadow-sm flex items-center gap-1 transition disabled:opacity-50 cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />
-                    <span>डाउनलोड (PNG)</span>
+                    <span>{isDownloading ? 'तैयार हो रहा है...' : 'डाउनलोड (PNG)'}</span>
                   </button>
                 </div>
               </div>
+
+              {/* VISITING CARD POP-UP MODAL */}
+              {showVisitingCardModal && typeof document !== 'undefined' && createPortal(
+                <div className="fixed inset-0 z-[9999] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn">
+                  <div className="relative max-w-2xl w-full bg-slate-900 border-2 border-blue-400/60 rounded-2xl shadow-[0_0_60px_rgba(0,0,0,0.9)] overflow-hidden text-slate-100 flex flex-col my-auto max-h-[95vh]">
+                    <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 p-4 border-b border-blue-400/40 flex items-center justify-between gap-3 shrink-0">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-400 text-blue-400 flex items-center justify-center font-bold shrink-0">
+                          <CreditCard className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-sm sm:text-base text-white truncate">
+                            {partnerName} — अधिकृत विजिटिंग कार्ड (HD Full View)
+                          </h3>
+                          <p className="text-[11px] text-slate-400 font-mono truncate">
+                            AGENT 🆔: {cleanSponsorId} • {shopName}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowVisitingCardModal(false)}
+                        className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition cursor-pointer"
+                        title="बंद करें"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    <div className="p-4 sm:p-6 overflow-y-auto flex items-center justify-center bg-slate-950/80">
+                      <div
+                        className={`w-full max-w-[620px] aspect-[1.75/1] rounded-2xl p-4 sm:p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between text-white ${
+                          cardTheme === 'airtel_mitra'
+                            ? 'bg-gradient-to-br from-[#1a4bb0] via-[#2874f0] to-[#0c2d7a] border-2 border-blue-300/40'
+                            : cardTheme === 'spice_money_gold'
+                            ? 'bg-gradient-to-br from-[#0c111d] via-[#151c2e] to-[#080c14] border-4 border-[#d4af37] shadow-amber-900/20'
+                            : cardTheme === 'jio_pos_blue'
+                            ? 'bg-gradient-to-br from-[#0057b8] via-[#00479e] to-[#002f6c] border-2 border-blue-400/50'
+                            : 'bg-gradient-to-br from-[#064e3b] via-[#047857] to-[#022c22] border-2 border-emerald-400/40'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between border-b border-white/20 pb-2.5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-lg bg-[#ffe500] text-[#2874f0] flex items-center justify-center font-black text-xs">
+                              ACC
+                            </div>
+                            <div>
+                              <span className="font-black text-sm tracking-tight text-white block">
+                                ACHIEVERS CLUB COMMUNITY
+                              </span>
+                              <span className={`text-[10px] font-bold block ${
+                                cardTheme === 'spice_money_gold' ? 'text-[#d4af37]' : 'text-[#ffe500]'
+                              }`}>
+                                ★ OFFICIAL BUSINESS ASSOCIATE PARTNER ★
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded font-bold uppercase">
+                            ISO 9001:2015 ✓
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-12 gap-3 items-center my-auto py-2">
+                          <div className="col-span-8 space-y-2 min-w-0">
+                            <div>
+                              <h4 className="font-black text-xl sm:text-2xl text-white tracking-tight truncate">
+                                {partnerName}
+                              </h4>
+                              <p className={`text-xs font-semibold truncate ${
+                                cardTheme === 'spice_money_gold' ? 'text-amber-300' : 'text-blue-200'
+                              }`}>
+                                {shopName} • अधिकृत डिस्ट्रीब्यूटर
+                              </p>
+                            </div>
+                            <div className="inline-flex items-center gap-1.5 bg-black/40 px-2.5 py-1 rounded border border-white/30 text-white font-mono font-bold text-xs">
+                              <span className="text-yellow-300">AGENT 🆔:</span>
+                              <span className="tracking-wider">{cleanSponsorId}</span>
+                            </div>
+                            <div className="space-y-1 text-xs text-slate-100 font-medium">
+                              <p className="flex items-center gap-1.5">
+                                <Phone className="w-3.5 h-3.5 text-[#ffe500]" />
+                                <span>+91 {partnerMobile}</span>
+                              </p>
+                              <p className="flex items-center gap-1.5">
+                                <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
+                                <span>WhatsApp: +91 {partnerWhatsapp}</span>
+                              </p>
+                              <p className="flex items-center gap-1.5">
+                                <MapPin className="w-3.5 h-3.5 text-rose-300" />
+                                <span>{partnerCity}</span>
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="col-span-4 flex flex-col items-center justify-center text-center">
+                            <div className="bg-white p-2 rounded-xl shadow-lg border border-white/60">
+                              <img
+                                src={qrCodeImageUrl}
+                                alt="Referral QR"
+                                className="w-24 h-24 sm:w-28 sm:h-28 object-contain"
+                              />
+                            </div>
+                            <span className="text-[10px] font-bold text-white mt-1 leading-tight block">
+                              स्कैन करके सीधे जॉइन करें
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="border-t border-white/20 pt-2 flex items-center justify-between text-xs text-blue-100 font-semibold">
+                          <span>⚡ SWIS 3.30% रिचार्ज • 👥 TWIS ₹150 रेफरल</span>
+                          <span className="font-mono text-white">WWW.ACHIEVERSCLUB.IN</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-950 p-3 sm:p-4 border-t border-slate-800 flex items-center justify-between gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleShareToWhatsapp()}
+                        className="px-3.5 py-2 bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs rounded-lg shadow-sm flex items-center gap-1.5 transition cursor-pointer"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        <span>WhatsApp शेयर</span>
+                      </button>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleDownloadCardImage}
+                          disabled={isDownloading}
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer"
+                        >
+                          <Download className="w-4 h-4" />
+                          <span>{isDownloading ? 'तैयार हो रहा है...' : 'HD विजिटिंग कार्ड डाउनलोड'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>,
+                document.body
+              )}
             </div>
           )}
 
@@ -1057,9 +1230,24 @@ export const PromotionBrandingHub: React.FC<PromotionBrandingHubProps> = ({
               </div>
 
               {/* POSTER PREVIEW CARD */}
-              <div className="p-4 sm:p-6 bg-slate-200/60 rounded-2xl border border-gray-300 flex items-center justify-center">
+              <div className="p-2 sm:p-6 bg-slate-200/60 rounded-2xl border border-gray-300 flex flex-col items-center justify-center gap-2">
+                <div className="w-full max-w-[560px] flex items-center justify-between text-[11px] text-slate-600 px-1">
+                  <span className="flex items-center gap-1 font-semibold text-orange-600">
+                    <Maximize2 className="w-3.5 h-3.5" />
+                    <span>पोस्टर पर क्लिक करें: <strong>फुल-स्क्रीन पॉप-अप विंडो</strong></span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowPosterModal(true)}
+                    className="text-[10px] bg-orange-600 text-white px-2 py-0.5 rounded font-bold hover:bg-orange-700 transition cursor-pointer"
+                  >
+                    पॉप-अप में बड़ा देखें ↗
+                  </button>
+                </div>
+
                 <div
-                  className={`w-full max-w-[560px] rounded-2xl p-5 sm:p-7 shadow-2xl relative overflow-hidden flex flex-col justify-between text-white border-4 border-yellow-400 ${
+                  onClick={() => setShowPosterModal(true)}
+                  className={`w-full max-w-[560px] rounded-2xl p-4 sm:p-7 shadow-2xl relative overflow-hidden flex flex-col justify-between text-white border-4 border-yellow-400 cursor-pointer group hover:scale-[1.01] transition-transform ${
                     activePosterType === 'recharge_shop'
                       ? 'bg-gradient-to-b from-[#0a2540] via-[#1c52b8] to-[#0b1d3a]'
                       : activePosterType === 'student_earn'
@@ -1068,31 +1256,32 @@ export const PromotionBrandingHub: React.FC<PromotionBrandingHubProps> = ({
                       ? 'bg-gradient-to-b from-[#7c2d12] via-[#ea580c] to-[#431407]'
                       : 'bg-gradient-to-b from-[#042f2e] via-[#0d9488] to-[#115e59]'
                   }`}
+                  title="पोस्टर को पॉप-अप में बड़ा देखने हेतु क्लिक करें"
                 >
                   {/* Poster Header */}
                   <div className="text-center space-y-1 border-b border-white/20 pb-3">
-                    <span className="text-[10px] font-black uppercase tracking-widest bg-yellow-400 text-slate-900 px-3 py-0.5 rounded-full inline-block">
+                    <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest bg-yellow-400 text-slate-900 px-3 py-0.5 rounded-full inline-block">
                       ★ भारत सरकार मान्यता प्राप्त MSME पार्टनर ★
                     </span>
-                    <h3 className="text-lg sm:text-2xl font-black text-white">
+                    <h3 className="text-base sm:text-2xl font-black text-white">
                       ACHIEVERS CLUB COMMUNITY
                     </h3>
                   </div>
 
                   {/* Main Poster Content Banner */}
-                  <div className="my-5 p-4 sm:p-5 bg-white/10 backdrop-blur-xs rounded-xl border-2 border-yellow-300 text-center space-y-3">
+                  <div className="my-4 sm:my-5 p-3.5 sm:p-5 bg-white/10 backdrop-blur-xs rounded-xl border-2 border-yellow-300 text-center space-y-2 sm:space-y-3">
                     {activePosterType === 'recharge_shop' ? (
                       <>
                         <span className="text-xs sm:text-sm font-extrabold text-yellow-300 block">
                           ⚡ यहाँ सभी मोबाइल व DTH रिचार्ज उपलब्ध हैं ⚡
                         </span>
-                        <h2 className="text-2xl sm:text-4xl font-black text-white drop-shadow-md">
+                        <h2 className="text-xl sm:text-3xl md:text-4xl font-black text-white drop-shadow-md">
                           3.30% फिक्स्ड कमीशन
                         </h2>
-                        <div className="bg-black/30 p-2 rounded-lg text-xs font-bold text-blue-100 flex flex-wrap items-center justify-center gap-2">
+                        <div className="bg-black/30 p-2 rounded-lg text-xs font-bold text-blue-100 flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
                           <span>Jio</span> • <span>Airtel</span> • <span>Vi</span> • <span>BSNL</span> • <span>Tata Play</span> • <span>Dish TV</span>
                         </div>
-                        <p className="text-[11px] sm:text-xs text-slate-100 font-medium">
+                        <p className="text-[10.5px] sm:text-xs text-slate-100 font-medium">
                           ✓ ₹0 अतिरिक्त शुल्क • 1 सेकंड में सुपरफास्ट रिचार्ज • 100% पक्की रसीद
                         </p>
                       </>
@@ -1101,13 +1290,13 @@ export const PromotionBrandingHub: React.FC<PromotionBrandingHubProps> = ({
                         <span className="text-xs sm:text-sm font-extrabold text-yellow-300 block">
                           🎓 कॉलेज व पढ़ाई के साथ घर बैठे कमाई 🎓
                         </span>
-                        <h2 className="text-2xl sm:text-4xl font-black text-white drop-shadow-md">
+                        <h2 className="text-xl sm:text-3xl md:text-4xl font-black text-white drop-shadow-md">
                           ₹15,000 - ₹25,000 / महीना
                         </h2>
                         <div className="bg-black/30 p-2 rounded-lg text-xs font-bold text-blue-100">
                           TWIS डायरेक्ट रेफरल: प्रति दोस्त ₹150 सीधा बैंक / UPI में
                         </div>
-                        <p className="text-[11px] sm:text-xs text-slate-100 font-medium">
+                        <p className="text-[10.5px] sm:text-xs text-slate-100 font-medium">
                           ✓ कोई लैपटॉप नहीं, केवल मोबाइल फोन • माता-पिता का UPI मान्य
                         </p>
                       </>
@@ -1116,13 +1305,13 @@ export const PromotionBrandingHub: React.FC<PromotionBrandingHubProps> = ({
                         <span className="text-xs sm:text-sm font-extrabold text-yellow-300 block">
                           🔥 ZERO INVESTMENT WORK OFFER 🔥
                         </span>
-                        <h2 className="text-2xl sm:text-4xl font-black text-white drop-shadow-md">
+                        <h2 className="text-xl sm:text-3xl md:text-4xl font-black text-white drop-shadow-md">
                           मात्र ₹249 लाइफटाइम एक्टिवेशन
                         </h2>
                         <div className="bg-black/30 p-2 rounded-lg text-xs font-bold text-amber-100">
                           SWIS 3.30% रिचार्ज + TWIS ₹150 रेफरल + प्रमाणित डिजिटल 🆔 कार्ड
                         </div>
-                        <p className="text-[11px] sm:text-xs text-slate-100 font-medium">
+                        <p className="text-[10.5px] sm:text-xs text-slate-100 font-medium">
                           ✓ अधिकृत Android APK लिंक • लाइफटाइम फ्री ट्रेनिंग किट
                         </p>
                       </>
@@ -1130,23 +1319,23 @@ export const PromotionBrandingHub: React.FC<PromotionBrandingHubProps> = ({
                   </div>
 
                   {/* Agent Identification Footer Box */}
-                  <div className="bg-white text-slate-900 rounded-xl p-3.5 sm:p-4 shadow-xl border-2 border-[#2874f0] flex items-center justify-between gap-3">
-                    <div className="space-y-1 min-w-0">
-                      <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                  <div className="bg-white text-slate-900 rounded-xl p-3 sm:p-4 shadow-xl border-2 border-[#2874f0] flex items-center justify-between gap-2.5">
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <span className="text-[9px] uppercase font-bold text-slate-500 block">
                         अधिकृत पार्टनर संपर्क विवरण:
                       </span>
                       <h4 className="font-black text-sm sm:text-lg text-slate-900 truncate">
                         {partnerName}
                       </h4>
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] bg-blue-100 text-[#2874f0] font-mono font-bold px-2 py-0.5 rounded">
+                        <span className="text-[9.5px] bg-blue-100 text-[#2874f0] font-mono font-bold px-2 py-0.5 rounded">
                           🆔 {cleanSponsorId}
                         </span>
-                        <span className="text-[10px] font-bold text-slate-700">
+                        <span className="text-[9.5px] font-bold text-slate-700">
                           📞 {partnerMobile}
                         </span>
                       </div>
-                      <p className="text-[10px] text-slate-500 truncate">
+                      <p className="text-[9.5px] text-slate-500 truncate">
                         📍 {partnerCity}
                       </p>
                     </div>
@@ -1156,9 +1345,9 @@ export const PromotionBrandingHub: React.FC<PromotionBrandingHubProps> = ({
                       <img
                         src={qrCodeImageUrl}
                         alt="QR Code"
-                        className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded border border-gray-200"
+                        className="w-14 h-14 sm:w-20 sm:h-20 object-contain rounded border border-gray-200"
                       />
-                      <span className="text-[9px] font-bold text-[#2874f0] block mt-0.5">
+                      <span className="text-[8px] sm:text-[9px] font-bold text-[#2874f0] block mt-0.5">
                         स्कैन करके जुड़ें
                       </span>
                     </div>
@@ -1174,14 +1363,182 @@ export const PromotionBrandingHub: React.FC<PromotionBrandingHubProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <button
+                    type="button"
+                    onClick={() => setShowPosterModal(true)}
+                    className="px-3 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold rounded-lg border border-orange-200 flex items-center gap-1 transition cursor-pointer"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                    <span>बड़ा प्रिव्यू</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={handleDownloadPosterImage}
-                    className="px-4 py-1.5 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold rounded-lg shadow-sm flex items-center gap-1 transition"
+                    disabled={isDownloading}
+                    className="px-4 py-1.5 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold rounded-lg shadow-sm flex items-center gap-1 transition disabled:opacity-50 cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />
-                    <span>पोस्टर डाउनलोड (PNG)</span>
+                    <span>{isDownloading ? 'तैयार हो रहा है...' : 'पोस्टर डाउनलोड (PNG)'}</span>
                   </button>
                 </div>
               </div>
+
+              {/* POSTER POP-UP MODAL */}
+              {showPosterModal && typeof document !== 'undefined' && createPortal(
+                <div className="fixed inset-0 z-[9999] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn">
+                  <div className="relative max-w-xl w-full bg-slate-900 border-2 border-orange-500/60 rounded-2xl shadow-[0_0_60px_rgba(0,0,0,0.9)] overflow-hidden text-slate-100 flex flex-col my-auto max-h-[95vh]">
+                    <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 p-4 border-b border-orange-500/40 flex items-center justify-between gap-3 shrink-0">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-orange-500/20 border border-orange-400 text-orange-400 flex items-center justify-center font-bold shrink-0">
+                          <ImageIcon className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-sm sm:text-base text-white truncate">
+                            प्रचार पोस्टर — HD Full View
+                          </h3>
+                          <p className="text-[11px] text-slate-400 font-mono truncate">
+                            स्पॉन्सर 🆔: {cleanSponsorId} • {partnerName}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowPosterModal(false)}
+                        className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition cursor-pointer"
+                        title="बंद करें"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    <div className="p-4 sm:p-6 overflow-y-auto flex items-center justify-center bg-slate-950/80">
+                      <div
+                        className={`w-full max-w-[500px] rounded-2xl p-5 sm:p-7 shadow-2xl relative overflow-hidden flex flex-col justify-between text-white border-4 border-yellow-400 ${
+                          activePosterType === 'recharge_shop'
+                            ? 'bg-gradient-to-b from-[#0a2540] via-[#1c52b8] to-[#0b1d3a]'
+                            : activePosterType === 'student_earn'
+                            ? 'bg-gradient-to-b from-[#312e81] via-[#4338ca] to-[#0f172a]'
+                            : activePosterType === 'activation_249'
+                            ? 'bg-gradient-to-b from-[#7c2d12] via-[#ea580c] to-[#431407]'
+                            : 'bg-gradient-to-b from-[#042f2e] via-[#0d9488] to-[#115e59]'
+                        }`}
+                      >
+                        <div className="text-center space-y-1 border-b border-white/20 pb-3">
+                          <span className="text-[10px] font-black uppercase tracking-widest bg-yellow-400 text-slate-900 px-3 py-0.5 rounded-full inline-block">
+                            ★ भारत सरकार मान्यता प्राप्त MSME पार्टनर ★
+                          </span>
+                          <h3 className="text-xl sm:text-2xl font-black text-white">
+                            ACHIEVERS CLUB COMMUNITY
+                          </h3>
+                        </div>
+
+                        <div className="my-5 p-4 sm:p-5 bg-white/10 backdrop-blur-xs rounded-xl border-2 border-yellow-300 text-center space-y-3">
+                          {activePosterType === 'recharge_shop' ? (
+                            <>
+                              <span className="text-xs sm:text-sm font-extrabold text-yellow-300 block">
+                                ⚡ यहाँ सभी मोबाइल व DTH रिचार्ज उपलब्ध हैं ⚡
+                              </span>
+                              <h2 className="text-2xl sm:text-3xl font-black text-white drop-shadow-md">
+                                3.30% फिक्स्ड कमीशन
+                              </h2>
+                              <div className="bg-black/30 p-2 rounded-lg text-xs font-bold text-blue-100 flex flex-wrap items-center justify-center gap-2">
+                                <span>Jio</span> • <span>Airtel</span> • <span>Vi</span> • <span>BSNL</span> • <span>Tata Play</span> • <span>Dish TV</span>
+                              </div>
+                              <p className="text-xs text-slate-100 font-medium">
+                                ✓ ₹0 अतिरिक्त शुल्क • 1 सेकंड में सुपरफास्ट रिचार्ज • 100% पक्की रसीद
+                              </p>
+                            </>
+                          ) : activePosterType === 'student_earn' ? (
+                            <>
+                              <span className="text-xs sm:text-sm font-extrabold text-yellow-300 block">
+                                🎓 कॉलेज व पढ़ाई के साथ घर बैठे कमाई 🎓
+                              </span>
+                              <h2 className="text-2xl sm:text-3xl font-black text-white drop-shadow-md">
+                                ₹15,000 - ₹25,000 / महीना
+                              </h2>
+                              <div className="bg-black/30 p-2 rounded-lg text-xs font-bold text-blue-100">
+                                TWIS डायरेक्ट रेफरल: प्रति दोस्त ₹150 सीधा बैंक / UPI में
+                              </div>
+                              <p className="text-xs text-slate-100 font-medium">
+                                ✓ कोई लैपटॉप नहीं, केवल मोबाइल फोन • माता-पिता का UPI मान्य
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-xs sm:text-sm font-extrabold text-yellow-300 block">
+                                🔥 ZERO INVESTMENT WORK OFFER 🔥
+                              </span>
+                              <h2 className="text-2xl sm:text-3xl font-black text-white drop-shadow-md">
+                                मात्र ₹249 लाइफटाइम एक्टिवेशन
+                              </h2>
+                              <div className="bg-black/30 p-2 rounded-lg text-xs font-bold text-amber-100">
+                                SWIS 3.30% रिचार्ज + TWIS ₹150 रेफरल + प्रमाणित डिजिटल 🆔 कार्ड
+                              </div>
+                              <p className="text-xs text-slate-100 font-medium">
+                                ✓ अधिकृत Android APK लिंक • लाइफटाइम फ्री ट्रेनिंग किट
+                              </p>
+                            </>
+                          )}
+                        </div>
+
+                        <div className="bg-white text-slate-900 rounded-xl p-3.5 sm:p-4 shadow-xl border-2 border-[#2874f0] flex items-center justify-between gap-3">
+                          <div className="space-y-1 min-w-0">
+                            <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                              अधिकृत पार्टनर संपर्क विवरण:
+                            </span>
+                            <h4 className="font-black text-base text-slate-900 truncate">
+                              {partnerName}
+                            </h4>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[10px] bg-blue-100 text-[#2874f0] font-mono font-bold px-2 py-0.5 rounded">
+                                🆔 {cleanSponsorId}
+                              </span>
+                              <span className="text-[10px] font-bold text-slate-700">
+                                📞 {partnerMobile}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-500 truncate">
+                              📍 {partnerCity}
+                            </p>
+                          </div>
+
+                          <div className="shrink-0 text-center">
+                            <img
+                              src={qrCodeImageUrl}
+                              alt="QR Code"
+                              className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded border border-gray-200"
+                            />
+                            <span className="text-[9px] font-bold text-[#2874f0] block mt-0.5">
+                              स्कैन करके जुड़ें
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-950 p-3 sm:p-4 border-t border-slate-800 flex items-center justify-between gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleShareToWhatsapp()}
+                        className="px-3.5 py-2 bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs rounded-lg shadow-sm flex items-center gap-1.5 transition cursor-pointer"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        <span>WhatsApp स्टेटस शेयर</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleDownloadPosterImage}
+                        disabled={isDownloading}
+                        className="px-4 py-2 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold text-xs rounded-lg shadow-sm flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>{isDownloading ? 'तैयार हो रहा है...' : 'HD पोस्टर डाउनलोड करें'}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>,
+                document.body
+              )}
             </div>
           )}
 

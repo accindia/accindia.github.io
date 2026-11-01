@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ShieldCheck,
   Award,
@@ -24,6 +25,8 @@ import {
   Shield,
   MessageCircle,
   AlertTriangle,
+  Maximize2,
+  ZoomIn,
 } from 'lucide-react';
 import { Member, PrivacySettings, SiteConfig } from '../types';
 import { StorageService } from '../services/storage';
@@ -53,7 +56,8 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
   const [qrViewMode, setQrViewMode] = useState<'referral' | 'personal'>('referral');
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadBlockedMsg, setDownloadBlockedMsg] = useState('');
-  
+  const [showCardModal, setShowCardModal] = useState(false);
+
   // Privacy Modal State
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [privacyDraft, setPrivacyDraft] = useState<PrivacySettings>(
@@ -93,7 +97,6 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
   );
 
   // Strict Rule: ONLY the user can download their OWN ID card.
-  // When viewing a sponsor's card, demo card, or someone else's card, downloading is strictly forbidden.
   const canDownload = isOwnCard && !isSponsorCard;
   const isSponsorOrOther = !canDownload;
 
@@ -106,7 +109,6 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
     showPersonalQr: false,
   };
 
-  // Whether mobile should be displayed in clear text or masked
   const isMobileVisible = isOwnCard || Boolean(currentPrivacy.showMobile);
   const maskedMobile = member.mobile
     ? `${member.mobile.slice(0, 2)}••••••${member.mobile.slice(-2)}`
@@ -116,22 +118,24 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
     ? `${window.location.origin}/?sponsor=${member.accId}`
     : `https://achieversclub.in/?sponsor=${member.accId}`;
 
-  // Live scannable QR Code URL for the member's referral link
-  const referralQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(referralLink)}`;
+  const referralQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(referralLink)}`;
 
-  const handleCopyId = () => {
+  const handleCopyId = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     navigator.clipboard.writeText(member.accId);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleCopyReferralLink = () => {
+  const handleCopyReferralLink = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     navigator.clipboard.writeText(referralLink);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
-  const handlePrint = () => {
+  const handlePrint = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (!canDownload) {
       setDownloadBlockedMsg('🔒 सुरक्षा नियम: केवल कार्डधारक ही अपना पहचान पत्र प्रिंट कर सकते हैं। स्पॉन्सर का आईडी कार्ड प्रिंट या डाउनलोड नहीं किया जा सकता।');
       setTimeout(() => setDownloadBlockedMsg(''), 5000);
@@ -140,7 +144,8 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
     window.print();
   };
 
-  const handleShareWhatsApp = () => {
+  const handleShareWhatsApp = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (isOwnCard) {
       const text = encodeURIComponent(
         `🔥 My Official Achievers Club Community (ACC) Digital ID Card 🔥\n` +
@@ -154,7 +159,6 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
       );
       window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
     } else {
-      // Sponsor view: if sponsor allows WhatsApp contact, open sponsor's WhatsApp, otherwise general ACC helpline
       if (currentPrivacy.showWhatsapp && member.mobile) {
         const text = encodeURIComponent(
           `नमस्ते ${member.fullName} जी! मैं आपके Achievers Club (ACC) रेफरल लिंक (${referralLink}) से जुड़ना चाहता हूँ। कृपया मुझे मार्गदर्शन दें।`
@@ -169,7 +173,8 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
     }
   };
 
-  const handleDownloadFront = async () => {
+  const handleDownloadFront = async (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (!canDownload) {
       setDownloadBlockedMsg('🔒 सुरक्षा नियम: आप केवल अपना स्वयं का डिजिटल आईडी कार्ड डाउनलोड कर सकते हैं। स्पॉन्सर या अन्य सदस्य का आईडी कार्ड डाउनलोड नहीं किया जा सकता।');
       setTimeout(() => setDownloadBlockedMsg(''), 5000);
@@ -183,7 +188,8 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
     }
   };
 
-  const handleDownloadBack = async () => {
+  const handleDownloadBack = async (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (!canDownload) {
       setDownloadBlockedMsg('🔒 सुरक्षा नियम: आप केवल अपना स्वयं का डिजिटल आईडी कार्ड डाउनलोड कर सकते हैं।');
       setTimeout(() => setDownloadBlockedMsg(''), 5000);
@@ -197,7 +203,8 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
     }
   };
 
-  const handleDownloadBothSides = async () => {
+  const handleDownloadBothSides = async (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (!canDownload) {
       setDownloadBlockedMsg('🔒 सुरक्षा नियम: आप केवल अपना स्वयं का डिजिटल आईडी कार्ड डाउनलोड कर सकते हैं।');
       setTimeout(() => setDownloadBlockedMsg(''), 5000);
@@ -236,6 +243,416 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
     }
   };
 
+  // Reusable Core Card Content (Front or Back)
+  const renderCardContent = (isModalView: boolean = false) => {
+    if (cardSide === 'front') {
+      return (
+        <div
+          id="printable-id-card"
+          ref={cardRef}
+          className={`relative w-full ${isModalView ? 'max-w-[460px]' : 'max-w-[430px]'} mx-auto bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 rounded-2xl border-2 border-amber-500/80 shadow-[0_0_35px_rgba(245,158,11,0.2)] overflow-hidden text-slate-100 p-3.5 sm:p-5 select-none transition-all`}
+        >
+          {/* Subtle Ambient Background Gradients */}
+          <div className="absolute -top-16 -right-16 w-44 h-44 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-16 -left-16 w-44 h-44 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          {/* Click to Expand Floating Hint (only in inline view) */}
+          {!isModalView && (
+            <div className="mb-2 flex items-center justify-between text-[10px] text-amber-300/90 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-lg backdrop-blur-xs">
+              <span className="flex items-center gap-1 font-semibold">
+                <Maximize2 className="w-3 h-3 text-amber-400 shrink-0" />
+                <span>कार्ड पर क्लिक करें: <strong>फुल-स्क्रीन पॉप-अप विंडो</strong></span>
+              </span>
+              <span className="text-[9px] bg-amber-400/20 text-amber-200 px-1.5 py-0.2 rounded font-mono font-bold">
+                ZOOM HD
+              </span>
+            </div>
+          )}
+
+          {/* Sponsor Privacy Header Notice */}
+          {isSponsorOrOther && (
+            <div className="mb-2.5 p-2 bg-gradient-to-r from-amber-950/90 via-slate-900 to-amber-950/90 border border-amber-500/40 rounded-xl flex items-center justify-between text-xs gap-2">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
+                <span className="text-[10px] sm:text-[10.5px] font-bold text-amber-300 truncate">
+                  🌟 प्रमाणित स्पॉन्सर आईडी • प्राइवेसी सुरक्षित
+                </span>
+              </div>
+              <span className="text-[9px] font-mono-acc text-amber-300 bg-amber-900/60 border border-amber-500/30 px-1.5 py-0.2 rounded font-bold shrink-0 flex items-center gap-1">
+                <Lock className="w-2.5 h-2.5 text-amber-400" /> डाउनलोड सुरक्षित
+              </span>
+            </div>
+          )}
+
+          {/* Top Gold Header */}
+          <div className="relative border-b border-amber-500/30 pb-3 mb-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-amber-600 via-amber-400 to-yellow-300 p-0.5 shadow-md shrink-0">
+                <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+                  <span className="font-extrabold text-amber-400 text-base sm:text-lg font-display">ACC</span>
+                </div>
+              </div>
+              <div className="min-w-0">
+                <h2 className="font-display font-black text-sm sm:text-base tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-yellow-300 truncate">
+                  ACHIEVERS CLUB
+                </h2>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[9px] sm:text-[10px] tracking-widest text-slate-300 uppercase font-semibold">
+                    COMMUNITY (ACC)
+                  </span>
+                  <span className="text-[8px] sm:text-[9px] bg-amber-400/20 text-amber-300 px-1 py-0.2 rounded border border-amber-400/30 font-bold">
+                    OFFICIAL
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-right shrink-0">
+              <span className="text-[8px] sm:text-[9px] text-amber-300/80 font-mono-acc font-semibold uppercase tracking-wider block">
+                MEMBERSHIP CARD
+              </span>
+              <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-2 py-0.5 rounded-full font-bold">
+                <CheckCircle2 className="w-3 h-3" /> VERIFIED
+              </span>
+            </div>
+          </div>
+
+          {/* Slogan Pill */}
+          <div className="text-center mb-3">
+            <span className="text-[10px] sm:text-[11px] font-semibold text-amber-300/90 tracking-wide bg-amber-500/10 border border-amber-500/20 px-3 py-0.5 rounded-full inline-block">
+              ✦ START YOUNG, RETIRE YOUNG ✦
+            </span>
+          </div>
+
+          {/* Member Profile Body (Avatar + Personal Info) */}
+          <div className="flex gap-3 sm:gap-4 items-center mb-3.5">
+            {/* Avatar / Photo */}
+            <div className="relative shrink-0">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 p-0.5 shadow-lg">
+                <div className="w-full h-full bg-slate-900 rounded-[10px] flex items-center justify-center overflow-hidden">
+                  {member.avatarUrl ? (
+                    <img
+                      src={member.avatarUrl}
+                      alt={member.fullName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-amber-400">
+                      <User className="w-7 h-7 sm:w-8 sm:h-8 text-slate-400" />
+                      <span className="text-[7.5px] sm:text-[8px] font-bold text-amber-300 mt-0.5 font-mono-acc">
+                        ACC MEMBER
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="absolute -bottom-1 -right-1 bg-amber-500 text-slate-950 p-1 rounded-full shadow">
+                <ShieldCheck className="w-3 h-3" />
+              </div>
+            </div>
+
+            {/* Core Member Details */}
+            <div className="min-w-0 flex-1 space-y-1">
+              <div>
+                <span className="text-[8.5px] sm:text-[9px] uppercase tracking-wider text-slate-400 block font-medium">
+                  {isOwnCard ? 'Authorized Member Name' : 'Official Sponsor Name'}
+                </span>
+                <h3 className="text-sm sm:text-base font-bold text-white tracking-wide truncate">
+                  {member.fullName}
+                </h3>
+              </div>
+
+              <div className="space-y-0.5 text-xs text-slate-300">
+                {/* System Plan */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-400 text-[10px] shrink-0">System:</span>
+                  <span className="font-bold text-amber-400 bg-amber-950/40 px-1.5 py-0.2 rounded border border-amber-500/30 text-[10px] sm:text-[11px] truncate">
+                    {member.plan === 'SWIS' ? 'SELF WORK (SWIS)' : member.plan === 'TWIS' ? 'TEAM WORK (TWIS)' : 'COMBO'}
+                  </span>
+                </div>
+
+                {/* Mobile */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-slate-400 text-[10px] shrink-0">Mobile:</span>
+                  <span className="font-mono-acc text-slate-200 text-[10.5px] sm:text-[11px] font-bold">
+                    +91 {isMobileVisible ? member.mobile : maskedMobile}
+                  </span>
+                  {isOwnCard && (
+                    <span className="text-[8px] text-slate-400 bg-slate-800/80 px-1 rounded border border-slate-700">
+                      {currentPrivacy.showMobile ? 'पब्लिक' : '🔒 प्राइवेट'}
+                    </span>
+                  )}
+                </div>
+
+                {/* City */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-400 text-[10px] shrink-0">City:</span>
+                  <span className="text-slate-200 text-[10.5px] sm:text-[11px] truncate">
+                    {isSponsorOrOther && currentPrivacy.showCity === false
+                      ? 'भारत (India) 🔒'
+                      : `${member.city || 'Indore'}, ${member.state || 'MP'}`}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Unique ACC ID Banner */}
+          <div className="bg-slate-900 border-2 border-amber-500/40 rounded-xl p-2.5 sm:p-3 mb-3 relative overflow-hidden">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 shrink-0" /> OFFICIAL UNIQUE MEMBER 🆔
+                </span>
+                <p className="font-mono-acc font-black text-sm sm:text-base md:text-lg text-amber-300 tracking-wider truncate">
+                  {member.accId}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyId}
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-lg border border-amber-500/40 text-[10px] sm:text-[11px] font-bold transition shadow-xs shrink-0 cursor-pointer"
+                title="Copy Member ID"
+              >
+                {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copied ? 'कॉपी' : 'Copy'}</span>
+              </button>
+            </div>
+            <div className="mt-1 flex items-center justify-between text-[8.5px] sm:text-[9px] text-slate-400 font-mono-acc border-t border-slate-800 pt-1">
+              <span>ACC = Achievers Club</span>
+              <span>249 = Activation</span>
+              <span className="text-amber-400 font-bold">{member.plan} Plan</span>
+            </div>
+          </div>
+
+          {/* Secondary Details Grid */}
+          <div className="grid grid-cols-2 gap-2 text-xs bg-slate-950/70 p-2 sm:p-2.5 rounded-xl border border-slate-800 mb-3">
+            <div className="min-w-0">
+              <span className="text-[9px] text-slate-400 block">Sponsor ID:</span>
+              <span className="font-mono-acc font-semibold text-slate-200 text-[10px] truncate block">
+                {member.sponsorId || 'ACC249SWISRK01'}
+              </span>
+            </div>
+            <div className="min-w-0">
+              <span className="text-[9px] text-slate-400 block">Sponsor Name:</span>
+              <span className="font-semibold text-slate-200 text-[10px] truncate block">
+                {member.sponsorName || 'Rahul Kumar'}
+              </span>
+            </div>
+            <div className="min-w-0">
+              <span className="text-[9px] text-slate-400 block">Activation Fee:</span>
+              <span className="font-bold text-emerald-400 text-[10px] truncate block">
+                ₹249 (ONE TIME PAID)
+              </span>
+            </div>
+            <div className="min-w-0">
+              <span className="text-[9px] text-slate-400 block">Active Date:</span>
+              <span className="font-mono-acc text-slate-300 text-[10px] truncate block">
+                {member.paymentDate || '10-08-2026'}
+              </span>
+            </div>
+          </div>
+
+          {/* Footer Section: QR Code + Links + Authority Stamp */}
+          <div className="border-t border-slate-800 pt-2.5 flex flex-col sm:flex-row items-stretch sm:items-start justify-between gap-2.5">
+            {/* QR Code and Links */}
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <div className="relative shrink-0 flex flex-col items-center">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 bg-white rounded-lg p-1 flex items-center justify-center overflow-hidden border border-amber-400/50 shadow-sm">
+                  <img
+                    src={
+                      qrViewMode === 'personal' && member.personalQrUrl && (isOwnCard || currentPrivacy.showPersonalQr)
+                        ? member.personalQrUrl
+                        : referralQrUrl
+                    }
+                    alt="Digital ID QR Code"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                {member.personalQrUrl && (isOwnCard || currentPrivacy.showPersonalQr) ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setQrViewMode(qrViewMode === 'referral' ? 'personal' : 'referral');
+                    }}
+                    className="text-[7.5px] text-amber-300 hover:text-white font-bold underline mt-0.5"
+                  >
+                    {qrViewMode === 'personal' ? 'Switch: Referral QR' : 'Switch: Personal QR'}
+                  </button>
+                ) : (
+                  <span className="text-[7.5px] font-bold text-amber-300 uppercase tracking-tighter block text-center mt-0.5">
+                    Referral QR
+                  </span>
+                )}
+              </div>
+
+              {/* Referral Link & User Submitted Link */}
+              <div className="text-[9px] text-slate-300 space-y-1 min-w-0 flex-1">
+                <div className="min-w-0">
+                  <span className="text-[8px] text-amber-400 font-bold block uppercase tracking-wider">
+                    रेफरल लिंक (Referral Link):
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCopyReferralLink}
+                    className="text-left font-mono-acc text-slate-300 hover:text-white truncate block w-full max-w-[170px] sm:max-w-[210px] text-[8.5px] sm:text-[9px] transition cursor-pointer"
+                    title="रेफरल लिंक कॉपी करें"
+                  >
+                    {copiedLink ? '✓ लिंक कॉपी हो गया!' : referralLink.replace(/^https?:\/\//, '')}
+                  </button>
+                </div>
+
+                <div className="min-w-0">
+                  <span className="text-[8px] text-emerald-400 font-bold block uppercase tracking-wider">
+                    यूजर लिंक (User Profile Link):
+                  </span>
+                  {isSponsorOrOther && currentPrivacy.showProfileLink === false ? (
+                    <span className="text-slate-500 text-[8px] italic block flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5 text-slate-500" /> प्राइवेसी सुरक्षित
+                    </span>
+                  ) : member.profileLink ? (
+                    <a
+                      href={member.profileLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1 text-emerald-300 hover:text-emerald-200 bg-emerald-950/60 border border-emerald-500/30 px-1.5 py-0.5 rounded truncate max-w-[170px] sm:max-w-[210px] transition text-[8px] sm:text-[8.5px] font-semibold"
+                      title="सदस्य द्वारा सबमिट किया गया लिंक"
+                    >
+                      <ExternalLink className="w-2.5 h-2.5 shrink-0 text-emerald-400" />
+                      <span className="truncate">{member.profileLink.replace(/^https?:\/\//, '')}</span>
+                    </a>
+                  ) : (
+                    <span className="text-slate-500 text-[8px] italic block">
+                      उपलब्ध नहीं
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Side: Authority Stamp & Signature */}
+            <div className="text-right shrink-0 pt-0.5 self-end sm:self-auto">
+              <div className="inline-block border border-amber-500/50 rounded px-1.5 py-0.5 bg-amber-500/10 text-[7.5px] sm:text-[8px] font-bold text-amber-300 uppercase tracking-widest">
+                START YOUNG RETIRE YOUNG
+              </div>
+              <p className="text-[7.5px] sm:text-[8px] text-slate-400 mt-0.5">Authorised Signature</p>
+              <p className="text-[8.5px] sm:text-[9px] font-mono-acc text-amber-400 font-bold italic">Achievers Community</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // BACK SIDE OF ID CARD
+    return (
+      <div
+        id="printable-id-card-back"
+        className={`relative w-full ${isModalView ? 'max-w-[460px]' : 'max-w-[430px]'} mx-auto bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 rounded-2xl border-2 border-amber-500/80 shadow-[0_0_35px_rgba(245,158,11,0.2)] overflow-hidden text-slate-100 p-3.5 sm:p-5 select-none transition-all space-y-3`}
+      >
+        {/* Top Gold Header */}
+        <div className="relative border-b border-amber-500/30 pb-2.5 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-600 via-amber-400 to-yellow-300 p-0.5 shadow-md shrink-0">
+              <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+                <span className="font-extrabold text-amber-400 text-base font-display">ACC</span>
+              </div>
+            </div>
+            <div>
+              <h3 className="font-display font-black text-xs sm:text-sm tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-yellow-300">
+                ACHIEVERS CLUB COMMUNITY (ACC)
+              </h3>
+              <span className="text-[8px] sm:text-[9px] tracking-wider text-slate-400 uppercase font-semibold block">
+                TERMS, SERVICES & VERIFICATION PROTOCOL
+              </span>
+            </div>
+          </div>
+
+          <div className="text-right shrink-0">
+            <span className="text-[8px] text-slate-400 block font-mono-acc">ACC 🆔:</span>
+            <span className="text-[10px] font-mono-acc font-black text-amber-300">
+              {member.accId}
+            </span>
+          </div>
+        </div>
+
+        {/* 1. Platform Objective & Description */}
+        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 space-y-1">
+          <div className="flex items-center gap-1.5 text-amber-400 font-bold text-[10px] uppercase tracking-wider">
+            <Sparkles className="w-3 h-3 shrink-0" />
+            <span>1. प्लेटफॉर्म परिचय (Platform Description)</span>
+          </div>
+          <p className="text-[9.5px] text-slate-300 leading-relaxed">
+            अचीवर्स क्लब कम्युनिटी (ACC) भारत के छात्र-छात्राओं और युवाओं का एक स्वावलंबन व डिजिटल स्किल डेवलपमेंट समुदाय है। यहाँ छात्र बिना पढ़ाई प्रभावित किए अपने स्मार्टफोन से SWIS एवं TWIS माध्यम से सुरक्षित पॉकेट मनी व स्वावलंबी आय अर्जित करते हैं।
+          </p>
+        </div>
+
+        {/* 2. Platform Core Services */}
+        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 space-y-1.5">
+          <div className="flex items-center gap-1.5 text-blue-400 font-bold text-[10px] uppercase tracking-wider">
+            <Zap className="w-3 h-3 shrink-0" />
+            <span>2. अधिकृत सेवाएं व लाभ (Services Information)</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[9px] text-slate-300">
+            <div className="p-1.5 bg-slate-950/60 rounded border border-slate-800">
+              <strong className="text-amber-300 block">⚡ SWIS रिचार्ज कमीशन:</strong>
+              <span>सभी प्रीपेड, DTH व बिल पेमेंट्स पर 3.30% फिक्स्ड कमीशन।</span>
+            </div>
+            <div className="p-1.5 bg-slate-950/60 rounded border border-slate-800">
+              <strong className="text-emerald-300 block">👥 TWIS रेफरल हब:</strong>
+              <span>प्रत्येक नए एक्टिवेटेड साथी पर ₹150 सीधी रेफरल इनकम (Daily UPI)।</span>
+            </div>
+            <div className="p-1.5 bg-slate-950/60 rounded border border-slate-800">
+              <strong className="text-purple-300 block">📚 स्टूडेंट स्किल किट:</strong>
+              <span>लाइफटाइम ट्रेनिंग वीडियो, कोर्सेज व सोशल प्रमोशन टूल्स।</span>
+            </div>
+            <div className="p-1.5 bg-slate-950/60 rounded border border-slate-800">
+              <strong className="text-cyan-300 block">📱 Real App एक्सेस:</strong>
+              <span>सत्यापित सदस्यों को अधिकृत Android APK डाउनलोड लिंक।</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Community Rules & Code of Conduct */}
+        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 space-y-1">
+          <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-[10px] uppercase tracking-wider">
+            <ShieldCheck className="w-3 h-3 shrink-0" />
+            <span>3. नियम व महत्वपूर्ण शर्तें (Community Rules)</span>
+          </div>
+          <ul className="text-[8.5px] text-slate-300 space-y-0.5 leading-tight list-disc pl-3">
+            <li>यह 🆔 कार्ड अहस्तांतरणीय (Non-transferable) है और केवल अधिकृत सदस्य हेतु मान्य है।</li>
+            <li>वॉलेट में न्यूनतम ₹100 होते ही UPI द्वारा बैंक ट्रांसफर का अनुरोध कर सकते हैं।</li>
+            <li>₹249 सदस्यता एक्टिवेशन शुल्क एकमुश्त (One-Time) है और आजीवन वैधता प्रदान करता है।</li>
+            <li>किसी भी प्रकार की भ्रामक जानकारी या अनधिकृत प्रचार पर सदस्यता तत्काल निरस्त की जा सकती है।</li>
+          </ul>
+        </div>
+
+        {/* 4. Official Helpline & Verification Seal */}
+        <div className="border-t border-slate-800 pt-2 flex items-center justify-between text-[8px] text-slate-400">
+          <div className="space-y-0.5 min-w-0">
+            <p className="text-slate-300 font-bold">आधिकारिक संपर्क एवं सहायता:</p>
+            <p>📞 हेल्पलाइन: <span className="text-emerald-400 font-semibold">{siteConfig.helplinePhone || '+91 8877490845'}</span></p>
+            <p>✉️ ईमेल: <span className="text-slate-200">{siteConfig.officialEmail || 'newuserhelpline@gmail.com'}</span></p>
+            <p>💬 टेलीग्राम: <span className="text-sky-300">@NEWUSERHELPLINE</span></p>
+            <p>🌐 पोर्टल: <span className="text-amber-400 font-semibold">{siteConfig.websiteUrl || 'www.achieversclub.in'}</span></p>
+          </div>
+
+          <div className="text-right shrink-0">
+            <div className="w-10 h-10 rounded-full bg-amber-500/20 border border-amber-400/40 flex flex-col items-center justify-center mx-auto mb-1 text-amber-300 font-bold">
+              <span className="text-[7px]">ACC</span>
+              <span className="text-[6.5px]">LEGAL</span>
+            </div>
+            <p className="text-[7.5px] text-slate-400 font-semibold">Authorised Signatory</p>
+            <p className="text-[8.5px] font-mono-acc text-amber-400 font-bold italic">
+              {siteConfig.adminSignatoryName || 'Vikas Kumar'} (Admin)
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-4 max-w-2xl mx-auto w-full">
       {/* Sample Card Notification if demo member */}
@@ -247,16 +664,13 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
               यह एक <strong>नमूना (Sample Preview)</strong> कार्ड है। अपना व्यक्तिगत <strong>Student 🆔 Card</strong> पाने के लिए रजिस्ट्रेशन करें।
             </span>
           </div>
-          <a
-            href="#register"
-            onClick={(e) => {
-              e.preventDefault();
-              if (onClose) onClose();
-            }}
-            className="px-3.5 py-1.5 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold rounded-sm shrink-0 transition shadow-xs text-xs"
+          <button
+            type="button"
+            onClick={() => setShowCardModal(true)}
+            className="text-[#2874f0] font-bold underline shrink-0 hover:text-blue-800"
           >
-            अपना कार्ड बनाएं (₹249)
-          </a>
+            बड़ा करके देखें
+          </button>
         </div>
       )}
 
@@ -302,7 +716,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
             <button
               type="button"
               onClick={() => setCardSide('front')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-md transition ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-md transition cursor-pointer ${
                 cardSide === 'front'
                   ? 'bg-[#2874f0] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
@@ -313,13 +727,13 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
             <button
               type="button"
               onClick={() => setCardSide('back')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-md transition ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-md transition cursor-pointer ${
                 cardSide === 'back'
                   ? 'bg-[#2874f0] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              पीछे का भाग (Back / Rules)
+              पीछे का भाग (Back)
             </button>
           </div>
         </div>
@@ -328,32 +742,44 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
         <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
           <div className="flex items-center gap-1.5 flex-wrap">
             <button
-              onClick={() => setCardSide(cardSide === 'front' ? 'back' : 'front')}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-sm border border-slate-300 transition"
-              title="कार्ड आगे/पीछे पलटें"
+              type="button"
+              onClick={() => setShowCardModal(true)}
+              className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-md shadow-xs transition cursor-pointer"
+              title="आईडी कार्ड पॉप-अप विंडो में बड़ा खोलें"
             >
-              <RotateCw className="w-3.5 h-3.5 text-[#2874f0]" />
-              <span>{cardSide === 'front' ? 'पीछे पलटें (Flip)' : 'आगे पलटें (Flip)'}</span>
+              <Maximize2 className="w-3.5 h-3.5" />
+              <span>पॉप-अप में बड़ा देखें</span>
             </button>
 
             <button
+              type="button"
+              onClick={() => setCardSide(cardSide === 'front' ? 'back' : 'front')}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-md border border-slate-300 transition cursor-pointer"
+              title="कार्ड आगे/पीछे पलटें"
+            >
+              <RotateCw className="w-3.5 h-3.5 text-[#2874f0]" />
+              <span>{cardSide === 'front' ? 'पीछे पलटें' : 'आगे पलटें'}</span>
+            </button>
+
+            <button
+              type="button"
               onClick={handleCopyId}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-sm border border-gray-200 transition"
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-md border border-gray-200 transition cursor-pointer"
             >
               {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copied ? 'ID कॉपी हुआ' : 'Copy ID'}</span>
             </button>
 
             <button
+              type="button"
               onClick={handleShareWhatsApp}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-sm shadow-xs transition"
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-md shadow-xs transition cursor-pointer"
               title={isOwnCard ? 'व्हाट्सएप पर कार्ड शेयर करें' : 'स्पॉन्सर से संपर्क करें'}
             >
               <Share2 className="w-3.5 h-3.5" />
-              <span>{isOwnCard ? 'WhatsApp' : currentPrivacy.showWhatsapp ? 'स्पॉन्सर चैट' : 'WhatsApp'}</span>
+              <span>WhatsApp</span>
             </button>
 
-            {/* Privacy Controls Modal Button for the cardholder */}
             {isOwnCard && (
               <button
                 type="button"
@@ -368,18 +794,19 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
                   });
                   setShowPrivacyModal(true);
                 }}
-                className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-sm border border-indigo-200 transition"
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-md border border-indigo-200 transition cursor-pointer"
                 title="स्पॉन्सर कार्ड में अपनी पर्सनल जानकारी छुपाएं या दिखाएं"
               >
                 <Sliders className="w-3.5 h-3.5 text-indigo-600" />
-                <span>⚙️ प्राइवेसी सेटिंग्स</span>
+                <span>⚙️ प्राइवेसी</span>
               </button>
             )}
 
             {canDownload && (
               <button
+                type="button"
                 onClick={handlePrint}
-                className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-sm border border-gray-200 transition"
+                className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-md border border-gray-200 transition cursor-pointer"
               >
                 <Printer className="w-3.5 h-3.5" />
                 <span>प्रिंट</span>
@@ -387,13 +814,14 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
             )}
           </div>
 
-          {/* Download HD Options: ONLY SHOWN IF IT IS THE USER'S OWN ID CARD */}
+          {/* Download HD Options */}
           {canDownload ? (
             <div className="flex items-center gap-1.5 flex-wrap">
               <button
+                type="button"
                 onClick={handleDownloadFront}
                 disabled={isDownloading}
-                className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-slate-950 font-black rounded-sm shadow-xs transition disabled:opacity-50"
+                className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-slate-950 font-black rounded-md shadow-xs transition disabled:opacity-50 cursor-pointer"
                 title="Download Front Side HD PNG"
               >
                 <Download className="w-3.5 h-3.5" />
@@ -401,9 +829,10 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
               </button>
 
               <button
+                type="button"
                 onClick={handleDownloadBack}
                 disabled={isDownloading}
-                className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 bg-slate-900 hover:bg-black text-amber-300 font-bold rounded-sm border border-amber-400/40 shadow-xs transition disabled:opacity-50"
+                className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 bg-slate-900 hover:bg-black text-amber-300 font-bold rounded-md border border-amber-400/40 shadow-xs transition disabled:opacity-50 cursor-pointer"
                 title="Download Back Side HD PNG"
               >
                 <Download className="w-3.5 h-3.5 text-amber-400" />
@@ -411,437 +840,164 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
               </button>
 
               <button
+                type="button"
                 onClick={handleDownloadBothSides}
                 disabled={isDownloading}
-                className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white font-bold rounded-sm shadow-xs transition disabled:opacity-50"
-                title="Download Both Sides (Front & Back Print Sheet) HD PNG"
+                className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white font-bold rounded-md shadow-xs transition disabled:opacity-50 cursor-pointer"
+                title="Download Both Sides Print Sheet"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>दोनों भाग (Print Sheet)</span>
               </button>
             </div>
           ) : (
-            /* Protected Badge when viewing Sponsor or Specimen card - NO DOWNLOAD ALLOWED */
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-300 rounded-lg text-amber-900 text-xs font-semibold shadow-xs">
               <Lock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-              <span>🔒 स्पॉन्सर कार्ड (डाउनलोड प्रतिबंधित • केवल कार्डधारक डाउनलोड कर सकते हैं)</span>
+              <span>🔒 स्पॉन्सर कार्ड (डाउनलोड केवल कार्डधारक हेतु)</span>
             </div>
           )}
         </div>
       </div>
 
-      {/* The Printable / Viewable Card Wrapper */}
-      <div className="flex justify-center p-0.5 sm:p-2 w-full max-w-full overflow-hidden">
-        {cardSide === 'front' ? (
-          /* ========================================================================= */
-          /* FRONT SIDE OF DIGITAL ID CARD */
-          /* ========================================================================= */
-          <div
-            id="printable-id-card"
-            ref={cardRef}
-            className="relative w-full max-w-[430px] mx-auto bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 rounded-2xl border-2 border-amber-500/70 shadow-[0_0_40px_rgba(245,158,11,0.18)] overflow-hidden text-slate-100 p-3 sm:p-5 select-none animate-fadeIn"
-          >
-            {/* Subtle Background Pattern & Holographic Accent */}
-            <div className="absolute -top-20 -right-20 w-44 h-44 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-20 -left-20 w-44 h-44 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-
-            {/* Sponsor Privacy Header Notice if viewing Sponsor's card */}
-            {isSponsorOrOther && (
-              <div className="mb-2.5 p-2 bg-gradient-to-r from-amber-950/90 via-slate-900 to-amber-950/90 border border-amber-500/40 rounded-xl flex items-center justify-between text-xs gap-2">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span className="text-[10px] sm:text-[10.5px] font-bold text-amber-300 truncate">
-                    🌟 प्रमाणित स्पॉन्सर आईडी • प्राइवेसी सुरक्षित
-                  </span>
-                </div>
-                <span className="text-[9px] font-mono-acc text-amber-300 bg-amber-900/60 border border-amber-500/30 px-1.5 py-0.2 rounded font-bold shrink-0 flex items-center gap-1">
-                  <Lock className="w-2.5 h-2.5 text-amber-400" /> डाउनलोड सुरक्षित
-                </span>
-              </div>
-            )}
-
-            {/* Top Gold Foil Header */}
-            <div className="relative border-b border-amber-500/30 pb-3 mb-3 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-amber-600 via-amber-400 to-yellow-300 p-0.5 shadow-md shrink-0">
-                  <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-                    <span className="font-extrabold text-amber-400 text-lg font-display">ACC</span>
-                  </div>
-                </div>
-                <div className="min-w-0">
-                  <h2 className="font-display font-black text-sm sm:text-base tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-yellow-300 truncate">
-                    ACHIEVERS CLUB
-                  </h2>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[9px] sm:text-[10px] tracking-widest text-slate-300 uppercase font-semibold">
-                      COMMUNITY (ACC)
-                    </span>
-                    <span className="text-[8px] sm:text-[9px] bg-amber-400/20 text-amber-300 px-1 py-0.2 rounded border border-amber-400/30 font-bold">
-                      OFFICIAL
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-right shrink-0">
-                <span className="text-[8px] sm:text-[9px] text-amber-300/80 font-mono-acc font-semibold uppercase tracking-wider block">
-                  MEMBERSHIP CARD
-                </span>
-                <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-2 py-0.5 rounded-full font-bold">
-                  <CheckCircle2 className="w-3 h-3" /> VERIFIED
-                </span>
-              </div>
-            </div>
-
-            {/* Slogan Pill */}
-            <div className="text-center mb-3">
-              <span className="text-[10px] sm:text-[11px] font-semibold text-amber-300/90 tracking-wide bg-amber-500/10 border border-amber-500/20 px-3 py-0.5 rounded-full inline-block">
-                ✦ START YOUNG, RETIRE YOUNG ✦
-              </span>
-            </div>
-
-            {/* Member Profile Body */}
-            <div className="flex gap-3 sm:gap-4 items-center mb-4">
-              {/* Avatar / Photo */}
-              <div className="relative shrink-0">
-                <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 p-0.5 shadow-lg">
-                  <div className="w-full h-full bg-slate-900 rounded-[10px] flex items-center justify-center overflow-hidden">
-                    {member.avatarUrl ? (
-                      <img
-                        src={member.avatarUrl}
-                        alt={member.fullName}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center text-amber-400">
-                        <User className="w-8 h-8 text-slate-400" />
-                        <span className="text-[8px] font-bold text-amber-300 mt-0.5 font-mono-acc">
-                          ACC MEMBER
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="absolute -bottom-1 -right-1 bg-amber-500 text-slate-950 p-1 rounded-full shadow">
-                  <ShieldCheck className="w-3 h-3" />
-                </div>
-              </div>
-
-              {/* Core Member Details */}
-              <div className="min-w-0 flex-1">
-                <span className="text-[9px] uppercase tracking-wider text-slate-400 block font-medium">
-                  {isOwnCard ? 'Authorized Member Name' : 'Official Sponsor Name'}
-                </span>
-                <h3 className="text-sm sm:text-base font-bold text-white tracking-wide truncate">
-                  {member.fullName}
-                </h3>
-
-                <div className="mt-1 space-y-0.5">
-                  <div className="flex items-center gap-1.5 text-xs text-slate-300">
-                    <span className="text-slate-400 text-[10px]">System:</span>
-                    <span className="font-bold text-amber-400 bg-amber-950/40 px-1.5 py-0.2 rounded border border-amber-500/30 text-[11px]">
-                      {member.plan === 'SWIS' ? 'SELF WORK (SWIS)' : member.plan === 'TWIS' ? 'TEAM WORK (TWIS)' : 'COMBO'}
-                    </span>
-                  </div>
-
-                  {/* Privacy Controlled Mobile Number */}
-                  <div className="flex items-center gap-1.5 text-xs text-slate-300">
-                    <span className="text-slate-400 text-[10px]">Mobile:</span>
-                    {isMobileVisible ? (
-                      <span className="font-mono-acc text-slate-200 text-[11px] flex items-center gap-1.5">
-                        +91 {member.mobile}
-                        {isOwnCard && (
-                          <span className="text-[8px] text-slate-400 bg-slate-800/80 px-1 rounded border border-slate-700">
-                            स्पॉन्सर व्यू: {currentPrivacy.showMobile ? 'सार्वजनिक' : '🔒 सुरक्षित'}
-                          </span>
-                        )}
-                        {!isOwnCard && (
-                          <span className="text-[8px] bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 px-1 rounded font-bold">
-                            सार्वजनिक
-                          </span>
-                        )}
-                      </span>
-                    ) : (
-                      <span className="font-mono-acc text-amber-300 text-[11px] flex items-center gap-1.5">
-                        +91 {maskedMobile}
-                        <span className="text-[8px] bg-amber-950/80 text-amber-300 border border-amber-500/40 px-1.5 py-0.2 rounded font-bold inline-flex items-center gap-0.5">
-                          <Lock className="w-2.5 h-2.5 text-amber-400" /> प्राइवेसी सुरक्षित
-                        </span>
-                      </span>
-                    )}
-                  </div>
-
-                  {/* City & State (Privacy Controlled) */}
-                  <div className="flex items-center gap-1.5 text-xs text-slate-300">
-                    <span className="text-slate-400 text-[10px]">City:</span>
-                    <span className="text-slate-200 text-[11px] truncate">
-                      {isSponsorOrOther && currentPrivacy.showCity === false
-                        ? 'भारत (India) 🔒'
-                        : `${member.city || 'Indore'}, ${member.state || 'MP'}`}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Unique ACC ID Banner (Highlighted) */}
-            <div className="bg-slate-900 border-2 border-amber-500/40 rounded-xl p-2.5 sm:p-3 mb-3 relative overflow-hidden">
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
-                    <Sparkles className="w-3 h-3" /> OFFICIAL UNIQUE MEMBER 🆔
-                  </span>
-                  <p className="font-mono-acc font-black text-base sm:text-lg text-amber-300 tracking-wider truncate">
-                    {member.accId}
-                  </p>
-                </div>
-                <button
-                  onClick={handleCopyId}
-                  className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-lg border border-amber-500/40 text-[11px] font-bold transition shadow-xs shrink-0"
-                  title="Copy Member ID"
-                >
-                  {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copied ? 'कॉपी' : 'Copy'}</span>
-                </button>
-              </div>
-              <div className="mt-1 flex items-center justify-between text-[9px] text-slate-400 font-mono-acc border-t border-slate-800 pt-1">
-                <span>ACC = Achievers Club</span>
-                <span>249 = Activation</span>
-                <span>{member.plan} Plan</span>
-              </div>
-            </div>
-
-            {/* Secondary Details Grid */}
-            <div className="grid grid-cols-2 gap-2 text-xs bg-slate-950/60 p-2 sm:p-2.5 rounded-xl border border-slate-800 mb-3">
-              <div>
-                <span className="text-[9px] text-slate-400 block">Sponsor ID:</span>
-                <span className="font-mono-acc font-semibold text-slate-200 text-[10px] truncate block">
-                  {member.sponsorId || 'ACC249SWISRK01'}
-                </span>
-              </div>
-              <div>
-                <span className="text-[9px] text-slate-400 block">Sponsor Name:</span>
-                <span className="font-semibold text-slate-200 text-[10px] truncate block">
-                  {member.sponsorName || 'Rahul Kumar'}
-                </span>
-              </div>
-              <div>
-                <span className="text-[9px] text-slate-400 block">Activation Fee:</span>
-                <span className="font-bold text-emerald-400 text-[10px]">
-                  ₹249 (ONE TIME PAID)
-                </span>
-              </div>
-              <div>
-                <span className="text-[9px] text-slate-400 block">Active Date:</span>
-                <span className="font-mono-acc text-slate-300 text-[10px]">
-                  {member.paymentDate || '10-08-2026'}
-                </span>
-              </div>
-            </div>
-
-            {/* ============================================================= */}
-            {/* FOOTER: REFERRAL QR CODE & USER-SUBMITTED PROFILE LINK */}
-            {/* ============================================================= */}
-            <div className="border-t border-slate-800 pt-2.5 flex flex-col xs:flex-row items-stretch xs:items-start justify-between gap-2.5">
-              {/* Left Corner: Referral QR & Member Link Section */}
-              <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                {/* QR Code Container */}
-                <div className="relative shrink-0 flex flex-col items-center">
-                  <div className="w-13 h-13 sm:w-14 sm:h-14 bg-white rounded-lg p-0.5 sm:p-1 flex items-center justify-center overflow-hidden border border-amber-400/50 shadow-sm">
-                    <img
-                      src={
-                        qrViewMode === 'personal' && member.personalQrUrl && (isOwnCard || currentPrivacy.showPersonalQr)
-                          ? member.personalQrUrl
-                          : referralQrUrl
-                      }
-                      alt="Digital ID QR Code"
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                  {/* Allow toggle only if owner OR if sponsor allows personal QR */}
-                  {member.personalQrUrl && (isOwnCard || currentPrivacy.showPersonalQr) ? (
-                    <button
-                      type="button"
-                      onClick={() => setQrViewMode(qrViewMode === 'referral' ? 'personal' : 'referral')}
-                      className="text-[7.5px] text-amber-300 hover:text-white font-bold underline mt-0.5"
-                      title="Switch between Referral QR and Personal QR"
-                    >
-                      {qrViewMode === 'personal' ? 'Switch: Referral QR' : 'Switch: Personal QR'}
-                    </button>
-                  ) : (
-                    <span className="text-[7.5px] font-bold text-amber-300 uppercase tracking-tighter block text-center mt-0.5">
-                      Referral QR
-                    </span>
-                  )}
-                </div>
-
-                {/* Referral Link & User Submitted Link */}
-                <div className="text-[9px] text-slate-300 space-y-1 min-w-0 flex-1">
-                  <div className="min-w-0">
-                    <span className="text-[8px] text-amber-400 font-bold block uppercase tracking-wider">
-                      रेफरल लिंक (Referral Link):
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleCopyReferralLink}
-                      className="text-left font-mono-acc text-slate-300 hover:text-white truncate block w-full max-w-[200px] text-[8.5px] sm:text-[9px] transition"
-                      title="रेफरल लिंक कॉपी करें"
-                    >
-                      {copiedLink ? '✓ लिंक कॉपी हो गया!' : referralLink.replace(/^https?:\/\//, '')}
-                    </button>
-                  </div>
-
-                  {/* User Submitted Profile Link */}
-                  <div className="min-w-0">
-                    <span className="text-[8px] text-emerald-400 font-bold block uppercase tracking-wider">
-                      यूजर सबमिट लिंक (User Link):
-                    </span>
-                    {isSponsorOrOther && currentPrivacy.showProfileLink === false ? (
-                      <span className="text-slate-500 text-[8px] italic block flex items-center gap-1">
-                        <Lock className="w-2.5 h-2.5 text-slate-500" /> प्राइवेसी सुरक्षा के तहत सुरक्षित
-                      </span>
-                    ) : member.profileLink ? (
-                      <a
-                        href={member.profileLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-emerald-300 hover:text-emerald-200 bg-emerald-950/60 border border-emerald-500/30 px-1.5 py-0.5 rounded truncate max-w-full transition text-[8px] sm:text-[8.5px] font-semibold"
-                        title="सदस्य द्वारा सबमिट किया गया लिंक खोलें"
-                      >
-                        <ExternalLink className="w-2.5 h-2.5 shrink-0 text-emerald-400" />
-                        <span className="truncate">{member.profileLink.replace(/^https?:\/\//, '')}</span>
-                      </a>
-                    ) : (
-                      <span className="text-slate-500 text-[8px] italic block">
-                        उपलब्ध नहीं
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Side: Authority Stamp & Signature */}
-              <div className="text-right shrink-0 pt-0.5 self-end xs:self-auto">
-                <div className="inline-block border border-amber-500/50 rounded px-1.5 py-0.5 bg-amber-500/10 text-[7.5px] sm:text-[8px] font-bold text-amber-300 uppercase tracking-widest">
-                  START YOUNG RETIRE YOUNG
-                </div>
-                <p className="text-[7.5px] sm:text-[8px] text-slate-400 mt-0.5">Authorised Signature</p>
-                <p className="text-[8.5px] sm:text-[9px] font-mono-acc text-amber-400 font-bold italic">Achievers Community</p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          /* ========================================================================= */
-          /* BACK SIDE OF DIGITAL ID CARD (Rules, Platform Description & Services) */
-          /* ========================================================================= */
-          <div
-            id="printable-id-card-back"
-            className="relative w-full max-w-[430px] mx-auto bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 rounded-2xl border-2 border-amber-500/70 shadow-[0_0_40px_rgba(245,158,11,0.18)] overflow-hidden text-slate-100 p-3 sm:p-5 select-none animate-fadeIn space-y-3"
-          >
-            {/* Top Gold Header */}
-            <div className="relative border-b border-amber-500/30 pb-2.5 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-600 via-amber-400 to-yellow-300 p-0.5 shadow-md shrink-0">
-                  <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-                    <span className="font-extrabold text-amber-400 text-base font-display">ACC</span>
-                  </div>
-                </div>
-                <div>
-                  <h3 className="font-display font-black text-xs sm:text-sm tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-yellow-300">
-                    ACHIEVERS CLUB COMMUNITY (ACC)
-                  </h3>
-                  <span className="text-[8px] sm:text-[9px] tracking-wider text-slate-400 uppercase font-semibold block">
-                    TERMS, SERVICES & VERIFICATION PROTOCOL
-                  </span>
-                </div>
-              </div>
-
-              <div className="text-right">
-                <span className="text-[8px] text-slate-400 block font-mono-acc">ACC 🆔:</span>
-                <span className="text-[10px] font-mono-acc font-black text-amber-300">
-                  {member.accId}
-                </span>
-              </div>
-            </div>
-
-            {/* 1. Platform Objective & Description */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 space-y-1">
-              <div className="flex items-center gap-1.5 text-amber-400 font-bold text-[10px] uppercase tracking-wider">
-                <Sparkles className="w-3 h-3" />
-                <span>1. प्लेटफॉर्म परिचय (Platform Description)</span>
-              </div>
-              <p className="text-[9.5px] text-slate-300 leading-relaxed">
-                अचीवर्स क्लब कम्युनिटी (ACC) भारत के छात्र-छात्राओं और युवाओं का एक स्वावलंबन व डिजिटल स्किल डेवलपमेंट समुदाय है। यहाँ छात्र बिना पढ़ाई प्रभावित किए अपने स्मार्टफोन से SWIS एवं TWIS माध्यम से सुरक्षित पॉकेट मनी व स्वावलंबी आय अर्जित करते हैं।
-              </p>
-            </div>
-
-            {/* 2. Platform Core Services */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 space-y-1.5">
-              <div className="flex items-center gap-1.5 text-blue-400 font-bold text-[10px] uppercase tracking-wider">
-                <Zap className="w-3 h-3" />
-                <span>2. अधिकृत सेवाएं व लाभ (Services Information)</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[9px] text-slate-300">
-                <div className="p-1.5 bg-slate-950/60 rounded border border-slate-800">
-                  <strong className="text-amber-300 block">⚡ SWIS रिचार्ज कमीशन:</strong>
-                  <span>सभी प्रीपेड, DTH व बिल पेमेंट्स पर 3.30% फिक्स्ड कमीशन।</span>
-                </div>
-                <div className="p-1.5 bg-slate-950/60 rounded border border-slate-800">
-                  <strong className="text-emerald-300 block">👥 TWIS रेफरल हब:</strong>
-                  <span>प्रत्येक नए एक्टिवेटेड साथी पर ₹150 सीधी रेफरल इनकम (Daily UPI)।</span>
-                </div>
-                <div className="p-1.5 bg-slate-950/60 rounded border border-slate-800">
-                  <strong className="text-purple-300 block">📚 स्टूडेंट स्किल किट:</strong>
-                  <span>लाइफटाइम ट्रेनिंग वीडियो, कोर्सेज व सोशल प्रमोशन टूल्स।</span>
-                </div>
-                <div className="p-1.5 bg-slate-950/60 rounded border border-slate-800">
-                  <strong className="text-cyan-300 block">📱 Real App एक्सेस:</strong>
-                  <span>सत्यापित सदस्यों को अधिकृत Android APK डाउनलोड लिंक।</span>
-                </div>
-              </div>
-            </div>
-
-            {/* 3. Community Rules & Code of Conduct */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 space-y-1">
-              <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-[10px] uppercase tracking-wider">
-                <ShieldCheck className="w-3 h-3" />
-                <span>3. नियम व महत्वपूर्ण शर्तें (Community Rules)</span>
-              </div>
-              <ul className="text-[8.5px] text-slate-300 space-y-0.8 leading-tight list-disc pl-3">
-                <li>यह 🆔 कार्ड अहस्तांतरणीय (Non-transferable) है और केवल अधिकृत सदस्य हेतु मान्य है।</li>
-                <li>वॉलेट में न्यूनतम ₹100 होते ही UPI द्वारा बैंक ट्रांसफर का अनुरोध कर सकते हैं।</li>
-                <li>₹249 सदस्यता एक्टिवेशन शुल्क एकमुश्त (One-Time) है और आजीवन वैधता प्रदान करता है।</li>
-                <li>किसी भी प्रकार की भ्रामक जानकारी या अनधिकृत प्रचार पर सदस्यता तत्काल निरस्त की जा सकती है।</li>
-              </ul>
-            </div>
-
-            {/* 4. Official Helpline & Verification Seal */}
-            <div className="border-t border-slate-800 pt-2 flex items-center justify-between text-[8px] text-slate-400">
-              <div className="space-y-0.5">
-                <p className="text-slate-300 font-bold">आधिकारिक संपर्क एवं सहायता:</p>
-                <p>📞 हेल्पलाइन: <span className="text-emerald-400 font-semibold">{siteConfig.helplinePhone || '+91 8877490845'}</span></p>
-                <p>✉️ ईमेल: <span className="text-slate-200">{siteConfig.officialEmail || 'santosh09patidar@gmail.com'}</span></p>
-                <p>🌐 पोर्टल: <span className="text-amber-400 font-semibold">{siteConfig.websiteUrl || 'www.achieversclub.in'}</span></p>
-              </div>
-
-              <div className="text-right">
-                <div className="w-11 h-11 rounded-full bg-amber-500/20 border border-amber-400/40 flex flex-col items-center justify-center mx-auto mb-1 text-amber-300 font-bold">
-                  <span className="text-[7px]">ACC</span>
-                  <span className="text-[6.5px]">LEGAL</span>
-                </div>
-                <p className="text-[7.5px] text-slate-400 font-semibold">Authorised Signatory</p>
-                <p className="text-[8.5px] font-mono-acc text-amber-400 font-bold italic">
-                  {siteConfig.adminSignatoryName || 'Vikas Kumar'} ({siteConfig.adminSignatoryTitle || 'Admin'})
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+      {/* Interactive Card Container (Clicking opens pop-up modal!) */}
+      <div
+        onClick={() => setShowCardModal(true)}
+        className="flex justify-center p-0.5 sm:p-2 w-full max-w-full overflow-hidden cursor-pointer group transition-transform hover:scale-[1.01]"
+        title="आईडी कार्ड को पॉप-अप विंडो में फुल स्क्रीन देखने के लिए क्लिक करें"
+      >
+        {renderCardContent(false)}
       </div>
 
       {/* ========================================================================= */}
+      {/* FULL-SCREEN POP-UP MODAL WINDOW FOR DIGITAL ID CARD */}
+      {/* ========================================================================= */}
+      {showCardModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn">
+          <div className="relative max-w-xl w-full bg-slate-900 border-2 border-amber-500/60 rounded-2xl shadow-[0_0_60px_rgba(0,0,0,0.9)] overflow-hidden text-slate-100 flex flex-col my-auto max-h-[95vh]">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 p-4 border-b border-amber-500/40 flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-400 text-amber-400 flex items-center justify-center font-bold shrink-0">
+                  <Award className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-sm sm:text-base text-amber-300 truncate">
+                    {member.fullName} — डिजिटल पहचान पत्र (HD Full View)
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-mono-acc truncate">
+                    ACC 🆔: {member.accId} • {cardSide === 'front' ? 'आगे का भाग (Front)' : 'पीछे का भाग (Back)'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Front / Back Switcher + Close */}
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center bg-slate-800 p-0.5 rounded-lg border border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => setCardSide('front')}
+                    className={`px-2.5 py-1 text-xs font-bold rounded-md transition cursor-pointer ${
+                      cardSide === 'front' ? 'bg-[#2874f0] text-white shadow-xs' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Front
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCardSide('back')}
+                    className={`px-2.5 py-1 text-xs font-bold rounded-md transition cursor-pointer ${
+                      cardSide === 'back' ? 'bg-[#2874f0] text-white shadow-xs' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Back
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowCardModal(false)}
+                  className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition cursor-pointer"
+                  title="बंद करें"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body: High Resolution Scaled Card */}
+            <div className="p-4 sm:p-6 overflow-y-auto flex items-center justify-center bg-slate-950/80">
+              {renderCardContent(true)}
+            </div>
+
+            {/* Modal Footer Toolbar */}
+            <div className="bg-slate-950 p-3 sm:p-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs shrink-0">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCardSide(cardSide === 'front' ? 'back' : 'front')}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-lg border border-slate-700 transition cursor-pointer"
+                >
+                  <RotateCw className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{cardSide === 'front' ? 'पीछे का भाग देखें' : 'आगे का भाग देखें'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleShareWhatsApp}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-sm transition cursor-pointer"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>WhatsApp</span>
+                </button>
+              </div>
+
+              {/* Download Buttons inside Pop-up */}
+              {canDownload ? (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleDownloadFront}
+                    disabled={isDownloading}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-slate-950 font-black rounded-lg shadow-md transition disabled:opacity-50 cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Front HD डाउनलोड</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDownloadBack}
+                    disabled={isDownloading}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold rounded-lg border border-amber-500/40 shadow-sm transition disabled:opacity-50 cursor-pointer"
+                  >
+                    <Download className="w-4 h-4 text-amber-400" />
+                    <span>Back HD डाउनलोड</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDownloadBothSides}
+                    disabled={isDownloading}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-md transition disabled:opacity-50 cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>शीट (दोनों भाग)</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="text-amber-300 text-xs font-semibold flex items-center gap-1 bg-amber-950/60 px-3 py-1.5 rounded-lg border border-amber-500/30">
+                  <Lock className="w-3.5 h-3.5 text-amber-400" />
+                  <span>केवल व्यू मोड (डाउनलोड केवल कार्डधारक हेतु मान्य)</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ========================================================================= */}
       {/* CARDHOLDER PRIVACY SETTINGS MODAL */}
-      {/* Allows the user to decide what to show and what to hide on their sponsor ID card */}
       {/* ========================================================================= */}
       {showPrivacyModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
@@ -864,7 +1020,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
               <button
                 type="button"
                 onClick={() => setShowPrivacyModal(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg transition"
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -879,181 +1035,118 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
                 </p>
               </div>
 
-              {/* 1. Mobile Number Privacy */}
-              <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Phone className="w-4 h-4 text-[#2874f0]" />
-                    <span className="font-bold text-slate-900 text-xs">पर्सनल मोबाइल नंबर (Personal Mobile)</span>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(privacyDraft.showMobile)}
-                      onChange={(e) => setPrivacyDraft({ ...privacyDraft, showMobile: e.target.checked })}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
-                  </label>
-                </div>
-                <p className="text-[11px] text-slate-600">
-                  {privacyDraft.showMobile
-                    ? '🟢 सार्वजनिक: स्पॉन्सर कार्ड पर आपका पूरा नंबर (+91 ' + member.mobile + ') दिखाई देगा।'
-                    : '🔒 सुरक्षित (अनुशंसित): स्पॉन्सर कार्ड पर आपका नंबर ' + maskedMobile + ' के रूप में छुपा रहेगा।'}
-                </p>
-              </div>
-
-              {/* 2. WhatsApp Direct Contact */}
-              <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <MessageCircle className="w-4 h-4 text-emerald-600" />
-                    <span className="font-bold text-slate-900 text-xs">व्हाट्सएप संपर्क (WhatsApp Direct)</span>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(privacyDraft.showWhatsapp)}
-                      onChange={(e) => setPrivacyDraft({ ...privacyDraft, showWhatsapp: e.target.checked })}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
-                  </label>
-                </div>
-                <p className="text-[11px] text-slate-600">
-                  {privacyDraft.showWhatsapp
-                    ? '🟢 चालू: विजिटर्स स्पॉन्सर कार्ड से आपसे सीधा WhatsApp चैट शुरू कर सकेंगे।'
-                    : '🔒 बंद: पर्सनल व्हाट्सएप संपर्क छुपा रहेगा और कम्युनिटी हेल्पलाइन का उपयोग होगा।'}
-                </p>
-              </div>
-
-              {/* 3. Email Privacy */}
-              <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-purple-600" />
-                    <span className="font-bold text-slate-900 text-xs">ईमेल पता (Email Address)</span>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(privacyDraft.showEmail)}
-                      onChange={(e) => setPrivacyDraft({ ...privacyDraft, showEmail: e.target.checked })}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
-                  </label>
-                </div>
-                <p className="text-[11px] text-slate-600">
-                  {privacyDraft.showEmail
-                    ? '🟢 चालू: स्पॉन्सर कार्ड के विवरण में ईमेल पता दिखाई देगा।'
-                    : '🔒 बंद: ईमेल पता सुरक्षित और छुपा रहेगा।'}
-                </p>
-              </div>
-
-              {/* 4. City & State Privacy */}
-              <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-red-500" />
-                    <span className="font-bold text-slate-900 text-xs">शहर एवं राज्य (City & State)</span>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={privacyDraft.showCity !== false}
-                      onChange={(e) => setPrivacyDraft({ ...privacyDraft, showCity: e.target.checked })}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
-                  </label>
-                </div>
-                <p className="text-[11px] text-slate-600">
-                  {privacyDraft.showCity !== false
-                    ? '🟢 चालू: कार्ड पर शहर व राज्य (' + (member.city || 'Indore') + ', ' + (member.state || 'MP') + ') दिखेगा।'
-                    : '🔒 बंद: शहर छुपाकर केवल "भारत (India)" दिखेगा।'}
-                </p>
-              </div>
-
-              {/* 5. Personal QR Privacy */}
-              <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Sliders className="w-4 h-4 text-amber-600" />
-                    <span className="font-bold text-slate-900 text-xs">पर्सनल QR कोड (Personal QR)</span>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(privacyDraft.showPersonalQr)}
-                      onChange={(e) => setPrivacyDraft({ ...privacyDraft, showPersonalQr: e.target.checked })}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
-                  </label>
-                </div>
-                <p className="text-[11px] text-slate-600">
-                  {privacyDraft.showPersonalQr
-                    ? '🟢 चालू: स्पॉन्सर कार्ड पर आपका व्यक्तिगत QR दिखेगा (यदि अपलोड किया है)।'
-                    : '🔒 बंद (सुरक्षित): स्पॉन्सर कार्ड पर हमेशा सुरक्षित ऑफिशियल ACC रेफरल QR ही दिखेगा।'}
-                </p>
-              </div>
-
-              {/* 6. Profile Link Privacy */}
-              <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <ExternalLink className="w-4 h-4 text-cyan-600" />
-                    <span className="font-bold text-slate-900 text-xs">पर्सनल प्रोफाइल लिंक (Personal Link)</span>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={privacyDraft.showProfileLink !== false}
-                      onChange={(e) => setPrivacyDraft({ ...privacyDraft, showProfileLink: e.target.checked })}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
-                  </label>
-                </div>
-                <p className="text-[11px] text-slate-600">
-                  {privacyDraft.showProfileLink !== false
-                    ? '🟢 चालू: स्पॉन्सर कार्ड पर आपका सबमिट किया गया सोशल / पर्सनल लिंक दिखेगा।'
-                    : '🔒 बंद: व्यक्तिगत लिंक सुरक्षित और छुपा रहेगा।'}
-                </p>
-              </div>
-
               {privacySuccessMsg && (
-                <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 p-3 rounded-lg text-center font-bold text-xs flex items-center justify-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 p-3 rounded-xl font-bold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                   <span>{privacySuccessMsg}</span>
                 </div>
               )}
+
+              {/* Toggle 1: Mobile */}
+              <div className="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-slate-50 transition">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2 font-bold text-slate-900">
+                    <Phone className="w-4 h-4 text-blue-600" />
+                    <span>मोबाइल नंबर प्रदर्शित करें (Show Mobile)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    यदि बंद रहेगा तो मोबाइल नंबर <strong>{maskedMobile}</strong> के रूप में सुरक्षित रहेगा।
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={privacyDraft.showMobile}
+                    onChange={(e) => setPrivacyDraft({ ...privacyDraft, showMobile: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#2874f0]"></div>
+                </label>
+              </div>
+
+              {/* Toggle 2: WhatsApp Chat */}
+              <div className="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-slate-50 transition">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2 font-bold text-slate-900">
+                    <MessageCircle className="w-4 h-4 text-emerald-600" />
+                    <span>WhatsApp चैट बटन (Direct WhatsApp Contact)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    यदि चालू रहेगा तो नया विजिटर सीधे आपके WhatsApp पर मैसेज भेज सकेगा।
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={privacyDraft.showWhatsapp}
+                    onChange={(e) => setPrivacyDraft({ ...privacyDraft, showWhatsapp: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                </label>
+              </div>
+
+              {/* Toggle 3: City & State */}
+              <div className="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-slate-50 transition">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2 font-bold text-slate-900">
+                    <MapPin className="w-4 h-4 text-purple-600" />
+                    <span>शहर व राज्य दिखाएं (Show City & State)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    यदि बंद रहेगा तो स्थान केवल 'भारत (India)' के रूप में सुरक्षित रहेगा।
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={privacyDraft.showCity !== false}
+                    onChange={(e) => setPrivacyDraft({ ...privacyDraft, showCity: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                </label>
+              </div>
+
+              {/* Toggle 4: Profile Link */}
+              <div className="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-slate-50 transition">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2 font-bold text-slate-900">
+                    <ExternalLink className="w-4 h-4 text-teal-600" />
+                    <span>यूजर सबमिट लिंक दिखाएं (User Submitted Link)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    स्पॉन्सर कार्ड में आपके द्वारा डैशबोर्ड से जोड़ा गया लिंक दिखेगा।
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={privacyDraft.showProfileLink !== false}
+                    onChange={(e) => setPrivacyDraft({ ...privacyDraft, showProfileLink: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
+                </label>
+              </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="bg-slate-50 p-4 border-t border-gray-200 flex items-center justify-end gap-2.5">
+            <div className="p-4 bg-slate-50 border-t border-gray-200 flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setShowPrivacyModal(false)}
-                className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 font-bold rounded-sm border border-gray-300 text-xs transition"
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg transition cursor-pointer"
               >
                 रद्द करें
               </button>
               <button
                 type="button"
-                disabled={isSavingPrivacy}
                 onClick={handleSavePrivacySettings}
-                className="px-5 py-2 bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold rounded-sm shadow-md text-xs transition disabled:opacity-50 flex items-center gap-2"
+                disabled={isSavingPrivacy}
+                className="px-5 py-2 bg-[#2874f0] hover:bg-blue-700 text-white font-bold rounded-lg shadow-sm transition disabled:opacity-50 cursor-pointer"
               >
-                {isSavingPrivacy ? (
-                  <span>सहेज रहे हैं...</span>
-                ) : (
-                  <>
-                    <Check className="w-4 h-4" />
-                    <span>💾 प्राइवेसी सेटिंग्स सहेजें (Save Changes)</span>
-                  </>
-                )}
+                {isSavingPrivacy ? 'सहेज रहे हैं...' : 'सेटिंग्स सहेजें ✓'}
               </button>
             </div>
           </div>

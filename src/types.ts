@@ -49,6 +49,7 @@ export interface Member {
   fullName: string;
   mobile: string;
   whatsapp: string;
+  telegram?: string; // e.g. @username or https://t.me/username (optional, not required)
   email: string;
   qualification: string;
   state: string;
@@ -172,7 +173,8 @@ export type ActiveWindow =
   | 'disclaimer'
   | 'terms'
   | 'contact'
-  | 'faq';
+  | 'faq'
+  | 'guidelines';
 
 export interface AppServiceItem {
   id: string;
@@ -203,7 +205,7 @@ export interface PromotionalPoster {
 export interface SiteConfig {
   helplinePhone: string; // e.g. "+91 8877490845"
   whatsappNumber: string; // e.g. "+91 8877490845"
-  officialEmail: string; // e.g. "santosh09patidar@gmail.com"
+  officialEmail: string; // e.g. "newuserhelpline@gmail.com"
   officialAddress: string; // e.g. "Indore, Madhya Pradesh (452001)"
   websiteUrl: string; // e.g. "www.achieversclub.in"
   telegramLink?: string;
@@ -217,6 +219,10 @@ export interface SiteConfig {
   showHelplineWhatsAppButton: boolean;
   showCallButton?: boolean;
   showWhatsAppButton?: boolean;
+  showWhatsAppSupport?: boolean; // When false (default), WhatsApp is removed; admin enables via Admin Panel
+  showTelegramSupport?: boolean; // When true (default), Telegram is active
+  showEmailSupport?: boolean; // When true (default), Email is active
+  showCallSupport?: boolean; // Calling support toggle
   services: AppServiceItem[];
   promotionalPosters: PromotionalPoster[];
 }

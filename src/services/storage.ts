@@ -103,18 +103,24 @@ export const DEFAULT_PROMOTIONAL_POSTERS: PromotionalPoster[] = [
 export const DEFAULT_SITE_CONFIG: SiteConfig = {
   helplinePhone: '+91 8877490845',
   whatsappNumber: '+91 8877490845',
-  officialEmail: 'santosh09patidar@gmail.com',
-  officialAddress: 'Indore, Madhya Pradesh (452001)',
+  officialEmail: 'newuserhelpline@gmail.com',
+  officialAddress: 'Scheme No. 54, Vijay Nagar, Indore, Madhya Pradesh - 452001',
   websiteUrl: 'www.achieversclub.in',
-  telegramLink: 'https://t.me/achieversclub',
+  telegramLink: 'https://t.me/NEWUSERHELPLINE',
   adminSignatoryName: 'Vikas Kumar',
   adminSignatoryTitle: 'Chief Community Administrator',
   activationFee: 249,
   upiId: '8877490845@spicepay',
   upiReceiverName: 'Vikas Kumar',
-  announcementMarquee: '🔥 ZERO INVESTMENT WORK | ONE TIME 🆔 ACTIVATION CHARGE ₹249 ONLY | SWIS: 3.30% FIXED COMMISSION ON RECHARGES & BILLS | TWIS: ₹150 DIRECT REFERRAL INCOME | START YOUNG, RETIRE YOUNG | WHATSAPP SUPPORT: +91 8877490845 | EMAIL: santosh09patidar@gmail.com',
-  showHelplineCallButton: true,
-  showHelplineWhatsAppButton: true,
+  announcementMarquee: '🔥 ZERO INVESTMENT WORK | ONE TIME 🆔 ACTIVATION CHARGE ₹249 ONLY | SWIS: 3.30% FIXED COMMISSION ON RECHARGES & BILLS | TWIS: ₹150 DIRECT REFERRAL INCOME | START YOUNG, RETIRE YOUNG | TELEGRAM HELPDESK: https://t.me/NEWUSERHELPLINE | EMAIL: newuserhelpline@gmail.com',
+  showHelplineCallButton: false,
+  showHelplineWhatsAppButton: false,
+  showCallButton: false,
+  showWhatsAppButton: false,
+  showWhatsAppSupport: false, // WhatsApp button removed by default as instructed
+  showTelegramSupport: true,
+  showEmailSupport: true,
+  showCallSupport: false,
   services: DEFAULT_SERVICES,
   promotionalPosters: DEFAULT_PROMOTIONAL_POSTERS,
 };
@@ -853,10 +859,28 @@ export const StorageService = {
         return DEFAULT_SITE_CONFIG;
       }
       const parsed = JSON.parse(data);
+      const email = (!parsed.officialEmail || parsed.officialEmail === 'santosh09patidar@gmail.com')
+        ? 'newuserhelpline@gmail.com'
+        : parsed.officialEmail;
+      const telegram = (!parsed.telegramLink || parsed.telegramLink === 'https://t.me/achieversclub')
+        ? 'https://t.me/NEWUSERHELPLINE'
+        : parsed.telegramLink;
+
+      // WhatsApp is explicitly OFF by default unless admin toggles it ON in Admin Panel
+      const isWhatsAppActive = parsed.showWhatsAppSupport === true;
+
       // Merge with defaults in case of missing keys
       return {
         ...DEFAULT_SITE_CONFIG,
         ...parsed,
+        officialEmail: email,
+        telegramLink: telegram,
+        showWhatsAppSupport: isWhatsAppActive,
+        showHelplineWhatsAppButton: isWhatsAppActive,
+        showWhatsAppButton: isWhatsAppActive,
+        showTelegramSupport: parsed.showTelegramSupport !== false,
+        showEmailSupport: parsed.showEmailSupport !== false,
+        showCallSupport: Boolean(parsed.showCallSupport || parsed.showHelplineCallButton),
         services: Array.isArray(parsed.services) ? parsed.services : DEFAULT_SERVICES,
         promotionalPosters: Array.isArray(parsed.promotionalPosters) ? parsed.promotionalPosters : DEFAULT_PROMOTIONAL_POSTERS,
       };

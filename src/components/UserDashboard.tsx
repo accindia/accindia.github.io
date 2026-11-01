@@ -57,6 +57,7 @@ import {
   Shield,
   FileSpreadsheet,
   Eye,
+  Send,
 } from 'lucide-react';
 import { Member, PrivacySettings, WithdrawalRequest, ReferralRecord, ProfileFieldChange, ProfileEditAuditLog } from '../types';
 import { StorageService } from '../services/storage';
@@ -113,6 +114,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
   const [editFullName, setEditFullName] = useState<string>(currentUser.fullName || '');
   const [editMobile, setEditMobile] = useState<string>(currentUser.mobile || '');
   const [editWhatsapp, setEditWhatsapp] = useState<string>(currentUser.whatsapp || '');
+  const [editTelegram, setEditTelegram] = useState<string>(currentUser.telegram || '');
   const [editEmail, setEditEmail] = useState<string>(currentUser.email || '');
   const [editQualification, setEditQualification] = useState<string>(currentUser.qualification || 'Graduate');
   const [editState, setEditState] = useState<string>(currentUser.state || '');
@@ -164,6 +166,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
     if (currentUser.fullName) setEditFullName(currentUser.fullName);
     if (currentUser.mobile) setEditMobile(currentUser.mobile);
     if (currentUser.whatsapp) setEditWhatsapp(currentUser.whatsapp);
+    setEditTelegram(currentUser.telegram || '');
     if (currentUser.email) setEditEmail(currentUser.email);
     if (currentUser.qualification) setEditQualification(currentUser.qualification);
     if (currentUser.state) setEditState(currentUser.state);
@@ -345,6 +348,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
       checkFieldChange('fullName', 'पूरा नाम (Full Name)', currentUser.fullName, editFullName);
       checkFieldChange('mobile', 'मोबाइल नंबर (Mobile Number)', currentUser.mobile, editMobile);
       checkFieldChange('whatsapp', 'व्हाट्सएप नंबर (WhatsApp Number)', currentUser.whatsapp, editWhatsapp);
+      checkFieldChange('telegram', 'टेलीग्राम लिंक / यूज़रनेम (Telegram)', currentUser.telegram, editTelegram);
       checkFieldChange('email', 'ईमेल आईडी (Email ID)', currentUser.email, editEmail);
       checkFieldChange('qualification', 'योग्यता (Qualification)', currentUser.qualification, editQualification);
       checkFieldChange('state', 'राज्य (State)', currentUser.state, editState);
@@ -396,6 +400,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
         fullName: editFullName.trim() || currentUser.fullName,
         mobile: editMobile.trim() || currentUser.mobile,
         whatsapp: editWhatsapp.trim() || currentUser.whatsapp,
+        telegram: editTelegram.trim() || undefined,
         email: editEmail.trim(),
         qualification: editQualification.trim(),
         state: editState.trim(),
@@ -984,19 +989,35 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
               )}
             </div>
 
-            {/* Fast Track WhatsApp Button */}
-            <div className="pt-4 border-t border-gray-100">
-              <a
-                href={`https://api.whatsapp.com/send?phone=918877490845&text=${encodeURIComponent(
-                  `नमस्ते एडमिन! मैंने Achievers Club Community में ₹249 का रजिस्ट्रेशन किया है।\n\n🆔 Member ID: ${currentUser.accId}\n👤 Name: ${currentUser.fullName}\n📱 Mobile: ${currentUser.mobile}\n💼 Plan: ${currentUser.plan}\n💳 UTR Number: ${currentUser.utrNumber}\n\nकृपया मेरा खाता वेरीफाई करके Real App Link व डैशबोर्ड अनलॉक करें। धन्यवाद!`
-                )}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 shadow-md transition"
-              >
-                <MessageCircle className="w-4 h-4" />
-                <span>WhatsApp पर तुरंत वेरीफाई करवाएं (+91 8877490845)</span>
-              </a>
+            {/* Fast Track WhatsApp & Telegram Buttons */}
+            <div className="pt-4 border-t border-gray-100 space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <a
+                  href={`https://api.whatsapp.com/send?phone=${(siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '')}&text=${encodeURIComponent(
+                    `नमस्ते एडमिन! मैंने Achievers Club Community में ₹249 का रजिस्ट्रेशन किया है।\n\n🆔 Member ID: ${currentUser.accId}\n👤 Name: ${currentUser.fullName}\n📱 Mobile: ${currentUser.mobile}\n💼 Plan: ${currentUser.plan}\n💳 UTR Number: ${currentUser.utrNumber}\n\nकृपया मेरा खाता वेरीफाई करके Real App Link व डैशबोर्ड अनलॉक करें। धन्यवाद!`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-md transition"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span>WhatsApp पर वेरीफाई करवाएं</span>
+                </a>
+
+                <a
+                  href={siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3 bg-[#229ED9] hover:bg-[#1a85b9] text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-md transition"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Telegram सपोर्ट (@NEWUSERHELPLINE)</span>
+                </a>
+              </div>
+
+              <div className="text-center pt-1 text-[11px] text-slate-500">
+                Full Support Desk: <a href={`mailto:${siteConfig.officialEmail || 'newuserhelpline@gmail.com'}`} className="text-[#2874f0] font-bold underline">{siteConfig.officialEmail || 'newuserhelpline@gmail.com'}</a>
+              </div>
             </div>
           </div>
         </div>
@@ -1939,7 +1960,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                     <h4 className="text-xs font-bold text-slate-900">2. संपर्क विवरण (Contact Details)</h4>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
                     <div>
                       <label className="block text-[11px] font-bold text-slate-800 mb-1">
                         मोबाइल नंबर (Calling Mobile) <span className="text-red-500">*</span>
@@ -1967,6 +1988,25 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                         placeholder="10 अंक"
                         required
                         className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono-acc text-slate-900 focus:outline-none focus:border-[#2874f0]"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[11px] font-bold text-slate-800 flex items-center gap-1">
+                          <Send className="w-3 h-3 text-sky-500" />
+                          <span>टेलीग्राम (Telegram)</span>
+                        </label>
+                        <span className="text-[9.5px] text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                          वैकल्पिक
+                        </span>
+                      </div>
+                      <input
+                        type="text"
+                        value={editTelegram}
+                        onChange={(e) => setEditTelegram(e.target.value)}
+                        placeholder="उदा. @username या लिंक"
+                        className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0]"
                       />
                     </div>
 
@@ -2438,6 +2478,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                     setEditFullName(currentUser.fullName || '');
                     setEditMobile(currentUser.mobile || '');
                     setEditWhatsapp(currentUser.whatsapp || '');
+                    setEditTelegram(currentUser.telegram || '');
                     setEditEmail(currentUser.email || '');
                     setEditQualification(currentUser.qualification || 'Graduate');
                     setEditState(currentUser.state || '');

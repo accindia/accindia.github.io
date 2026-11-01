@@ -5,7 +5,6 @@ import {
   Sparkles,
   ShieldCheck,
   Video,
-  FileText,
   CreditCard,
   LayoutDashboard,
   LogIn,
@@ -17,9 +16,10 @@ import {
   Award,
   Zap,
   MessageCircle,
-  User,
   Megaphone,
   HelpCircle,
+  BookOpen,
+  Send,
 } from 'lucide-react';
 import { ActiveWindow, Member, SiteConfig } from '../types';
 import { StorageService, subscribeToSync } from '../services/storage';
@@ -153,37 +153,82 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const navItems = [
-    { id: 'home' as ActiveWindow, label: 'होम', icon: <Sparkles className="w-3.5 h-3.5 text-amber-500" /> },
-    { id: 'video' as ActiveWindow, label: 'ट्रेनिंग वीडियो', icon: <Video className="w-3.5 h-3.5 text-rose-500" /> },
-    { id: 'calculator' as ActiveWindow, label: 'कैलकुलेटर', icon: <Calculator className="w-3.5 h-3.5 text-emerald-600" /> },
+    {
+      id: 'home' as ActiveWindow,
+      label: 'होम',
+      icon: <Sparkles className="w-3.5 h-3.5" />,
+      colorClass: 'from-amber-400 to-amber-600 text-white',
+    },
+    {
+      id: 'video' as ActiveWindow,
+      label: 'ट्रेनिंग वीडियो',
+      icon: <Video className="w-3.5 h-3.5" />,
+      colorClass: 'from-rose-500 to-rose-700 text-white',
+    },
+    {
+      id: 'calculator' as ActiveWindow,
+      label: 'कैलकुलेटर',
+      icon: <Calculator className="w-3.5 h-3.5" />,
+      colorClass: 'from-emerald-500 to-emerald-700 text-white',
+    },
     ...(!currentUser
       ? [
           {
             id: 'register' as ActiveWindow,
             label: 'रजिस्ट्रेशन',
-            icon: <Sparkles className="w-3.5 h-3.5 text-[#fb641b]" />,
+            icon: <Sparkles className="w-3.5 h-3.5" />,
+            colorClass: 'from-orange-500 to-amber-600 text-white',
           },
         ]
       : []),
     {
       id: 'idcard' as ActiveWindow,
       label: 'डिजिटल ID',
-      icon: <CreditCard className="w-3.5 h-3.5 text-cyan-600" />,
+      icon: <CreditCard className="w-3.5 h-3.5" />,
+      colorClass: 'from-cyan-500 to-blue-600 text-white',
     },
     {
       id: 'dashboard' as ActiveWindow,
       label: 'डैशबोर्ड',
-      icon: <LayoutDashboard className="w-3.5 h-3.5 text-[#2874f0]" />,
+      icon: <LayoutDashboard className="w-3.5 h-3.5" />,
+      colorClass: 'from-[#2874f0] to-blue-700 text-white',
     },
     {
       id: 'promotions' as ActiveWindow,
       label: 'प्रमोशन किट',
-      icon: <Megaphone className="w-3.5 h-3.5 text-amber-500" />,
+      icon: <Megaphone className="w-3.5 h-3.5" />,
+      colorClass: 'from-amber-500 to-orange-600 text-white',
     },
-    { id: 'admin' as ActiveWindow, label: 'एडमिन पैनल', icon: <ShieldCheck className="w-3.5 h-3.5 text-red-500" /> },
-    { id: 'faq' as ActiveWindow, label: 'FAQ', icon: <HelpCircle className="w-3.5 h-3.5 text-yellow-500" /> },
-    { id: 'about' as ActiveWindow, label: 'हमारे बारे में', icon: <Award className="w-3.5 h-3.5 text-blue-500" /> },
-    { id: 'contact' as ActiveWindow, label: 'सपोर्ट', icon: <Phone className="w-3.5 h-3.5 text-green-600" /> },
+    {
+      id: 'guidelines' as ActiveWindow,
+      label: 'गाइड केंद्र',
+      icon: <BookOpen className="w-3.5 h-3.5" />,
+      colorClass: 'from-emerald-600 to-teal-700 text-white',
+    },
+    {
+      id: 'admin' as ActiveWindow,
+      label: 'एडमिन पैनल',
+      icon: <ShieldCheck className="w-3.5 h-3.5" />,
+      colorClass: 'from-red-500 to-rose-700 text-white',
+    },
+    {
+      id: 'faq' as ActiveWindow,
+      label: 'FAQ',
+      icon: <HelpCircle className="w-3.5 h-3.5" />,
+      colorClass: 'from-yellow-400 to-amber-500 text-slate-900',
+    },
+    {
+      id: 'about' as ActiveWindow,
+      label: 'हमारे बारे में',
+      icon: <Award className="w-3.5 h-3.5" />,
+      colorClass: 'from-blue-500 to-indigo-600 text-white',
+    },
+    {
+      id: 'contact' as ActiveWindow,
+      label: 'सपोर्ट',
+      icon: <Phone className="w-3.5 h-3.5" />,
+      colorClass: 'from-green-500 to-emerald-700 text-white',
+    },
   ];
 
   const cleanPhone = (siteConfig.helplinePhone || '+91 8877490845').replace(/[^0-9]/g, '');
@@ -191,17 +236,19 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 w-full shadow-md bg-[#2874f0] select-none">
-      {/* Top Yellow Announcement Banner - Highlights & Features Showcase */}
+      {/* ------------------------------------------------------------- */}
+      {/* 1. Top Yellow Announcement Banner - Highlights & Features     */}
+      {/* ------------------------------------------------------------- */}
       <div className="bg-[#ffe500] text-[#212121] text-xs font-semibold py-1 px-2 sm:px-4 overflow-hidden border-b border-yellow-400 select-none">
         <div className="flex items-center justify-between gap-2 max-w-7xl mx-auto w-full">
           {/* Badge: Offer & Website USP Tag */}
           <div className="flex items-center gap-1.5 shrink-0">
-            <div className="flex items-center gap-1 bg-[#2874f0] text-white px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-black shadow-xs">
+            <div className="flex items-center gap-1 bg-[#2874f0] text-white px-2 py-0.5 rounded-lg text-[10px] sm:text-[11px] font-black shadow-[0_2px_4px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.4)]">
               <Zap className="w-3 h-3 text-yellow-300 fill-yellow-300 animate-pulse" />
               <span>वेबसाइट की खासियत</span>
             </div>
             {/* Active Rotating Feature Tag */}
-            <div className="hidden sm:flex items-center gap-1 text-[11px] font-black text-slate-900 bg-black/10 px-2 py-0.5 rounded transition-all">
+            <div className="hidden sm:flex items-center gap-1 text-[11px] font-black text-slate-900 bg-black/10 px-2 py-0.5 rounded-md transition-all">
               <span>{websiteFeatures[featureIndex].title}:</span>
               <span className="font-semibold text-slate-800">{websiteFeatures[featureIndex].tag}</span>
             </div>
@@ -218,68 +265,77 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Quick rotating feature badge on right */}
           <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-[#212121] font-bold shrink-0">
-            <span className="hidden md:inline bg-white/70 px-1.5 py-0.5 rounded text-slate-800 text-[10px]">
+            <span className="hidden md:inline bg-white/70 px-1.5 py-0.5 rounded-md text-slate-800 text-[10px] shadow-xs">
               {featureIndex + 1}/{websiteFeatures.length}
             </span>
-            <span className="bg-emerald-700 text-white px-2 py-0.5 rounded text-[10px] font-bold hidden xs:inline">
+            <span className="bg-emerald-700 text-white px-2 py-0.5 rounded-md text-[10px] font-bold hidden xs:inline shadow-xs">
               ✓ 100% VERIFIED
             </span>
           </div>
         </div>
       </div>
 
-      {/* Main Royal Blue Header Bar - 100% Responsive for All Devices */}
-      <div className="bg-[#2874f0] text-white w-full">
-        <div className="max-w-7xl mx-auto px-2 sm:px-4 md:px-6 py-2 flex items-center justify-between gap-1 sm:gap-3 w-full">
-          {/* Brand Logo - Shrink-safe so it never pushes the right buttons off-screen */}
+      {/* ------------------------------------------------------------- */}
+      {/* 2. Main Royal Blue Header Bar - 100% Responsive for All      */}
+      {/* ------------------------------------------------------------- */}
+      <div className="bg-[#2874f0] text-white w-full border-b border-blue-400/20">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 md:px-6 py-1.5 sm:py-2 flex items-center justify-between gap-1.5 sm:gap-3 w-full">
+          {/* Brand Logo - 3D Embossed ACC Badge */}
           <div 
             onClick={() => setActiveWindow('home')}
-            className="flex items-center gap-1.5 sm:gap-2 cursor-pointer group select-none min-w-0 shrink"
+            className="flex items-center gap-1.5 sm:gap-2.5 cursor-pointer group select-none min-w-0 shrink"
+            title="Achievers Club Community - होम"
           >
-            <div className="w-7 h-7 sm:w-9 sm:h-9 rounded bg-[#ffe500] text-[#2874f0] flex items-center justify-center font-black text-xs sm:text-base tracking-wider shadow-xs group-hover:scale-105 transition-transform shrink-0">
-              ACC
+            {/* 3D Embossed ACC Emblem */}
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-b from-[#fff777] via-[#ffe500] to-[#e6cf00] text-[#1258c7] flex items-center justify-center font-black text-xs sm:text-base tracking-wider shadow-[0_3px_8px_rgba(0,0,0,0.3),inset_0_1.5px_1px_rgba(255,255,255,0.95),inset_0_-1.5px_1px_rgba(0,0,0,0.2)] border border-yellow-200 group-hover:scale-105 active:translate-y-0.5 transition-all shrink-0">
+              <span className="drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">ACC</span>
             </div>
-            <div className="flex flex-col min-w-0">
-              <span className="font-display font-black text-xs sm:text-base md:text-lg tracking-tight text-white leading-none truncate">
+            <div className="flex flex-col min-w-0 justify-center">
+              <span className="font-display font-black text-xs sm:text-base md:text-lg tracking-tight text-white leading-tight truncate drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]">
                 Achievers Club
               </span>
-              <span className="text-[9px] sm:text-[11px] text-[#ffe500] italic font-bold flex items-center gap-0.5 mt-0.5 truncate">
+              <span className="text-[9.5px] sm:text-[11px] text-[#ffe500] italic font-bold flex items-center gap-1 leading-none mt-0.5 truncate">
                 <span>Community</span>
-                <span className="hidden sm:inline text-[9px] text-white font-normal not-italic ml-1">· Start Young</span>
+                <span className="hidden sm:inline text-[9px] text-blue-100 font-normal not-italic">· Start Young</span>
               </span>
             </div>
           </div>
 
           {/* Real-time IST Digital Clock (Desktop only) */}
-          <div className="hidden lg:flex items-center gap-3 bg-[#1c52b8] border border-blue-400/30 rounded-md px-3 py-1 shadow-inner text-xs shrink-0">
-            <div className="flex items-center gap-1.5 border-r border-blue-400/40 pr-2.5">
-              <Clock className="w-3.5 h-3.5 text-[#ffe500]" />
+          <div className="hidden lg:flex items-center gap-3 bg-[#1c52b8] border border-blue-400/40 rounded-xl px-3 py-1 shadow-[0_2px_6px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(0,0,0,0.25)] text-xs shrink-0">
+            <div className="flex items-center gap-2 border-r border-blue-400/40 pr-2.5">
+              <div className="w-6 h-6 rounded-lg bg-gradient-to-b from-yellow-300 to-amber-500 text-slate-900 flex items-center justify-center shadow-[0_1.5px_3px_rgba(0,0,0,0.2),inset_0_1px_0.5px_rgba(255,255,255,0.7)] shrink-0">
+                <Clock className="w-3.5 h-3.5" />
+              </div>
               <div className="flex flex-col">
-                <span className="text-[9px] text-blue-200 font-semibold uppercase">IST Time</span>
+                <span className="text-[9px] text-blue-200 font-semibold uppercase tracking-wider">IST Time</span>
                 <span className="font-mono-acc font-bold text-white text-xs">
                   {currentTime || '12:00:00 PM'}
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-blue-200" />
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-gradient-to-b from-blue-400 to-blue-600 text-white flex items-center justify-center shadow-[0_1.5px_3px_rgba(0,0,0,0.2),inset_0_1px_0.5px_rgba(255,255,255,0.5)] shrink-0">
+                <Calendar className="w-3.5 h-3.5" />
+              </div>
               <div className="flex flex-col">
-                <span className="text-[9px] text-blue-200 font-semibold uppercase">Today</span>
-                <span className="text-xs font-medium text-white">
+                <span className="text-[9px] text-blue-200 font-semibold uppercase tracking-wider">Today</span>
+                <span className="text-xs font-semibold text-white">
                   {currentDate || 'Saturday, 19 Sep'}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* User Account / Login & Register Actions - Fits with Ample Space on All Mobile Screens */}
+          {/* Top Action Buttons - 3D Icons & Sized Text Boxes (Zero Cutoff on Mobile) */}
           <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-auto">
             {currentUser ? (
-              /* LOGGED IN USER ACTIONS WITH SYMBOLIC LOGOS */
-              <div className="flex items-center gap-1 sm:gap-1.5 bg-[#1c52b8] border border-blue-400/30 rounded-md p-0.5 sm:p-1 pr-1 sm:pr-2 shrink-0">
+              /* LOGGED IN USER ACTIONS WITH 3D BUTTONS */
+              <div className="flex items-center gap-1 sm:gap-2 bg-[#1c52b8]/80 border border-blue-400/40 rounded-xl p-1 pr-1.5 sm:pr-2 shadow-[0_2px_6px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.2)] shrink-0">
+                {/* 3D User Avatar Badge */}
                 <div 
                   onClick={() => handleNavClick('idcard')}
-                  className="w-7 h-7 rounded-full bg-[#ffe500] text-[#2874f0] flex items-center justify-center font-bold text-xs cursor-pointer hover:ring-2 hover:ring-yellow-300 transition overflow-hidden shrink-0 border border-white/60"
+                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-b from-[#fff777] via-[#ffe500] to-[#e6cf00] text-[#1258c7] flex items-center justify-center font-black text-xs cursor-pointer shadow-[0_2px_5px_rgba(0,0,0,0.25),inset_0_1px_1px_rgba(255,255,255,0.9)] hover:scale-105 active:translate-y-0.5 transition-all overflow-hidden shrink-0 border border-yellow-200"
                   title="डिजिटल ID कार्ड देखें"
                 >
                   {currentUser.avatarUrl ? (
@@ -289,88 +345,124 @@ export const Header: React.FC<HeaderProps> = ({
                   )}
                 </div>
 
+                {/* 3D Dashboard Button */}
                 <button
+                  type="button"
                   onClick={() => setActiveWindow('dashboard')}
-                  className="text-[11px] sm:text-xs font-bold bg-white text-[#2874f0] px-1.5 sm:px-2.5 py-1 rounded-sm hover:bg-slate-100 transition shadow-xs whitespace-nowrap shrink-0 flex items-center gap-1"
+                  className="group relative flex items-center gap-1 sm:gap-1.5 bg-gradient-to-b from-white via-slate-50 to-slate-100 text-[#2874f0] hover:text-[#1258c7] px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl font-black text-[11px] sm:text-xs shadow-[0_3px_8px_rgba(0,0,0,0.2),inset_0_1.5px_1px_rgba(255,255,255,1)] border border-slate-200 active:translate-y-0.5 transition cursor-pointer shrink-0"
                 >
-                  <LayoutDashboard className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#2874f0] shrink-0" />
-                  <span>डैशबोर्ड</span>
+                  <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-lg bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white flex items-center justify-center shadow-[0_2px_4px_rgba(40,116,240,0.4),inset_0_1px_0.5px_rgba(255,255,255,0.6)] shrink-0">
+                    <LayoutDashboard className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                  </div>
+                  <span className="whitespace-nowrap leading-none">डैशबोर्ड</span>
                 </button>
 
+                {/* 3D Logout Button */}
                 <button
+                  type="button"
                   onClick={onLogout}
-                  className="p-1 text-blue-200 hover:text-white transition shrink-0"
+                  className="p-1 sm:p-1.5 text-red-200 hover:text-white bg-red-600/25 hover:bg-red-600/40 rounded-lg border border-red-400/30 transition shadow-xs active:translate-y-0.5 shrink-0"
                   title="लॉगआउट करें"
                 >
-                  <LogOut className="w-3.5 h-3.5" />
+                  <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </button>
               </div>
             ) : (
-              /* LOGGED OUT ACTIONS WITH SYMBOLIC LOGOS */
-              <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+              /* LOGGED OUT ACTIONS: 3D LOGIN & 3D REGISTER (ZERO TEXT CUTOFF) */
+              <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                {/* 3D Login Button */}
                 <button
+                  type="button"
                   onClick={() => setActiveWindow('login')}
-                  className="text-[11px] sm:text-xs font-bold text-[#2874f0] bg-white hover:bg-slate-50 px-1.5 sm:px-3 py-1 sm:py-1.5 rounded-sm shadow-xs transition whitespace-nowrap shrink-0 flex items-center gap-1"
+                  className="group relative flex items-center gap-1 sm:gap-1.5 bg-gradient-to-b from-white via-slate-50 to-slate-100 text-[#2874f0] hover:text-[#1258c7] px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl font-black text-[11px] sm:text-xs shadow-[0_3px_8px_rgba(0,0,0,0.2),inset_0_1.5px_1px_rgba(255,255,255,1)] border border-slate-200 active:translate-y-0.5 transition cursor-pointer shrink-0"
+                  title="विद्यार्थी लॉगिन करें"
                 >
-                  <LogIn className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#2874f0] shrink-0" />
-                  <span className="hidden sm:inline">विद्यार्थी लॉगिन</span>
-                  <span className="sm:hidden">लॉगिन</span>
+                  <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-lg bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white flex items-center justify-center shadow-[0_2px_4px_rgba(40,116,240,0.35),inset_0_1px_0.5px_rgba(255,255,255,0.6)] shrink-0">
+                    <LogIn className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                  </div>
+                  <span className="whitespace-nowrap leading-none">लॉगिन</span>
                 </button>
+
+                {/* 3D Register Button */}
                 <button
+                  type="button"
                   onClick={() => setActiveWindow('register')}
-                  className="text-[11px] sm:text-xs font-bold text-white bg-[#fb641b] hover:bg-[#e85a14] px-1.5 sm:px-3 py-1 sm:py-1.5 rounded-sm shadow-xs transition flex items-center gap-1 whitespace-nowrap shrink-0"
+                  className="group relative flex items-center gap-1 sm:gap-1.5 bg-gradient-to-b from-[#fb641b] via-[#ea580c] to-[#c2410c] text-white hover:from-[#ea580c] hover:to-[#9a3412] px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl font-black text-[11px] sm:text-xs shadow-[0_3px_10px_rgba(251,100,27,0.4),inset_0_1.5px_1px_rgba(255,255,255,0.5)] border border-amber-300/40 active:translate-y-0.5 transition cursor-pointer shrink-0"
+                  title="कंपनी डायरेक्ट ₹249 में रजिस्ट्रेशन करें"
                 >
-                  <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-yellow-300 shrink-0" />
-                  <span className="hidden sm:inline">रजिस्ट्रेशन (₹249)</span>
-                  <span className="sm:hidden">रजिस्टर ₹249</span>
+                  <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-lg bg-gradient-to-b from-yellow-300 to-amber-400 text-slate-950 flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.25),inset_0_1px_0.5px_rgba(255,255,255,0.8)] shrink-0">
+                    <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-pulse" />
+                  </div>
+                  <span className="whitespace-nowrap leading-none">रजिस्टर ₹249</span>
                 </button>
               </div>
             )}
 
-            {/* Mobile Menu Toggle Button (ALWAYS INSIDE VIEWPORT & VISIBLE) */}
+            {/* 3D Mobile Menu Toggle Button */}
             <button
+              type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-1 text-white hover:bg-[#1c52b8] active:bg-[#143e8c] rounded-md transition shrink-0 border border-blue-400/40 flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8"
+              className="md:hidden p-1 sm:p-1.5 text-white bg-gradient-to-b from-blue-500 to-[#1c52b8] hover:from-blue-400 hover:to-[#17469e] active:translate-y-0.5 rounded-xl shadow-[0_3px_8px_rgba(0,0,0,0.25),inset_0_1.5px_1px_rgba(255,255,255,0.4)] border border-blue-300/40 flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 shrink-0 transition cursor-pointer"
               aria-label="मेनू खोलें"
               title="मेनू खोलें"
             >
-              {mobileMenuOpen ? <X className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-300" /> : <Menu className="w-4 h-4 sm:w-5 sm:h-5" />}
+              {mobileMenuOpen ? (
+                <X className="w-4 h-4 text-yellow-300 drop-shadow-sm" />
+              ) : (
+                <Menu className="w-4 h-4 text-white drop-shadow-sm" />
+              )}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Navigation Sub-bar - Perfectly Adjusted Desktop Menu */}
-      <div className="hidden md:block bg-white border-b border-gray-200 px-3 py-1 shadow-xs w-full">
+      {/* ------------------------------------------------------------- */}
+      {/* 3. Navigation Sub-bar - 3D Buttons for Desktop                */}
+      {/* ------------------------------------------------------------- */}
+      <div className="hidden md:block bg-white border-b border-gray-200 px-3 py-1.5 shadow-xs w-full">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-1 lg:gap-1.5">
           {navItems.map((item) => {
             const isActive = activeWindow === item.id;
             return (
               <button
                 key={item.id}
+                type="button"
                 onClick={() => handleNavClick(item.id)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                className={`group flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap active:translate-y-0.5 ${
                   isActive
-                    ? 'text-[#2874f0] font-bold bg-blue-50 border border-blue-200 shadow-xs ring-1 ring-blue-300/50'
-                    : 'text-slate-700 hover:text-[#2874f0] hover:bg-slate-100 border border-transparent'
+                    ? 'bg-gradient-to-b from-blue-50 to-blue-100 text-[#2874f0] border-2 border-[#2874f0] shadow-[0_3px_8px_rgba(40,116,240,0.25),inset_0_1px_1px_rgba(255,255,255,0.9)]'
+                    : 'bg-gradient-to-b from-white via-slate-50 to-slate-100 text-slate-700 hover:text-[#2874f0] border border-slate-200/90 hover:border-blue-300 shadow-[0_2px_4px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.9)]'
                 }`}
               >
-                {item.icon}
-                <span>{item.label}</span>
+                {/* 3D Icon Capsule */}
+                <div
+                  className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 border border-white/50 ${
+                    isActive
+                      ? 'bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white shadow-[0_2px_4px_rgba(40,116,240,0.35),inset_0_1px_0.5px_rgba(255,255,255,0.5)]'
+                      : `bg-gradient-to-b ${item.colorClass} shadow-[0_1.5px_3px_rgba(0,0,0,0.15),inset_0_1px_0.5px_rgba(255,255,255,0.6)]`
+                  }`}
+                >
+                  <span className="drop-shadow-[0_1px_1px_rgba(0,0,0,0.25)] flex items-center justify-center">
+                    {item.icon}
+                  </span>
+                </div>
+                <span className="leading-tight">{item.label}</span>
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Mobile Drawer Navigation (100% Screen Fit Dropdown Modal) */}
+      {/* ------------------------------------------------------------- */}
+      {/* 4. Mobile Drawer Navigation - 3D Buttons & Zero Cutoff Grid    */}
+      {/* ------------------------------------------------------------- */}
       {mobileMenuOpen && (
         <div className="md:hidden bg-white border-b border-gray-200 px-3.5 py-4 space-y-3 animate-fadeIn text-slate-800 shadow-2xl max-h-[85vh] overflow-y-auto">
           {/* User Account Card inside Mobile Menu */}
           {currentUser ? (
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-xl border border-blue-200 flex items-center justify-between gap-3">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-2xl border border-blue-200 shadow-[0_3px_10px_rgba(40,116,240,0.1),inset_0_1px_0_rgba(255,255,255,0.8)] flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-10 h-10 rounded-full bg-[#2874f0] text-white flex items-center justify-center font-bold text-sm shadow-sm overflow-hidden shrink-0 border-2 border-white">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white flex items-center justify-center font-bold text-sm shadow-[0_3px_6px_rgba(40,116,240,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)] overflow-hidden shrink-0 border border-white">
                   {currentUser.avatarUrl ? (
                     <img src={currentUser.avatarUrl} alt={currentUser.fullName} className="w-full h-full object-cover" />
                   ) : (
@@ -380,94 +472,130 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="min-w-0">
                   <p className="font-bold text-slate-900 text-xs truncate">{currentUser.fullName}</p>
                   <p className="text-[#2874f0] font-mono-acc text-[11px] font-semibold">{currentUser.accId}</p>
-                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded inline-block mt-0.5">
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-md inline-block mt-0.5">
                     {currentUser.plan} Plan
                   </span>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => {
                   onLogout();
                   setMobileMenuOpen(false);
                 }}
-                className="text-xs text-red-600 flex items-center gap-1 bg-white hover:bg-red-50 px-2.5 py-1.5 rounded-lg border border-red-200 font-bold shadow-xs shrink-0"
+                className="text-xs text-red-600 flex items-center gap-1 bg-white hover:bg-red-50 px-2.5 py-1.5 rounded-xl border border-red-200 font-bold shadow-[0_2px_4px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] active:translate-y-0.5 shrink-0 cursor-pointer"
               >
                 <LogOut className="w-3.5 h-3.5" />
-                लॉगआउट
+                <span>लॉगआउट</span>
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-2 pb-1 border-b border-gray-100">
+            <div className="grid grid-cols-2 gap-2 pb-2 border-b border-gray-100">
+              {/* 3D Mobile Login */}
               <button
+                type="button"
                 onClick={() => {
                   setActiveWindow('login');
                   setMobileMenuOpen(false);
                 }}
-                className="py-2.5 px-3 bg-blue-50 hover:bg-blue-100 text-[#2874f0] font-bold text-xs rounded-lg border border-blue-200 flex items-center justify-center gap-1.5"
+                className="group py-2.5 px-3 bg-gradient-to-b from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-[#2874f0] font-black text-xs rounded-xl border border-blue-300 shadow-[0_3px_6px_rgba(40,116,240,0.15),inset_0_1px_0_rgba(255,255,255,0.8)] active:translate-y-0.5 flex items-center justify-center gap-2 cursor-pointer"
               >
-                <LogIn className="w-3.5 h-3.5" />
-                <span>विद्यार्थी लॉगिन</span>
+                <div className="w-6 h-6 rounded-lg bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white flex items-center justify-center shadow-[0_2px_4px_rgba(40,116,240,0.35),inset_0_1px_0.5px_rgba(255,255,255,0.5)] shrink-0">
+                  <LogIn className="w-3.5 h-3.5" />
+                </div>
+                <span className="leading-none">विद्यार्थी लॉगिन</span>
               </button>
+
+              {/* 3D Mobile Register */}
               <button
+                type="button"
                 onClick={() => {
                   setActiveWindow('register');
                   setMobileMenuOpen(false);
                 }}
-                className="py-2.5 px-3 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold text-xs rounded-lg shadow-sm flex items-center justify-center gap-1.5"
+                className="group py-2.5 px-3 bg-gradient-to-b from-[#fb641b] via-[#ea580c] to-[#c2410c] hover:from-[#ea580c] hover:to-[#9a3412] text-white font-black text-xs rounded-xl shadow-[0_3px_10px_rgba(251,100,27,0.35),inset_0_1.5px_1px_rgba(255,255,255,0.5)] active:translate-y-0.5 flex items-center justify-center gap-2 cursor-pointer"
               >
-                <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
-                <span>रजिस्ट्रेशन (₹249)</span>
+                <div className="w-6 h-6 rounded-lg bg-gradient-to-b from-yellow-300 to-amber-400 text-slate-950 flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.25),inset_0_1px_0.5px_rgba(255,255,255,0.8)] shrink-0">
+                  <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                </div>
+                <span className="leading-none">रजिस्टर ₹249</span>
               </button>
             </div>
           )}
 
           {/* Mobile Clock & Status */}
-          <div className="bg-slate-50 p-2.5 rounded-lg border border-gray-200 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-[#2874f0]" />
+          <div className="bg-slate-50 p-2.5 rounded-xl border border-gray-200 flex items-center justify-between text-xs shadow-inner">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-md bg-gradient-to-b from-blue-500 to-[#2874f0] text-white flex items-center justify-center shadow-xs">
+                <Clock className="w-3 h-3" />
+              </div>
               <span className="font-mono-acc font-bold text-slate-800">{currentTime}</span>
             </div>
-            <span className="text-slate-500 text-[11px]">{currentDate}</span>
+            <span className="text-slate-500 text-[11px] font-semibold">{currentDate}</span>
           </div>
 
-          {/* Navigation Items 2-Column Grid */}
+          {/* Navigation Items 2-Column Grid with 3D Icons & Multi-Line Text Boxes */}
           <div className="grid grid-cols-2 gap-2 pt-1">
-            {navItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  handleNavClick(item.id);
-                  setMobileMenuOpen(false);
-                }}
-                className={`flex items-center gap-2 p-2.5 rounded-lg text-left text-xs transition ${
-                  activeWindow === item.id
-                    ? 'bg-blue-50 text-[#2874f0] font-bold border border-blue-300 shadow-xs'
-                    : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-gray-200/60'
-                }`}
-              >
-                <div className="shrink-0">{item.icon}</div>
-                <span className="truncate">{item.label}</span>
-              </button>
-            ))}
+            {navItems.map((item) => {
+              const isActive = activeWindow === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    handleNavClick(item.id);
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`group flex items-center gap-2 p-2.5 rounded-xl text-left text-xs font-bold transition-all active:translate-y-0.5 cursor-pointer min-w-0 ${
+                    isActive
+                      ? 'bg-gradient-to-b from-blue-50 to-blue-100 text-[#2874f0] border-2 border-[#2874f0] shadow-[0_3px_8px_rgba(40,116,240,0.25),inset_0_1px_1px_rgba(255,255,255,0.9)]'
+                      : 'bg-gradient-to-b from-white via-slate-50 to-slate-100 text-slate-800 border border-slate-200/90 hover:border-blue-300 shadow-[0_2px_5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.9)]'
+                  }`}
+                >
+                  {/* 3D Icon Capsule */}
+                  <div
+                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 border border-white/50 ${
+                      isActive
+                        ? 'bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white shadow-[0_2px_4px_rgba(40,116,240,0.35),inset_0_1px_0.5px_rgba(255,255,255,0.5)]'
+                        : `bg-gradient-to-b ${item.colorClass} shadow-[0_2px_4px_rgba(0,0,0,0.15),inset_0_1px_0.5px_rgba(255,255,255,0.6)]`
+                    }`}
+                  >
+                    <span className="drop-shadow-[0_1px_1px_rgba(0,0,0,0.25)] flex items-center justify-center">
+                      {item.icon}
+                    </span>
+                  </div>
+                  {/* Text Container - Zero Truncation so Hindi words are never cut */}
+                  <div className="flex-1 min-w-0">
+                    <span className="leading-tight break-words block">{item.label}</span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
-          {/* Direct WhatsApp & Phone Helpline Shortcuts */}
-          <div className="pt-2 border-t border-gray-200 flex items-center gap-2">
+          {/* Direct WhatsApp & Telegram Helpline 3D Shortcuts */}
+          <div className="pt-2 border-t border-gray-200 grid grid-cols-2 gap-2">
             <a
               href={`https://api.whatsapp.com/send?phone=${cleanWhatsApp}&text=Namaste%20ACC%20Support%2C%20mujhe%20Achievers%20Club%20Community%20ke%20bare%20me%20jankari%20chahiye.`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs"
+              className="py-2.5 px-3 bg-gradient-to-b from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-[0_3px_8px_rgba(16,185,129,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)] active:translate-y-0.5 border border-emerald-400/40"
             >
-              <MessageCircle className="w-3.5 h-3.5" />
-              <span>WhatsApp हेल्प</span>
+              <div className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center shrink-0">
+                <MessageCircle className="w-3.5 h-3.5 text-white" />
+              </div>
+              <span className="whitespace-nowrap">WhatsApp</span>
             </a>
             <a
-              href={`tel:${cleanPhone}`}
-              className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 border border-slate-300"
+              href={siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="py-2.5 px-3 bg-gradient-to-b from-[#229ED9] to-[#177db0] hover:from-[#2ab2f3] hover:to-[#229ED9] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-[0_3px_8px_rgba(34,158,217,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)] active:translate-y-0.5 border border-cyan-300/40"
             >
-              <Phone className="w-3.5 h-3.5 text-blue-600" />
-              <span>कॉल करें</span>
+              <div className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center shrink-0">
+                <Send className="w-3.5 h-3.5 text-white" />
+              </div>
+              <span className="whitespace-nowrap">Telegram</span>
             </a>
           </div>
         </div>
@@ -475,4 +603,3 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
-

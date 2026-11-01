@@ -14,6 +14,7 @@ import { StudentPortalGate } from './components/StudentPortalGate';
 import { IdCardAccessGate } from './components/IdCardAccessGate';
 import { PromotionBrandingHub } from './components/PromotionBrandingHub';
 import { LockedFooterBar } from './components/LockedFooterBar';
+import { UserGuidelines } from './components/UserGuidelines';
 import { ActiveWindow, Member, SiteConfig } from './types';
 import { StorageService, subscribeToSync } from './services/storage';
 import { FirestoreService } from './services/firestore';
@@ -36,6 +37,8 @@ import {
   Lock,
   ArrowRight,
   Megaphone,
+  BookOpen,
+  Send,
 } from 'lucide-react';
 
 export default function App() {
@@ -429,6 +432,24 @@ export default function App() {
           </WindowFrame>
         )}
 
+        {/* VIEW: USER GUIDELINES HUB (New, Pending, Verified & Helpdesk Guide) */}
+        {activeWindow === 'guidelines' && (
+          <WindowFrame
+            title="विद्यार्थी उपयोगकर्ता मार्गदर्शन केंद्र (User Guidelines & Help Center)"
+            subtitle="नए सदस्य, पेंडिंग वेरिफिकेशन, एक्टिव मेंबर्स एवं सपोर्ट हेल्पडेस्क की सम्पूर्ण गाइड"
+            icon={<BookOpen className="w-4 h-4 text-emerald-400" />}
+            onClose={() => setActiveWindow('home')}
+          >
+            <UserGuidelines
+              currentUser={currentUser}
+              onGoToRegister={() => handleNavigateWithScroll('register')}
+              onGoToLogin={() => handleNavigateWithScroll('login')}
+              onGoToDashboard={() => handleNavigateWithScroll('dashboard')}
+              onGoToCalculator={() => handleNavigateWithScroll('calculator')}
+            />
+          </WindowFrame>
+        )}
+
         {/* VIEW: LEGAL PAGES (About, Privacy, Disclaimer, Terms, Contact, FAQ) */}
         {(activeWindow === 'about' ||
           activeWindow === 'privacy' ||
@@ -553,6 +574,15 @@ export default function App() {
                 </button>
               </li>
               <li>
+                <button
+                  type="button"
+                  onClick={() => handleNavigateWithScroll('guidelines')}
+                  className="hover:text-emerald-300 font-bold transition cursor-pointer text-left block w-full py-0.5 text-emerald-400"
+                >
+                  📖 उपयोगकर्ता गाइड केंद्र (Guidelines)
+                </button>
+              </li>
+              <li>
                 {currentUser ? (
                   <button
                     type="button"
@@ -647,12 +677,34 @@ export default function App() {
                 </a>
               </p>
               <p>
-                ईमेल:{' '}
+                WhatsApp:{' '}
                 <a
-                  href={`mailto:${siteConfig.officialEmail || 'santosh09patidar@gmail.com'}`}
-                  className="text-slate-300 hover:underline"
+                  href={`https://api.whatsapp.com/send?phone=${(siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-emerald-400 font-bold hover:underline"
                 >
-                  {siteConfig.officialEmail || 'santosh09patidar@gmail.com'}
+                  {siteConfig.whatsappNumber || '+91 8877490845'}
+                </a>
+              </p>
+              <p>
+                Telegram:{' '}
+                <a
+                  href={siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sky-400 font-bold hover:underline"
+                >
+                  @NEWUSERHELPLINE
+                </a>
+              </p>
+              <p>
+                Full Support Desk:{' '}
+                <a
+                  href={`mailto:${siteConfig.officialEmail || 'newuserhelpline@gmail.com'}`}
+                  className="text-yellow-300 font-bold hover:underline"
+                >
+                  {siteConfig.officialEmail || 'newuserhelpline@gmail.com'}
                 </a>
               </p>
               <p>

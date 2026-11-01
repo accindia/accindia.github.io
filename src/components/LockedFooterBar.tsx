@@ -16,6 +16,9 @@ import {
   PhoneCall,
   UserCheck,
   Megaphone,
+  Send,
+  Award,
+  Mail,
 } from 'lucide-react';
 import { ActiveWindow, Member, SiteConfig } from '../types';
 
@@ -26,6 +29,110 @@ interface LockedFooterBarProps {
   activeWindow: ActiveWindow;
   setActiveWindow: (window: ActiveWindow) => void;
 }
+
+interface NavButtonProps {
+  icon: React.ReactNode;
+  label: string;
+  subLabel?: string;
+  isActive?: boolean;
+  isSpecial?: boolean;
+  themeColor: 'blue' | 'orange' | 'emerald' | 'amber' | 'indigo' | 'rose';
+  onClick: () => void;
+  title?: string;
+}
+
+const Nav3DButton: React.FC<NavButtonProps> = ({
+  icon,
+  label,
+  subLabel,
+  isActive = false,
+  isSpecial = false,
+  themeColor,
+  onClick,
+  title,
+}) => {
+  // Theme color styles for 3D Icon Capsules and Button Boxes
+  const colorStyles = {
+    blue: {
+      activeBox: 'bg-gradient-to-b from-blue-50 to-blue-100 border-2 border-[#2874f0] shadow-[0_4px_12px_rgba(40,116,240,0.25),inset_0_1px_1px_rgba(255,255,255,0.9)] text-[#2874f0]',
+      inactiveBox: 'bg-gradient-to-b from-white via-slate-50 to-slate-100 border border-slate-200/90 text-slate-700 hover:border-blue-300 hover:bg-blue-50/50 shadow-[0_2px_5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.9)]',
+      iconCapsule: 'bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white shadow-[0_3px_6px_rgba(40,116,240,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)]',
+    },
+    orange: {
+      activeBox: 'bg-gradient-to-b from-orange-50 to-amber-100 border-2 border-[#fb641b] shadow-[0_4px_14px_rgba(251,100,27,0.3),inset_0_1px_1px_rgba(255,255,255,0.9)] text-[#fb641b]',
+      inactiveBox: isSpecial
+        ? 'bg-gradient-to-b from-[#fb641b] via-[#ea580c] to-[#c2410c] border border-amber-300/40 text-white shadow-[0_4px_10px_rgba(251,100,27,0.4),inset_0_1.5px_1px_rgba(255,255,255,0.5)]'
+        : 'bg-gradient-to-b from-white via-slate-50 to-slate-100 border border-slate-200/90 text-slate-700 hover:border-orange-300 hover:bg-orange-50/50 shadow-[0_2px_5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.9)]',
+      iconCapsule: isSpecial
+        ? 'bg-gradient-to-b from-yellow-300 to-amber-400 text-slate-950 shadow-[0_3px_6px_rgba(0,0,0,0.25),inset_0_1px_1px_rgba(255,255,255,0.8)]'
+        : 'bg-gradient-to-b from-[#fb641b] to-[#dc4204] text-white shadow-[0_3px_6px_rgba(251,100,27,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)]',
+    },
+    emerald: {
+      activeBox: 'bg-gradient-to-b from-emerald-50 to-teal-100 border-2 border-emerald-600 shadow-[0_4px_12px_rgba(16,185,129,0.25),inset_0_1px_1px_rgba(255,255,255,0.9)] text-emerald-800',
+      inactiveBox: isSpecial
+        ? 'bg-gradient-to-b from-emerald-600 to-teal-700 border border-emerald-400/40 text-white shadow-[0_3px_8px_rgba(16,185,129,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)]'
+        : 'bg-gradient-to-b from-white via-slate-50 to-slate-100 border border-slate-200/90 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/50 shadow-[0_2px_5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.9)]',
+      iconCapsule: isSpecial
+        ? 'bg-gradient-to-b from-white to-emerald-100 text-emerald-800 shadow-[0_2px_5px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.9)]'
+        : 'bg-gradient-to-b from-emerald-600 to-teal-700 text-white shadow-[0_3px_6px_rgba(16,185,129,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)]',
+    },
+    amber: {
+      activeBox: 'bg-gradient-to-b from-amber-50 to-yellow-100 border-2 border-amber-600 shadow-[0_4px_12px_rgba(245,158,11,0.25),inset_0_1px_1px_rgba(255,255,255,0.9)] text-amber-900',
+      inactiveBox: 'bg-gradient-to-b from-white via-slate-50 to-slate-100 border border-slate-200/90 text-slate-700 hover:border-amber-300 hover:bg-amber-50/50 shadow-[0_2px_5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.9)]',
+      iconCapsule: 'bg-gradient-to-b from-amber-500 to-yellow-600 text-white shadow-[0_3px_6px_rgba(245,158,11,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)]',
+    },
+    indigo: {
+      activeBox: 'bg-gradient-to-b from-indigo-50 to-indigo-100 border-2 border-indigo-600 shadow-[0_4px_12px_rgba(99,102,241,0.25),inset_0_1px_1px_rgba(255,255,255,0.9)] text-indigo-900',
+      inactiveBox: 'bg-gradient-to-b from-white via-slate-50 to-slate-100 border border-slate-200/90 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50/50 shadow-[0_2px_5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.9)]',
+      iconCapsule: 'bg-gradient-to-b from-indigo-600 to-indigo-800 text-white shadow-[0_3px_6px_rgba(99,102,241,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)]',
+    },
+    rose: {
+      activeBox: 'bg-gradient-to-b from-rose-50 to-rose-100 border-2 border-rose-600 shadow-[0_4px_12px_rgba(244,63,94,0.25),inset_0_1px_1px_rgba(255,255,255,0.9)] text-rose-900',
+      inactiveBox: 'bg-gradient-to-b from-white via-slate-50 to-slate-100 border border-slate-200/90 text-slate-700 hover:border-rose-300 hover:bg-rose-50/50 shadow-[0_2px_5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.9)]',
+      iconCapsule: 'bg-gradient-to-b from-rose-600 to-rose-800 text-white shadow-[0_3px_6px_rgba(244,63,94,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)]',
+    },
+  }[themeColor];
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title || label}
+      className={`group relative flex flex-col items-center justify-between py-1 px-0.5 sm:px-1.5 rounded-xl transition-all active:translate-y-0.5 cursor-pointer min-w-0 w-full ${
+        isActive ? colorStyles.activeBox : colorStyles.inactiveBox
+      }`}
+    >
+      {/* 3D Embossed Icon Capsule */}
+      <div
+        className={`w-7 h-7 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 border border-white/50 transition-transform group-hover:scale-105 ${colorStyles.iconCapsule}`}
+      >
+        <span className="drop-shadow-[0_1.5px_2px_rgba(0,0,0,0.35)] flex items-center justify-center">
+          {icon}
+        </span>
+      </div>
+
+      {/* Structured Text Box - Zero Cutoff on Mobile */}
+      <div className="w-full text-center mt-1 flex flex-col items-center justify-center min-h-[22px] px-0.5">
+        <span
+          className={`text-[9.5px] sm:text-[11.5px] font-black tracking-tight leading-tight block w-full whitespace-nowrap overflow-visible ${
+            isSpecial && !isActive ? 'text-white' : ''
+          }`}
+        >
+          {label}
+        </span>
+        {subLabel && (
+          <span
+            className={`text-[8px] sm:text-[9px] font-bold leading-none block mt-0.5 font-mono ${
+              isSpecial && !isActive ? 'text-yellow-200' : 'text-slate-500'
+            }`}
+          >
+            {subLabel}
+          </span>
+        )}
+      </div>
+    </button>
+  );
+};
 
 export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
   currentUser,
@@ -57,9 +164,9 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 w-full select-none shadow-[0_-4px_25px_rgba(0,0,0,0.18)] border-t border-slate-300 bg-white/95 backdrop-blur-md">
       {/* ------------------------------------------------------------- */}
-      {/* 1. Live Running Announcement Bar (Replaces static lock badges) */}
+      {/* 1. Live Running Announcement Bar                              */}
       {/* ------------------------------------------------------------- */}
-      <div className="bg-slate-950 text-white px-2.5 sm:px-4 py-1.5 text-xs flex items-center justify-between gap-2.5 border-b border-slate-800">
+      <div className="bg-slate-950 text-white px-2.5 sm:px-4 py-1 text-xs flex items-center justify-between gap-2.5 border-b border-slate-800">
         <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
           {/* Announcement Tag */}
           <div className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-black uppercase tracking-wider shrink-0 bg-yellow-400 text-slate-950 shadow-xs">
@@ -89,232 +196,228 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
           </div>
         </div>
 
-        {/* Action button on right of announcement strip: Quick Support / Call & Toggle */}
+        {/* Action buttons on right of announcement strip - 3D Tactile Buttons */}
         <div className="flex items-center gap-1.5 shrink-0">
           {currentUser ? (
             <button
               onClick={handleOpenWhatsAppAdmin}
-              className="text-[10px] bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-0.5 rounded font-bold flex items-center gap-1 shadow-xs transition cursor-pointer"
+              className="text-[10px] sm:text-[11px] bg-gradient-to-b from-emerald-500 to-teal-700 hover:from-emerald-400 hover:to-teal-600 text-white px-2 py-1 rounded-lg font-black flex items-center gap-1 shadow-[0_2px_4px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.4)] active:translate-y-0.5 border border-emerald-400/40 transition cursor-pointer"
               title="24x7 WhatsApp सपोर्ट"
             >
-              <MessageCircle className="w-3 h-3 text-white shrink-0" />
-              <span className="hidden xs:inline">सपोर्ट</span>
+              <div className="w-3.5 h-3.5 rounded bg-white/20 flex items-center justify-center shrink-0">
+                <MessageCircle className="w-2.5 h-2.5 text-white" />
+              </div>
+              <span className="whitespace-nowrap">सपोर्ट</span>
             </button>
           ) : (
             <a
               href={`tel:${cleanHelpline}`}
-              className="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-2 py-0.5 rounded font-bold flex items-center gap-1 shadow-xs transition cursor-pointer"
+              className="text-[10px] sm:text-[11px] bg-gradient-to-b from-blue-500 to-blue-700 hover:from-blue-400 hover:to-blue-600 text-white px-2 py-1 rounded-lg font-black flex items-center gap-1 shadow-[0_2px_4px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.4)] active:translate-y-0.5 border border-blue-400/40 transition cursor-pointer"
               title="हेल्पलाइन कॉल"
             >
-              <PhoneCall className="w-3 h-3 text-white shrink-0" />
-              <span className="hidden xs:inline">हेल्पलाइन</span>
+              <div className="w-3.5 h-3.5 rounded bg-white/20 flex items-center justify-center shrink-0">
+                <PhoneCall className="w-2.5 h-2.5 text-white" />
+              </div>
+              <span className="whitespace-nowrap">हेल्प</span>
             </a>
           )}
 
+          <a
+            href={siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE'}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] sm:text-[11px] bg-gradient-to-b from-[#229ED9] to-[#1579a8] hover:from-[#2eb0f1] hover:to-[#229ED9] text-white px-2 py-1 rounded-lg font-black flex items-center gap-1 shadow-[0_2px_4px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.4)] active:translate-y-0.5 border border-cyan-400/40 transition cursor-pointer"
+            title="Telegram हेल्पडेस्क (@NEWUSERHELPLINE)"
+          >
+            <div className="w-3.5 h-3.5 rounded bg-white/20 flex items-center justify-center shrink-0">
+              <Send className="w-2.5 h-2.5 text-white" />
+            </div>
+            <span className="whitespace-nowrap">Telegram</span>
+          </a>
+
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="text-slate-400 hover:text-white p-0.5 rounded transition flex items-center gap-0.5 text-[10px] cursor-pointer"
+            className="text-slate-300 hover:text-white bg-white/10 hover:bg-white/20 p-1 rounded-lg transition flex items-center justify-center text-[10px] cursor-pointer shadow-xs active:translate-y-0.5"
             title={isExpanded ? 'बार छोटा करें' : 'बार खोलें'}
           >
-            {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+            {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
           </button>
         </div>
       </div>
 
       {/* ------------------------------------------------------------- */}
-      {/* 2. Main 5 Distinct & Separated Action Buttons Grid            */}
+      {/* 2. Main 5 Distinct 3D Action Buttons Grid (Zero Text Cutoff)  */}
       {/* ------------------------------------------------------------- */}
       {isExpanded && (
-        <div className="px-2 sm:px-4 py-2 max-w-4xl mx-auto">
+        <div className="px-1.5 sm:px-4 py-1.5 sm:py-2 max-w-4xl mx-auto">
           {/* ========================================================= */}
-          {/* CATEGORY 1: LOGGED IN USER (EXACTLY 5 SEPARATE BUTTONS)  */}
+          {/* CATEGORY 1: LOGGED IN USER (5 SEPARATE 3D BUTTONS)        */}
           {/* ========================================================= */}
           {currentUser && (
-            <div className="grid grid-cols-5 gap-1.5 sm:gap-3 text-center">
-              {/* Button 1: Home */}
-              <button
+            <div className="grid grid-cols-5 gap-1 sm:gap-2.5 text-center">
+              <Nav3DButton
+                icon={<Home className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                label="होम"
+                subLabel="Home"
+                isActive={activeWindow === 'home'}
+                themeColor="blue"
                 onClick={() => setActiveWindow('home')}
-                className={`flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer ${
-                  activeWindow === 'home'
-                    ? 'bg-[#2874f0] text-white shadow-sm ring-1 ring-blue-300'
-                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                }`}
-              >
-                <Home className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-                <span className="truncate">होम</span>
-              </button>
+                title="मुख्य होम पेज"
+              />
 
-              {/* Button 2: Dashboard */}
-              <button
+              <Nav3DButton
+                icon={<LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                label="डैशबोर्ड"
+                subLabel="Panel"
+                isActive={activeWindow === 'dashboard'}
+                themeColor="indigo"
                 onClick={() => setActiveWindow('dashboard')}
-                className={`flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer ${
-                  activeWindow === 'dashboard'
-                    ? 'bg-[#2874f0] text-white shadow-sm ring-1 ring-blue-300'
-                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                }`}
-              >
-                <LayoutDashboard className="w-4 h-4 sm:w-5 sm:h-5 text-[#2874f0] shrink-0" />
-                <span className="truncate">डैशबोर्ड</span>
-              </button>
+                title="यूजर डैशबोर्ड व वॉलेट"
+              />
 
-              {/* Button 3: SWIS / TWIS */}
-              <button
+              <Nav3DButton
+                icon={<Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                label="SWIS·TWIS"
+                subLabel="3.30% · ₹150"
+                themeColor="emerald"
                 onClick={() => setActiveWindow('dashboard')}
-                className="flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl text-[11px] sm:text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-all cursor-pointer shadow-xs"
                 title="SWIS 3.30% रिचार्ज व TWIS ₹150 रेफरल"
-              >
-                <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 shrink-0" />
-                <span className="truncate">SWIS / TWIS</span>
-              </button>
+              />
 
-              {/* Button 4: Digital ID Card */}
-              <button
+              <Nav3DButton
+                icon={<CreditCard className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                label="ID कार्ड"
+                subLabel="Digital ID"
+                isActive={activeWindow === 'idcard'}
+                themeColor="amber"
                 onClick={() => setActiveWindow('idcard')}
-                className={`flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer ${
-                  activeWindow === 'idcard'
-                    ? 'bg-amber-600 text-white shadow-sm ring-1 ring-amber-300'
-                    : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200'
-                }`}
-              >
-                <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 shrink-0" />
-                <span className="truncate">डिजिटल ID</span>
-              </button>
+                title="डिजिटल पहचान पत्र (ID Card)"
+              />
 
-              {/* Button 5: Edit Profile */}
-              <button
+              <Nav3DButton
+                icon={<Edit3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                label="प्रोफाइल"
+                subLabel="Edit Info"
+                themeColor="orange"
                 onClick={() => setActiveWindow('dashboard')}
-                className="flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl text-[11px] sm:text-xs font-black bg-gradient-to-br from-amber-500 to-[#fb641b] text-white shadow-sm hover:brightness-105 transition-all cursor-pointer"
                 title="प्रोफाइल व संपर्क विवरण एडिट करें"
-              >
-                <Edit3 className="w-4 h-4 sm:w-5 sm:h-5 text-white shrink-0" />
-                <span className="truncate">✏️ प्रोफाइल</span>
-              </button>
+              />
             </div>
           )}
 
           {/* ========================================================= */}
-          {/* CATEGORY 2: REFERRED VISITOR WITH SPONSOR LINK (5 BUTTONS)*/}
+          {/* CATEGORY 2: REFERRED VISITOR WITH SPONSOR (5 3D BUTTONS)  */}
           {/* ========================================================= */}
           {!currentUser && referralSponsor && (
-            <div className="grid grid-cols-5 gap-1.5 sm:gap-3 text-center">
-              {/* Button 1: Home */}
-              <button
+            <div className="grid grid-cols-5 gap-1 sm:gap-2.5 text-center">
+              <Nav3DButton
+                icon={<Home className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                label="होम"
+                subLabel="Home"
+                isActive={activeWindow === 'home'}
+                themeColor="blue"
                 onClick={() => setActiveWindow('home')}
-                className={`flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer ${
-                  activeWindow === 'home'
-                    ? 'bg-[#2874f0] text-white shadow-sm ring-1 ring-blue-300'
-                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                }`}
-              >
-                <Home className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-                <span className="truncate">होम</span>
-              </button>
+                title="मुख्य होम पेज"
+              />
 
-              {/* Button 2: PROMINENT REGISTRATION WITH LOCKED SPONSOR */}
-              <button
+              <Nav3DButton
+                icon={<Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-pulse" />}
+                label="रजिस्टर"
+                subLabel={`₹${siteConfig.activationFee || 249}`}
+                isActive={activeWindow === 'register'}
+                isSpecial={true}
+                themeColor="orange"
                 onClick={() => setActiveWindow('register')}
-                className="flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl text-[11px] sm:text-xs font-black text-white bg-[#fb641b] hover:bg-[#e85a14] shadow-md transition-all hover:scale-[1.02] cursor-pointer ring-2 ring-[#fb641b]/30"
-                title={`स्पॉन्सर ${referralSponsor.fullName} (${referralSponsor.accId}) के साथ ₹249 में रजिस्ट्रेशन करें`}
-              >
-                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-300 animate-pulse shrink-0" />
-                <span className="truncate">रजिस्टर ₹{siteConfig.activationFee || 249}</span>
-              </button>
+                title={`स्पॉन्सर ${referralSponsor.fullName} के साथ ₹249 में रजिस्ट्रेशन करें`}
+              />
 
-              {/* Button 3: Login */}
-              <button
+              <Nav3DButton
+                icon={<LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                label="लॉगिन"
+                subLabel="Login"
+                isActive={activeWindow === 'login'}
+                themeColor="indigo"
                 onClick={() => setActiveWindow('login')}
-                className={`flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer ${
-                  activeWindow === 'login'
-                    ? 'bg-[#2874f0] text-white shadow-sm ring-1 ring-blue-300'
-                    : 'bg-blue-50 hover:bg-blue-100 text-[#2874f0] border border-blue-200'
-                }`}
-              >
-                <LogIn className="w-4 h-4 sm:w-5 sm:h-5 text-[#2874f0] shrink-0" />
-                <span className="truncate">लॉगिन</span>
-              </button>
+                title="विद्यार्थी लॉगिन करें"
+              />
 
-              {/* Button 4: View Sponsor ID */}
-              <button
+              <Nav3DButton
+                icon={<CreditCard className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                label="स्पॉन्सर ID"
+                subLabel="Preview"
+                isActive={activeWindow === 'idcard'}
+                themeColor="amber"
                 onClick={() => setActiveWindow('idcard')}
-                className="flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl text-[11px] sm:text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 transition-all cursor-pointer shadow-xs"
                 title={`स्पॉन्सर ${referralSponsor.fullName} का डिजिटल ID कार्ड देखें`}
-              >
-                <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 shrink-0" />
-                <span className="truncate">स्पॉन्सर ID</span>
-              </button>
+              />
 
-              {/* Button 5: WhatsApp Sponsor Chat */}
-              <button
+              <Nav3DButton
+                icon={<MessageCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                label="WhatsApp"
+                subLabel="चैट करें"
+                isSpecial={true}
+                themeColor="emerald"
                 onClick={handleOpenWhatsAppSponsor}
-                className="flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl text-[11px] sm:text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-md transition-all cursor-pointer"
                 title={`स्पॉन्सर ${referralSponsor.fullName} से सीधे WhatsApp पर बात करें`}
-              >
-                <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5 text-white shrink-0" />
-                <span className="truncate">स्पॉन्सर चैट</span>
-              </button>
+              />
             </div>
           )}
 
           {/* ========================================================= */}
-          {/* CATEGORY 3: DIRECT VISITOR WITHOUT SPONSOR (5 BUTTONS)    */}
+          {/* CATEGORY 3: DIRECT VISITOR WITHOUT SPONSOR (5 3D BUTTONS) */}
           {/* ========================================================= */}
           {!currentUser && !referralSponsor && (
-            <div className="grid grid-cols-5 gap-1.5 sm:gap-3 text-center">
-              {/* Button 1: Home */}
-              <button
+            <div className="grid grid-cols-5 gap-1 sm:gap-2.5 text-center">
+              <Nav3DButton
+                icon={<Home className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                label="होम"
+                subLabel="Home"
+                isActive={activeWindow === 'home'}
+                themeColor="blue"
                 onClick={() => setActiveWindow('home')}
-                className={`flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer ${
-                  activeWindow === 'home'
-                    ? 'bg-[#2874f0] text-white shadow-sm ring-1 ring-blue-300'
-                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                }`}
-              >
-                <Home className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-                <span className="truncate">होम</span>
-              </button>
+                title="मुख्य होम पेज"
+              />
 
-              {/* Button 2: PROMINENT COMPANY DIRECT REGISTRATION */}
-              <button
+              <Nav3DButton
+                icon={<Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-pulse" />}
+                label="रजिस्टर"
+                subLabel={`₹${siteConfig.activationFee || 249}`}
+                isActive={activeWindow === 'register'}
+                isSpecial={true}
+                themeColor="orange"
                 onClick={() => setActiveWindow('register')}
-                className="flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl text-[11px] sm:text-xs font-black text-white bg-[#fb641b] hover:bg-[#e85a14] shadow-md transition-all hover:scale-[1.02] cursor-pointer ring-2 ring-[#fb641b]/30"
                 title="कंपनी डायरेक्ट ₹249 में लाइफटाइम रजिस्ट्रेशन करें"
-              >
-                <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-300 shrink-0" />
-                <span className="truncate">डायरेक्ट रजिस्टर</span>
-              </button>
+              />
 
-              {/* Button 3: Login */}
-              <button
+              <Nav3DButton
+                icon={<LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                label="लॉगिन"
+                subLabel="Login"
+                isActive={activeWindow === 'login'}
+                themeColor="indigo"
                 onClick={() => setActiveWindow('login')}
-                className={`flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer ${
-                  activeWindow === 'login'
-                    ? 'bg-[#2874f0] text-white shadow-sm ring-1 ring-blue-300'
-                    : 'bg-blue-50 hover:bg-blue-100 text-[#2874f0] border border-blue-200'
-                }`}
-              >
-                <LogIn className="w-4 h-4 sm:w-5 sm:h-5 text-[#2874f0] shrink-0" />
-                <span className="truncate">लॉगिन</span>
-              </button>
+                title="विद्यार्थी लॉगिन करें"
+              />
 
-              {/* Button 4: Training Video */}
-              <button
+              <Nav3DButton
+                icon={<Video className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                label="वीडियो"
+                subLabel="Training"
+                isActive={activeWindow === 'video'}
+                themeColor="rose"
                 onClick={() => setActiveWindow('video')}
-                className="flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl text-[11px] sm:text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-all cursor-pointer shadow-xs"
-                title="4-मिनट सिस्टम ट्रेनिंग वीडियो देखें"
-              >
-                <Video className="w-4 h-4 sm:w-5 sm:h-5 text-rose-600 shrink-0" />
-                <span className="truncate">ट्रेनिंग वीडियो</span>
-              </button>
+                title="सिस्टम ट्रेनिंग वीडियो देखें"
+              />
 
-              {/* Button 5: Admin WhatsApp Support */}
-              <button
+              <Nav3DButton
+                icon={<MessageCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                label="सहायता"
+                subLabel="WhatsApp"
+                isSpecial={true}
+                themeColor="emerald"
                 onClick={handleOpenWhatsAppAdmin}
-                className="flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl text-[11px] sm:text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-md transition-all cursor-pointer"
                 title="24x7 एडमिन हेल्पलाइन व WhatsApp सहायता"
-              >
-                <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5 text-white shrink-0" />
-                <span className="truncate">एडमिन हेल्प</span>
-              </button>
+              />
             </div>
           )}
         </div>

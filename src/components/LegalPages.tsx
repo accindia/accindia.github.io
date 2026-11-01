@@ -16,6 +16,7 @@ import {
   Info,
   Shield,
   ArrowRight,
+  Copy,
 } from 'lucide-react';
 import { SiteConfig } from '../types';
 import { StorageService, subscribeToSync } from '../services/storage';
@@ -293,109 +294,205 @@ export const LegalPages: React.FC<LegalPagesProps> = ({
         </div>
       )}
 
-      {/* CONTENT: Contact Us */}
+      {/* CONTENT: Contact Us (Help Section) */}
       {tab === 'contact' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Contact Details */}
-          <div className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 space-y-5 shadow-sm">
+          {/* Official Support Channels */}
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 space-y-5 shadow-sm">
             <div>
-              <h2 className="text-xl font-black font-display text-slate-900">
-                Contact Us (संपर्क करें)
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] uppercase font-black bg-blue-100 text-[#2874f0] px-2.5 py-0.5 rounded-md border border-blue-200">
+                  24x7 SUPPORT DESK
+                </span>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-md">
+                  ✓ VERIFIED HELPDESK
+                </span>
+              </div>
+              <h2 className="text-xl font-black font-display text-slate-900 mt-1">
+                सपोर्ट हेल्पडेस्क एवं सहायता केंद्र
               </h2>
-              <p className="text-xs text-slate-500 mt-1">
-                Achievers Club Community सपोर्ट डेस्क हमेशा आपकी सहायता के लिए तत्पर है।
+              <p className="text-xs text-slate-500 mt-0.5">
+                Achievers Club Community (ACC) सहायता डेस्क - किसी भी समस्या या पूछताछ हेतु संपर्क करें।
               </p>
             </div>
 
-            <div className="space-y-3 text-xs sm:text-sm text-slate-700">
-              <div className="flex items-start gap-3 bg-[#f1f2f4] p-3.5 rounded-lg border border-gray-200">
-                <Mail className="w-5 h-5 text-[#2874f0] shrink-0 mt-0.5" />
-                <div>
-                  <span className="text-[11px] text-slate-500 block font-semibold">आधिकारिक ईमेल आईडी:</span>
+            <div className="space-y-3.5 text-xs sm:text-sm">
+              {/* 1. Official Support Email (Primary Channel) */}
+              <div className="p-4 rounded-xl bg-gradient-to-b from-blue-50/80 to-indigo-50/50 border border-blue-200 shadow-[0_2px_6px_rgba(40,116,240,0.08)] space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white flex items-center justify-center shadow-[0_2px_5px_rgba(40,116,240,0.35),inset_0_1px_0.5px_rgba(255,255,255,0.6)] shrink-0">
+                      <Mail className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-[10.5px] text-blue-900 font-bold uppercase tracking-wider block">
+                        आधिकारिक सपोर्ट ईमेल (Email Support Desk):
+                      </span>
+                      <span className="font-mono-acc font-black text-slate-900 text-xs sm:text-sm">
+                        {siteConfig.officialEmail || 'newuserhelpline@gmail.com'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
                   <a
-                    href={`mailto:${siteConfig.officialEmail || 'santosh09patidar@gmail.com'}`}
-                    className="font-bold text-[#2874f0] hover:underline"
+                    href={`mailto:${siteConfig.officialEmail || 'newuserhelpline@gmail.com'}?subject=ACC%20Support%20Help%20Request`}
+                    className="flex-1 py-2 px-3 bg-gradient-to-b from-[#2874f0] to-[#1258c7] hover:from-[#1e63d8] hover:to-[#0f4bb0] text-white font-black text-xs rounded-xl shadow-[0_3px_8px_rgba(40,116,240,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)] active:translate-y-0.5 flex items-center justify-center gap-1.5 transition cursor-pointer"
                   >
-                    {siteConfig.officialEmail || 'santosh09patidar@gmail.com'}
+                    <Mail className="w-3.5 h-3.5" />
+                    <span>ईमेल भेजें (Send Mail)</span>
                   </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(siteConfig.officialEmail || 'newuserhelpline@gmail.com');
+                      alert('ईमेल आईडी कॉपी हो गई: ' + (siteConfig.officialEmail || 'newuserhelpline@gmail.com'));
+                    }}
+                    className="py-2 px-3 bg-gradient-to-b from-white via-slate-50 to-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 shadow-[0_2px_4px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,1)] active:translate-y-0.5 flex items-center justify-center gap-1 transition cursor-pointer"
+                  >
+                    <Copy className="w-3.5 h-3.5 text-blue-600" />
+                    <span>कॉपी</span>
+                  </button>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 bg-[#f1f2f4] p-3.5 rounded-lg border border-gray-200">
-                <Phone className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                <div>
-                  <span className="text-[11px] text-slate-500 block font-semibold">कॉलिंग हेल्पलाइन:</span>
-                  <a
-                    href={`tel:${cleanPhone}`}
-                    className="font-bold text-slate-900 hover:underline"
-                  >
-                    {siteConfig.helplinePhone || '+91 8877490845'}
-                  </a>
+              {/* 2. Official Telegram Helpdesk (Primary Channel) */}
+              <div className="p-4 rounded-xl bg-gradient-to-b from-sky-50/80 to-cyan-50/50 border border-sky-200 shadow-[0_2px_6px_rgba(34,158,217,0.08)] space-y-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-b from-[#229ED9] to-[#1579a8] text-white flex items-center justify-center shadow-[0_2px_5px_rgba(34,158,217,0.35),inset_0_1px_0.5px_rgba(255,255,255,0.6)] shrink-0">
+                    <Send className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-[10.5px] text-sky-900 font-bold uppercase tracking-wider block">
+                      ऑफिशियल Telegram हेल्पडेस्क:
+                    </span>
+                    <span className="font-mono font-black text-slate-900 text-xs sm:text-sm">
+                      {siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE'}
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex items-start gap-3 bg-[#f1f2f4] p-3.5 rounded-lg border border-gray-200">
-                <MessageCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                <div>
-                  <span className="text-[11px] text-slate-500 block font-semibold">व्हाट्सएप सपोर्ट:</span>
+                <div className="pt-1">
                   <a
-                    href={`https://api.whatsapp.com/send?phone=${cleanWhatsApp}&text=${encodeURIComponent('Namaste ACC Support, mujhe sahayata chahiye.')}`}
+                    href={siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE'}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-bold text-emerald-700 hover:underline flex items-center gap-1 mt-0.5"
+                    className="w-full py-2 px-3 bg-gradient-to-b from-[#229ED9] to-[#1579a8] hover:from-[#29aef1] hover:to-[#229ED9] text-white font-black text-xs rounded-xl shadow-[0_3px_8px_rgba(34,158,217,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)] active:translate-y-0.5 flex items-center justify-center gap-2 transition cursor-pointer border border-cyan-400/40"
                   >
-                    <span>{siteConfig.whatsappNumber || '+91 8877490845'}</span>
-                    <ExternalLink className="w-3 h-3" />
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Telegram पर सहायता प्राप्त करें (@NEWUSERHELPLINE)</span>
+                    <ExternalLink className="w-3 h-3 text-cyan-100" />
                   </a>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 bg-[#f1f2f4] p-3.5 rounded-lg border border-gray-200">
-                <Building2 className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
-                <div>
-                  <span className="text-[11px] text-slate-500 block font-semibold">अधिकृत हस्ताक्षरकर्ता:</span>
-                  <span className="font-bold text-slate-900">
-                    {siteConfig.adminSignatoryName || 'Vikas Kumar'} ({siteConfig.adminSignatoryTitle || 'Chief Administrator'})
-                  </span>
-                </div>
-              </div>
+              {/* 3. WhatsApp Support - ONLY ACTIVE WHEN ADMIN ENABLES IT VIA ADMIN PANEL */}
+              {siteConfig.showWhatsAppSupport ? (
+                <div className="p-4 rounded-xl bg-gradient-to-b from-emerald-50/80 to-teal-50/50 border border-emerald-300 shadow-[0_2px_6px_rgba(16,185,129,0.1)] space-y-2 animate-fadeIn">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-b from-emerald-600 to-teal-700 text-white flex items-center justify-center shadow-[0_2px_5px_rgba(16,185,129,0.35),inset_0_1px_0.5px_rgba(255,255,255,0.6)] shrink-0">
+                      <MessageCircle className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-[10.5px] text-emerald-900 font-bold uppercase tracking-wider block">
+                        WhatsApp सहायता डेस्क (Admin Verified):
+                      </span>
+                      <span className="font-mono-acc font-black text-slate-900 text-xs sm:text-sm">
+                        {siteConfig.whatsappNumber || '+91 8877490845'}
+                      </span>
+                    </div>
+                  </div>
 
-              <div className="flex items-start gap-3 bg-[#f1f2f4] p-3.5 rounded-lg border border-gray-200">
-                <MapPin className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
-                <div>
-                  <span className="text-[11px] text-slate-500 block font-semibold">पंजीकृत कार्यालय पता:</span>
-                  <span className="text-slate-800 leading-relaxed">
-                    {siteConfig.officialAddress || 'Scheme No. 54, Vijay Nagar, Indore, Madhya Pradesh - 452001'}
-                  </span>
+                  <a
+                    href={`https://api.whatsapp.com/send?phone=${cleanWhatsApp}&text=${encodeURIComponent('Namaste ACC Support, mujhe Achievers Club Community me sahayata chahiye.')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2 px-3 bg-gradient-to-b from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-black text-xs rounded-xl shadow-[0_3px_8px_rgba(16,185,129,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)] active:translate-y-0.5 flex items-center justify-center gap-1.5 transition cursor-pointer border border-emerald-400/40"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span>WhatsApp पर चैट करें</span>
+                    <ExternalLink className="w-3 h-3 text-emerald-200" />
+                  </a>
+                </div>
+              ) : null}
+
+              {/* 4. Phone Calling Support (Only if enabled) */}
+              {(siteConfig.showCallSupport || siteConfig.showHelplineCallButton) && (
+                <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-gray-200 text-xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-gradient-to-b from-blue-500 to-blue-700 text-white flex items-center justify-center shrink-0">
+                      <Phone className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 font-bold block">कॉलिंग हेल्पलाइन:</span>
+                      <span className="font-mono-acc font-bold text-slate-800">{siteConfig.helplinePhone || '+91 8877490845'}</span>
+                    </div>
+                  </div>
+                  <a
+                    href={`tel:${cleanPhone}`}
+                    className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-xs active:translate-y-0.5"
+                  >
+                    कॉल करें
+                  </a>
+                </div>
+              )}
+
+              {/* 5. Organization & Registered Address */}
+              <div className="p-3.5 bg-slate-50/80 rounded-xl border border-gray-200 space-y-2">
+                <div className="flex items-start gap-2.5">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-b from-indigo-500 to-indigo-700 text-white flex items-center justify-center shrink-0 mt-0.5">
+                    <Building2 className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 block font-bold">अधिकृत हस्ताक्षरकर्ता:</span>
+                    <span className="font-bold text-slate-900 text-xs">
+                      {siteConfig.adminSignatoryName || 'Vikas Kumar'} ({siteConfig.adminSignatoryTitle || 'Chief Administrator'})
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2.5 pt-1 border-t border-gray-200/60">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-b from-rose-500 to-rose-700 text-white flex items-center justify-center shrink-0 mt-0.5">
+                    <MapPin className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 block font-bold">पंजीकृत कार्यालय पता:</span>
+                    <span className="text-slate-800 text-xs leading-relaxed">
+                      {siteConfig.officialAddress || 'Scheme No. 54, Vijay Nagar, Indore, Madhya Pradesh - 452001'}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Quick Contact Form */}
-          <div className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 shadow-sm">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm">
             <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-              <Send className="w-4 h-4 text-[#2874f0]" />
+              <div className="w-6 h-6 rounded-lg bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white flex items-center justify-center shadow-xs">
+                <Send className="w-3.5 h-3.5" />
+              </div>
               <span>सपोर्ट टीम को सीधा संदेश भेजें</span>
             </h3>
 
             {contactSent ? (
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-xs text-center space-y-1">
-                <CheckCircle2 className="w-8 h-8 mx-auto text-emerald-600" />
-                <p className="font-bold">संदेश प्राप्त हुआ!</p>
-                <p className="text-slate-600">
-                  हमारी सपोर्ट टीम {siteConfig.officialEmail || 'santosh09patidar@gmail.com'} से आपसे संपर्क करेगी।
+              <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs text-center space-y-2 animate-fadeIn">
+                <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-600" />
+                <p className="font-black text-sm">संदेश प्राप्त हुआ!</p>
+                <p className="text-slate-600 leading-relaxed">
+                  हमारी सपोर्ट डेस्क टीम <strong>{siteConfig.officialEmail || 'newuserhelpline@gmail.com'}</strong> से जल्द आपसे संपर्क करेगी।
                 </p>
               </div>
             ) : (
-              <form onSubmit={handleSubmitContact} className="space-y-3">
+              <form onSubmit={handleSubmitContact} className="space-y-3.5">
                 <div>
                   <label className="block text-xs font-bold text-slate-800 mb-1">आपका नाम</label>
                   <input
                     type="text"
                     value={contactName}
                     onChange={(e) => setContactName(e.target.value)}
-                    className="w-full bg-white border border-gray-300 rounded-sm px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0] focus:ring-1 focus:ring-[#2874f0]"
+                    className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0] focus:ring-1 focus:ring-[#2874f0]"
                     placeholder="उदा. Amit Sharma"
                     required
                   />
@@ -408,7 +505,7 @@ export const LegalPages: React.FC<LegalPagesProps> = ({
                       type="tel"
                       value={contactMobile}
                       onChange={(e) => setContactMobile(e.target.value)}
-                      className="w-full bg-white border border-gray-300 rounded-sm px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0] focus:ring-1 focus:ring-[#2874f0]"
+                      className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0] focus:ring-1 focus:ring-[#2874f0]"
                       placeholder="10 अंक"
                       required
                     />
@@ -419,7 +516,7 @@ export const LegalPages: React.FC<LegalPagesProps> = ({
                       type="email"
                       value={contactEmail}
                       onChange={(e) => setContactEmail(e.target.value)}
-                      className="w-full bg-white border border-gray-300 rounded-sm px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0] focus:ring-1 focus:ring-[#2874f0]"
+                      className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0] focus:ring-1 focus:ring-[#2874f0]"
                       placeholder="Email"
                       required
                     />
@@ -432,18 +529,21 @@ export const LegalPages: React.FC<LegalPagesProps> = ({
                     rows={3}
                     value={contactMessage}
                     onChange={(e) => setContactMessage(e.target.value)}
-                    className="w-full bg-white border border-gray-300 rounded-sm px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0] focus:ring-1 focus:ring-[#2874f0]"
+                    className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0] focus:ring-1 focus:ring-[#2874f0]"
                     placeholder="आप क्या सहायता चाहते हैं?"
                     required
                   />
                 </div>
 
+                {/* 3D Tactile Send Button */}
                 <button
                   type="submit"
-                  className="w-full py-2.5 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold text-xs rounded-sm shadow-sm flex items-center justify-center gap-2 transition"
+                  className="w-full py-3 bg-gradient-to-b from-[#fb641b] via-[#ea580c] to-[#c2410c] hover:from-[#ea580c] hover:to-[#9a3412] text-white font-black text-xs rounded-xl shadow-[0_3px_10px_rgba(251,100,27,0.35),inset_0_1.5px_1px_rgba(255,255,255,0.5)] border border-amber-300/40 active:translate-y-0.5 flex items-center justify-center gap-2 transition cursor-pointer"
                 >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>संदेश भेजें</span>
+                  <div className="w-5 h-5 rounded-md bg-yellow-300 text-slate-950 flex items-center justify-center shrink-0 shadow-xs">
+                    <Send className="w-3 h-3" />
+                  </div>
+                  <span>सपोर्ट संदेश भेजें (Submit Help Request)</span>
                 </button>
               </form>
             )}
