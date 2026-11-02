@@ -13,6 +13,8 @@ import {
   CreditCard,
   Download,
   MessageCircle,
+  Mail,
+  Send,
 } from 'lucide-react';
 import { Member } from '../types';
 import { StorageService } from '../services/storage';
@@ -137,15 +139,37 @@ export const StudentPortalGate: React.FC<StudentPortalGateProps> = ({
           </span>
         </div>
 
-        <a
-          href={`https://api.whatsapp.com/send?phone=${(siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '')}&text=Namaste%20ACC%20Support%2C%20mujhe%20Student%20Portal%20me%20help%20chahiye.`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-sm font-bold transition shrink-0"
-        >
-          <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-          <span>WhatsApp सहायता: {siteConfig.whatsappNumber || '+91 8877490845'}</span>
-        </a>
+        <div className="flex items-center gap-2 flex-wrap">
+          <a
+            href={siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE'}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-b from-[#229ed9] to-[#0088cc] hover:from-[#2eb0ee] hover:to-[#0077b3] text-white font-bold text-xs rounded-lg shadow-[0_2px_0_#005580] active:translate-y-0.5 active:shadow-none transition-all cursor-pointer whitespace-nowrap"
+          >
+            <Send className="w-3.5 h-3.5 text-white" />
+            <span>टेलीग्राम सहायता</span>
+          </a>
+
+          <a
+            href={`mailto:${siteConfig.officialEmail || 'newuserhelpline@gmail.com'}`}
+            className="relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-b from-[#2874f0] to-[#1258c7] hover:from-[#3a82f7] hover:to-[#0f4eb8] text-white font-bold text-xs rounded-lg shadow-[0_2px_0_#0a3782] active:translate-y-0.5 active:shadow-none transition-all cursor-pointer whitespace-nowrap"
+          >
+            <Mail className="w-3.5 h-3.5 text-white" />
+            <span>ईमेल हेल्प</span>
+          </a>
+
+          {siteConfig.showWhatsAppSupport === true && (
+            <a
+              href={`https://api.whatsapp.com/send?phone=${(siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '')}&text=Namaste%20ACC%20Support%2C%20mujhe%20Student%20Portal%20me%20help%20chahiye.`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-b from-[#25D366] to-[#128C7E] hover:from-[#2be66f] hover:to-[#0f7267] text-white font-bold text-xs rounded-lg shadow-[0_2px_0_#075E54] active:translate-y-0.5 active:shadow-none transition-all cursor-pointer whitespace-nowrap"
+            >
+              <MessageCircle className="w-3.5 h-3.5 text-white fill-white" />
+              <span>WhatsApp: {siteConfig.whatsappNumber || '+91 8877490845'}</span>
+            </a>
+          )}
+        </div>
       </div>
     </div>
   );

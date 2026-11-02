@@ -9,6 +9,8 @@ import {
   KeyRound,
   MessageCircle,
   Sparkles,
+  Mail,
+  Send,
 } from 'lucide-react';
 import { Member } from '../types';
 import { StorageService } from '../services/storage';
@@ -176,42 +178,73 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full py-3 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold rounded-sm text-sm shadow-sm flex items-center justify-center gap-2 transition disabled:opacity-50"
+          className="w-full py-3 bg-gradient-to-b from-[#fb641b] via-[#ea580c] to-[#c2410c] hover:from-[#ff752b] hover:to-[#b03608] text-white font-black rounded-xl text-sm shadow-[0_4px_0_#7c2d12,0_8px_16px_rgba(251,100,27,0.35)] active:translate-y-0.5 active:shadow-[0_1px_0_#7c2d12] flex items-center justify-center gap-2.5 transition-all disabled:opacity-50 cursor-pointer"
         >
           {isLoading ? (
             <span>सत्यापित हो रहा है...</span>
           ) : (
             <>
-              <LogIn className="w-4 h-4" />
-              <span>पोर्टल में प्रवेश करें (Secure Login)</span>
-              <ArrowRight className="w-4 h-4" />
+              <div className="w-6 h-6 rounded-lg bg-white/20 border-t border-white/40 flex items-center justify-center shadow-inner">
+                <LogIn className="w-3.5 h-3.5 text-white" />
+              </div>
+              <span className="truncate">पोर्टल में प्रवेश करें (Secure Login)</span>
+              <ArrowRight className="w-4 h-4 ml-0.5" />
             </>
           )}
         </button>
       </form>
 
-      {/* Official WhatsApp Support Help */}
-      <div className="bg-[#f1f2f4] border border-gray-200 rounded-lg p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="text-left">
-          <span className="text-xs font-bold text-slate-900 block">
-            लॉगिन या 🆔 में कोई समस्या है?
-          </span>
-          <span className="text-[11px] text-slate-500">
-            आधिकारिक WhatsApp हेल्पडेस्क से तुरंत सहायता प्राप्त करें
-          </span>
-        </div>
-        <a
-          href={`https://api.whatsapp.com/send?phone=${(StorageService.getSiteConfig().whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '')}&text=${encodeURIComponent(
-            'Namaste ACC Support, mujhe Achievers Club Community portal me login me sahayata chahiye.'
-          )}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-sm flex items-center gap-1.5 shrink-0 shadow-sm transition"
-        >
-          <MessageCircle className="w-3.5 h-3.5" />
-          <span>WhatsApp: {StorageService.getSiteConfig().whatsappNumber || '+91 8877490845'}</span>
-        </a>
-      </div>
+      {/* Official Helpdesk Support */}
+      {(() => {
+        const siteConfig = StorageService.getSiteConfig();
+        return (
+          <div className="bg-[#f1f2f4] border border-gray-200 rounded-xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="text-left">
+              <span className="text-xs font-bold text-slate-900 block">
+                लॉगिन या 🆔 में कोई समस्या है?
+              </span>
+              <span className="text-[11px] text-slate-500">
+                आधिकारिक सपोर्ट डेस्क से तुरंत सहायता प्राप्त करें
+              </span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {siteConfig.showTelegramSupport !== false && (
+                <a
+                  href={siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-b from-[#229ed9] to-[#0088cc] hover:from-[#2eb0ee] hover:to-[#0077b3] text-white font-bold text-xs rounded-lg shadow-[0_2px_0_#005580] active:translate-y-0.5 active:shadow-none transition-all cursor-pointer whitespace-nowrap"
+                >
+                  <Send className="w-3.5 h-3.5 text-white" />
+                  <span>टेलीग्राम</span>
+                </a>
+              )}
+              {siteConfig.showEmailSupport !== false && (
+                <a
+                  href={`mailto:${siteConfig.officialEmail || 'newuserhelpline@gmail.com'}`}
+                  className="relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-b from-[#2874f0] to-[#1258c7] hover:from-[#3a82f7] hover:to-[#0f4eb8] text-white font-bold text-xs rounded-lg shadow-[0_2px_0_#0a3782] active:translate-y-0.5 active:shadow-none transition-all cursor-pointer whitespace-nowrap"
+                >
+                  <Mail className="w-3.5 h-3.5 text-white" />
+                  <span>ईमेल हेल्प</span>
+                </a>
+              )}
+              {siteConfig.showWhatsAppSupport === true && (
+                <a
+                  href={`https://api.whatsapp.com/send?phone=${(siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '')}&text=${encodeURIComponent(
+                    'Namaste ACC Support, mujhe Achievers Club Community portal me login me sahayata chahiye.'
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-b from-[#25D366] to-[#128C7E] hover:from-[#2be66f] hover:to-[#0f7267] text-white font-bold text-xs rounded-lg shadow-[0_2px_0_#075E54] active:translate-y-0.5 active:shadow-none transition-all cursor-pointer whitespace-nowrap"
+                >
+                  <MessageCircle className="w-3.5 h-3.5 text-white fill-white" />
+                  <span>WhatsApp</span>
+                </a>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="text-center pt-2 border-t border-gray-200">
         <p className="text-xs text-slate-600 flex items-center justify-center gap-1 flex-wrap">

@@ -135,51 +135,58 @@ export const HomeView: React.FC<HomeViewProps> = ({
               <span className="bg-white/10 px-2.5 py-1 rounded-sm text-[#ffe500] font-bold">₹150 प्रति रेफरल बैंक/UPI</span>
             </div>
 
-            {/* Action Buttons with Symbolic Logos */}
-            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3 pt-2">
+            {/* 3D Action Buttons with Symbolic 3D Logo Capsules & Zero Text Cutoff */}
+            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2.5 sm:gap-3.5 pt-2">
               {currentUser ? (
                 <button
+                  type="button"
                   onClick={() => onNavigate('dashboard')}
-                  className="px-6 py-3.5 bg-white hover:bg-slate-100 text-[#2874f0] font-black rounded-sm text-sm shadow-md flex items-center gap-2 transition group"
+                  className="px-4 sm:px-6 py-2.5 sm:py-3.5 bg-gradient-to-b from-white via-slate-50 to-slate-100 hover:from-white hover:to-slate-200 text-[#2874f0] font-black rounded-xl text-xs sm:text-sm shadow-[0_4px_12px_rgba(0,0,0,0.25),inset_0_1.5px_1px_rgba(255,255,255,1)] border border-slate-200/90 flex items-center gap-2 active:translate-y-0.5 transition cursor-pointer group"
                 >
-                  <LayoutDashboard className="w-4 h-4 text-[#2874f0] group-hover:scale-110 transition-transform" />
-                  <span>मेरा डैशबोर्ड खोलें ({currentUser.fullName.split(' ')[0]})</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <div className="w-6 h-6 rounded-lg bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white flex items-center justify-center shadow-[0_2px_4px_rgba(40,116,240,0.35),inset_0_1px_0.5px_rgba(255,255,255,0.6)] shrink-0">
+                    <LayoutDashboard className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="leading-tight">मेरा डैशबोर्ड खोलें ({currentUser.fullName.split(' ')[0]})</span>
+                  <ArrowRight className="w-4 h-4 ml-0.5 group-hover:translate-x-0.5 transition-transform" />
                 </button>
               ) : (
                 <button
+                  type="button"
                   onClick={() => onNavigate('register')}
-                  className="px-6 py-3.5 bg-[#fb641b] hover:bg-[#e85a14] text-white font-black rounded-sm text-sm shadow-md flex items-center gap-2 transition group"
+                  className="px-4 sm:px-6 py-2.5 sm:py-3.5 bg-gradient-to-b from-[#fb641b] via-[#ea580c] to-[#c2410c] hover:from-[#ea580c] hover:to-[#9a3412] text-white font-black rounded-xl text-xs sm:text-sm shadow-[0_4px_14px_rgba(251,100,27,0.4),inset_0_1.5px_1px_rgba(255,255,255,0.5)] border border-amber-300/40 flex items-center gap-2 active:translate-y-0.5 transition cursor-pointer group"
                 >
-                  <Sparkles className="w-4 h-4 text-yellow-300 group-hover:scale-110 transition-transform" />
-                  <span>विद्यार्थी रजिस्ट्रेशन (₹{siteConfig.activationFee || 249})</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <div className="w-6 h-6 rounded-lg bg-gradient-to-b from-yellow-300 to-amber-400 text-slate-950 flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.25),inset_0_1px_0.5px_rgba(255,255,255,0.8)] shrink-0">
+                    <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                  </div>
+                  <span className="leading-tight">विद्यार्थी रजिस्ट्रेशन (₹{siteConfig.activationFee || 249})</span>
+                  <ArrowRight className="w-4 h-4 ml-0.5 group-hover:translate-x-0.5 transition-transform" />
                 </button>
               )}
 
               <button
+                type="button"
                 onClick={() => onNavigate('video')}
-                className="px-5 py-3.5 bg-white/10 hover:bg-white/20 text-white font-bold rounded-sm text-sm border border-white/30 flex items-center gap-2 transition"
+                className="px-4 sm:px-5 py-2.5 sm:py-3.5 bg-gradient-to-b from-white/20 via-white/10 to-white/5 hover:bg-white/25 text-white font-bold rounded-xl text-xs sm:text-sm border border-white/40 shadow-[0_3px_8px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.3)] flex items-center gap-2 active:translate-y-0.5 transition cursor-pointer"
               >
-                <Play className="w-4 h-4 text-rose-400 fill-rose-400" />
-                <span>ट्रेनिंग वीडियो देखें</span>
+                <div className="w-6 h-6 rounded-lg bg-gradient-to-b from-rose-500 to-rose-700 text-white flex items-center justify-center shadow-[0_2px_4px_rgba(244,63,94,0.35),inset_0_1px_0.5px_rgba(255,255,255,0.5)] shrink-0">
+                  <Play className="w-3.5 h-3.5 fill-white text-white" />
+                </div>
+                <span className="leading-tight">ट्रेनिंग वीडियो देखें</span>
               </button>
 
               <button
+                type="button"
                 onClick={() => onNavigate(currentUser ? 'idcard' : 'dashboard')}
-                className="px-4 py-3.5 bg-[#1c52b8] hover:bg-[#143e8c] text-white font-bold rounded-sm text-xs border border-blue-300/40 flex items-center gap-1.5 transition"
+                className="px-3.5 sm:px-4 py-2.5 sm:py-3.5 bg-gradient-to-b from-[#1c52b8] to-[#124296] hover:from-[#17469e] hover:to-[#0f3475] text-white font-bold rounded-xl text-xs sm:text-sm border border-blue-300/40 shadow-[0_3px_8px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.3)] flex items-center gap-2 active:translate-y-0.5 transition cursor-pointer"
               >
-                {currentUser ? (
-                  <>
-                    <CreditCard className="w-4 h-4 text-[#ffe500]" />
-                    <span>मेरा डिजिटल 🆔 कार्ड</span>
-                  </>
-                ) : (
-                  <>
-                    <GraduationCap className="w-4 h-4 text-[#ffe500]" />
-                    <span>विद्यार्थी पोर्टल</span>
-                  </>
-                )}
+                <div className="w-6 h-6 rounded-lg bg-gradient-to-b from-yellow-300 to-amber-500 text-slate-900 flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.25),inset_0_1px_0.5px_rgba(255,255,255,0.8)] shrink-0">
+                  {currentUser ? (
+                    <CreditCard className="w-3.5 h-3.5 text-slate-950" />
+                  ) : (
+                    <GraduationCap className="w-3.5 h-3.5 text-slate-950" />
+                  )}
+                </div>
+                <span className="leading-tight">{currentUser ? 'मेरा डिजिटल 🆔 कार्ड' : 'विद्यार्थी पोर्टल'}</span>
               </button>
             </div>
           </div>
@@ -254,6 +261,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               </div>
 
               <button
+                type="button"
                 onClick={() => {
                   if (onNavigateToIdCard) {
                     onNavigateToIdCard();
@@ -263,24 +271,14 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     onNavigate('register');
                   }
                 }}
-                className="w-full py-2.5 bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold text-xs rounded-sm shadow-sm flex items-center justify-center gap-1.5 transition"
+                className="w-full py-3 bg-gradient-to-b from-[#2874f0] to-[#1258c7] hover:from-[#1e63d8] hover:to-[#0f4bb0] text-white font-black text-xs sm:text-sm rounded-xl shadow-[0_4px_10px_rgba(40,116,240,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)] active:translate-y-0.5 flex items-center justify-center gap-2 transition cursor-pointer"
               >
-                {currentUser ? (
-                  <>
-                    <CreditCard className="w-3.5 h-3.5" />
-                    <span>मेरा डिजिटल 🆔 कार्ड खोलें</span>
-                  </>
-                ) : referralSponsor ? (
-                  <>
-                    <CreditCard className="w-3.5 h-3.5 text-yellow-300" />
-                    <span>स्पॉन्सर डिजिटल 🆔 कार्ड देखें</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
-                    <span>डिजिटल 🆔 कार्ड (रजिस्ट्रेशन आवश्यक)</span>
-                  </>
-                )}
+                <div className="w-6 h-6 rounded-lg bg-yellow-300 text-slate-950 flex items-center justify-center shadow-xs shrink-0">
+                  <CreditCard className="w-3.5 h-3.5 text-slate-950" />
+                </div>
+                <span className="leading-tight">
+                  {currentUser ? 'मेरा डिजिटल 🆔 कार्ड खोलें' : referralSponsor ? 'स्पॉन्सर डिजिटल 🆔 कार्ड देखें' : 'डिजिटल 🆔 कार्ड (रजिस्ट्रेशन आवश्यक)'}
+                </span>
               </button>
             </div>
           </div>
@@ -399,10 +397,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 <div className="pt-4 mt-3 border-t border-gray-200/60 flex items-center justify-between">
                   <button
                     onClick={() => onNavigate((svc.actionLink as any) || 'register')}
-                    className="px-4 py-2 bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold text-xs rounded-sm shadow-xs flex items-center gap-1.5 transition"
+                    className="relative inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-b from-[#2874f0] via-[#1a65dc] to-[#0f4eb8] hover:from-[#367ff5] hover:to-[#1258c7] text-white font-black text-xs rounded-lg shadow-[0_3px_0_#0a3782,0_6px_12px_rgba(40,116,240,0.3)] active:translate-y-0.5 active:shadow-[0_1px_0_#0a3782] transition-all cursor-pointer whitespace-nowrap"
                   >
                     <span>{svc.actionText}</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    <div className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center shadow-inner">
+                      <ArrowRight className="w-3 h-3 text-white" />
+                    </div>
                   </button>
                   <span className="text-[10px] text-slate-400 font-semibold">
                     100% वेरिफाइड
@@ -503,10 +503,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
             <button
               type="button"
               onClick={() => onNavigate('register')}
-              className="w-full mt-2 py-2 px-3 bg-[#2874f0] hover:bg-[#1258c7] text-white text-xs font-bold rounded-sm shadow-xs flex items-center justify-center gap-1.5 transition group cursor-pointer"
+              className="w-full mt-2 py-2.5 px-3 bg-gradient-to-b from-[#2874f0] via-[#1a65dc] to-[#0f4eb8] hover:from-[#367ff5] hover:to-[#1258c7] text-white text-xs font-black rounded-lg shadow-[0_3px_0_#0a3782,0_6px_12px_rgba(40,116,240,0.3)] active:translate-y-0.5 active:shadow-[0_1px_0_#0a3782] flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
-              <Sparkles className="w-3.5 h-3.5 text-yellow-300 group-hover:scale-110 transition-transform" />
-              <span>रजिस्ट्रेशन करें (₹{siteConfig.activationFee || 249})</span>
+              <div className="w-5 h-5 rounded-md bg-white/20 border-t border-white/40 flex items-center justify-center shadow-inner">
+                <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+              </div>
+              <span className="truncate">रजिस्ट्रेशन करें (₹{siteConfig.activationFee || 249})</span>
               <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
             </button>
           </div>
@@ -580,11 +582,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <div className="pt-6">
             <button
               onClick={() => onNavigate(currentUser ? 'dashboard' : 'register')}
-              className="w-full py-3 bg-[#2874f0] hover:bg-[#1258c7] text-white font-bold rounded-sm text-xs flex items-center justify-center gap-2 transition shadow-sm"
+              className="w-full py-3 bg-gradient-to-b from-[#2874f0] via-[#1a65dc] to-[#0f4eb8] hover:from-[#367ff5] hover:to-[#1258c7] text-white font-black rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all shadow-[0_4px_0_#0a3782,0_8px_16px_rgba(40,116,240,0.35)] active:translate-y-0.5 active:shadow-[0_1px_0_#0a3782] cursor-pointer"
             >
-              <Zap className="w-4 h-4 text-emerald-300" />
-              <span>{currentUser ? 'SWIS रिचार्ज वॉलेट डैशबोर्ड' : `SWIS जॉइन करें (₹${siteConfig.activationFee || 249} One-Time)`}</span>
-              <ArrowRight className="w-4 h-4" />
+              <div className="w-6 h-6 rounded-lg bg-emerald-500/30 border-t border-emerald-300/40 flex items-center justify-center shadow-inner">
+                <Zap className="w-3.5 h-3.5 text-emerald-300 fill-emerald-300" />
+              </div>
+              <span className="truncate">{currentUser ? 'SWIS रिचार्ज वॉलेट डैशबोर्ड' : `SWIS जॉइन करें (₹${siteConfig.activationFee || 249} One-Time)`}</span>
+              <ArrowRight className="w-4 h-4 ml-0.5" />
             </button>
           </div>
         </div>
@@ -634,11 +638,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <div className="pt-6">
             <button
               onClick={() => onNavigate(currentUser ? 'dashboard' : 'register')}
-              className="w-full py-3 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold rounded-sm text-xs flex items-center justify-center gap-2 transition shadow-sm"
+              className="w-full py-3 bg-gradient-to-b from-[#fb641b] via-[#ea580c] to-[#c2410c] hover:from-[#ff752b] hover:to-[#b03608] text-white font-black rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all shadow-[0_4px_0_#7c2d12,0_8px_16px_rgba(251,100,27,0.35)] active:translate-y-0.5 active:shadow-[0_1px_0_#7c2d12] cursor-pointer"
             >
-              <Users className="w-4 h-4 text-yellow-300" />
-              <span>{currentUser ? 'TWIS रेफरल हब खोलें' : `TWIS जॉइन करें (₹${siteConfig.activationFee || 249} One-Time)`}</span>
-              <ArrowRight className="w-4 h-4" />
+              <div className="w-6 h-6 rounded-lg bg-white/20 border-t border-white/40 flex items-center justify-center shadow-inner">
+                <Users className="w-3.5 h-3.5 text-yellow-300" />
+              </div>
+              <span className="truncate">{currentUser ? 'TWIS रेफरल हब खोलें' : `TWIS जॉइन करें (₹${siteConfig.activationFee || 249} One-Time)`}</span>
+              <ArrowRight className="w-4 h-4 ml-0.5" />
             </button>
           </div>
         </div>
@@ -661,10 +667,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
         <button
           onClick={() => onNavigate('video')}
-          className="px-6 py-3 bg-[#ff0000] hover:bg-[#d90000] text-white font-bold rounded-sm text-xs shadow flex items-center gap-2 shrink-0 transition"
+          className="px-6 py-3 bg-gradient-to-b from-[#ff0000] via-[#dc2626] to-[#991b1b] hover:from-[#ff2b2b] hover:to-[#7f1d1d] text-white font-black rounded-xl text-xs sm:text-sm shadow-[0_4px_0_#7f1d1d,0_8px_16px_rgba(220,38,38,0.35)] active:translate-y-0.5 active:shadow-[0_1px_0_#7f1d1d] flex items-center gap-2.5 shrink-0 transition-all cursor-pointer"
         >
-          <Play className="w-4 h-4 fill-white" />
-          <span>वीडियो देखें (YouTube)</span>
+          <div className="w-6 h-6 rounded-lg bg-white/20 border-t border-white/40 flex items-center justify-center shadow-inner">
+            <Play className="w-3.5 h-3.5 fill-white text-white" />
+          </div>
+          <span className="truncate">वीडियो देखें (YouTube)</span>
         </button>
       </div>
 
@@ -676,8 +684,25 @@ export const HomeView: React.FC<HomeViewProps> = ({
               <span className="font-bold text-white text-sm">Achievers Club Community (ACC)</span>
               <span className="text-[#ffe500] font-semibold italic text-xs">· Start Young, Retire Young</span>
             </div>
-            <p className="text-slate-400 mt-1">
-              Full Support Desk: <a href={`mailto:${siteConfig.officialEmail || 'santosh09patidar@gmail.com'}`} className="text-blue-300 hover:underline">{siteConfig.officialEmail || 'santosh09patidar@gmail.com'}</a> · WhatsApp: <a href={`https://api.whatsapp.com/send?phone=${cleanWhatsApp}&text=Namaste%20ACC%20Support`} target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline font-bold">{siteConfig.whatsappNumber || '+91 8877490845'}</a>
+            <p className="text-slate-400 mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span>सपोर्ट ईमेल:</span>
+              <a href={`mailto:${siteConfig.officialEmail || 'newuserhelpline@gmail.com'}`} className="text-blue-300 hover:underline font-bold font-mono">
+                {siteConfig.officialEmail || 'newuserhelpline@gmail.com'}
+              </a>
+              <span className="text-slate-600">·</span>
+              <span>Telegram:</span>
+              <a href={siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE'} target="_blank" rel="noopener noreferrer" className="text-sky-300 hover:underline font-bold">
+                @NEWUSERHELPLINE
+              </a>
+              {siteConfig.showWhatsAppSupport && (
+                <>
+                  <span className="text-slate-600">·</span>
+                  <span>WhatsApp:</span>
+                  <a href={`https://api.whatsapp.com/send?phone=${cleanWhatsApp}&text=Namaste%20ACC%20Support`} target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline font-bold">
+                    {siteConfig.whatsappNumber || '+91 8877490845'}
+                  </a>
+                </>
+              )}
             </p>
             <p className="text-slate-500 text-[11px] mt-0.5">
               कार्यालय पता: {siteConfig.officialAddress || 'Scheme No. 54, Vijay Nagar, Indore, Madhya Pradesh - 452001'}

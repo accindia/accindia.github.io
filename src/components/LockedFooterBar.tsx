@@ -198,7 +198,7 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
 
         {/* Action buttons on right of announcement strip - 3D Tactile Buttons */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {currentUser ? (
+          {siteConfig.showWhatsAppSupport ? (
             <button
               onClick={handleOpenWhatsAppAdmin}
               className="text-[10px] sm:text-[11px] bg-gradient-to-b from-emerald-500 to-teal-700 hover:from-emerald-400 hover:to-teal-600 text-white px-2 py-1 rounded-lg font-black flex items-center gap-1 shadow-[0_2px_4px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.4)] active:translate-y-0.5 border border-emerald-400/40 transition cursor-pointer"
@@ -207,18 +207,18 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
               <div className="w-3.5 h-3.5 rounded bg-white/20 flex items-center justify-center shrink-0">
                 <MessageCircle className="w-2.5 h-2.5 text-white" />
               </div>
-              <span className="whitespace-nowrap">सपोर्ट</span>
+              <span className="whitespace-nowrap">WhatsApp</span>
             </button>
           ) : (
             <a
-              href={`tel:${cleanHelpline}`}
+              href={`mailto:${siteConfig.officialEmail || 'newuserhelpline@gmail.com'}?subject=ACC%20Support`}
               className="text-[10px] sm:text-[11px] bg-gradient-to-b from-blue-500 to-blue-700 hover:from-blue-400 hover:to-blue-600 text-white px-2 py-1 rounded-lg font-black flex items-center gap-1 shadow-[0_2px_4px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.4)] active:translate-y-0.5 border border-blue-400/40 transition cursor-pointer"
-              title="हेल्पलाइन कॉल"
+              title="ईमेल सपोर्ट (newuserhelpline@gmail.com)"
             >
               <div className="w-3.5 h-3.5 rounded bg-white/20 flex items-center justify-center shrink-0">
-                <PhoneCall className="w-2.5 h-2.5 text-white" />
+                <Mail className="w-2.5 h-2.5 text-white" />
               </div>
-              <span className="whitespace-nowrap">हेल्प</span>
+              <span className="whitespace-nowrap">ईमेल हेल्प</span>
             </a>
           )}
 
@@ -351,15 +351,27 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
                 title={`स्पॉन्सर ${referralSponsor.fullName} का डिजिटल ID कार्ड देखें`}
               />
 
-              <Nav3DButton
-                icon={<MessageCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
-                label="WhatsApp"
-                subLabel="चैट करें"
-                isSpecial={true}
-                themeColor="emerald"
-                onClick={handleOpenWhatsAppSponsor}
-                title={`स्पॉन्सर ${referralSponsor.fullName} से सीधे WhatsApp पर बात करें`}
-              />
+              {siteConfig.showWhatsAppSupport ? (
+                <Nav3DButton
+                  icon={<MessageCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                  label="WhatsApp"
+                  subLabel="चैट करें"
+                  isSpecial={true}
+                  themeColor="emerald"
+                  onClick={handleOpenWhatsAppSponsor}
+                  title={`स्पॉन्सर ${referralSponsor.fullName} से सीधे WhatsApp पर बात करें`}
+                />
+              ) : (
+                <Nav3DButton
+                  icon={<Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                  label="Telegram"
+                  subLabel="हेल्पडेस्क"
+                  isSpecial={true}
+                  themeColor="blue"
+                  onClick={() => window.open(siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE', '_blank')}
+                  title="ऑफिशियल Telegram सहायता केंद्र (@NEWUSERHELPLINE)"
+                />
+              )}
             </div>
           )}
 
@@ -409,15 +421,27 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
                 title="सिस्टम ट्रेनिंग वीडियो देखें"
               />
 
-              <Nav3DButton
-                icon={<MessageCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
-                label="सहायता"
-                subLabel="WhatsApp"
-                isSpecial={true}
-                themeColor="emerald"
-                onClick={handleOpenWhatsAppAdmin}
-                title="24x7 एडमिन हेल्पलाइन व WhatsApp सहायता"
-              />
+              {siteConfig.showWhatsAppSupport ? (
+                <Nav3DButton
+                  icon={<MessageCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                  label="WhatsApp"
+                  subLabel="सपोर्ट"
+                  isSpecial={true}
+                  themeColor="emerald"
+                  onClick={handleOpenWhatsAppAdmin}
+                  title="24x7 एडमिन हेल्पलाइन व WhatsApp सहायता"
+                />
+              ) : (
+                <Nav3DButton
+                  icon={<Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                  label="Telegram"
+                  subLabel="हेल्पडेस्क"
+                  isSpecial={true}
+                  themeColor="blue"
+                  onClick={() => window.open(siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE', '_blank')}
+                  title="24x7 एडमिन Telegram सहायता (@NEWUSERHELPLINE)"
+                />
+              )}
             </div>
           )}
         </div>

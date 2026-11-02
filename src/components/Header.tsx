@@ -20,6 +20,7 @@ import {
   HelpCircle,
   BookOpen,
   Send,
+  Mail,
 } from 'lucide-react';
 import { ActiveWindow, Member, SiteConfig } from '../types';
 import { StorageService, subscribeToSync } from '../services/storage';
@@ -573,19 +574,31 @@ export const Header: React.FC<HeaderProps> = ({
             })}
           </div>
 
-          {/* Direct WhatsApp & Telegram Helpline 3D Shortcuts */}
+          {/* Direct Support Channels (Email & Telegram by default; WhatsApp only if enabled by Admin) */}
           <div className="pt-2 border-t border-gray-200 grid grid-cols-2 gap-2">
-            <a
-              href={`https://api.whatsapp.com/send?phone=${cleanWhatsApp}&text=Namaste%20ACC%20Support%2C%20mujhe%20Achievers%20Club%20Community%20ke%20bare%20me%20jankari%20chahiye.`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="py-2.5 px-3 bg-gradient-to-b from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-[0_3px_8px_rgba(16,185,129,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)] active:translate-y-0.5 border border-emerald-400/40"
-            >
-              <div className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center shrink-0">
-                <MessageCircle className="w-3.5 h-3.5 text-white" />
-              </div>
-              <span className="whitespace-nowrap">WhatsApp</span>
-            </a>
+            {siteConfig.showWhatsAppSupport ? (
+              <a
+                href={`https://api.whatsapp.com/send?phone=${cleanWhatsApp}&text=Namaste%20ACC%20Support%2C%20mujhe%20Achievers%20Club%20Community%20ke%20bare%20me%20jankari%20chahiye.`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="py-2.5 px-3 bg-gradient-to-b from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-[0_3px_8px_rgba(16,185,129,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)] active:translate-y-0.5 border border-emerald-400/40"
+              >
+                <div className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center shrink-0">
+                  <MessageCircle className="w-3.5 h-3.5 text-white" />
+                </div>
+                <span className="whitespace-nowrap">WhatsApp</span>
+              </a>
+            ) : (
+              <a
+                href={`mailto:${siteConfig.officialEmail || 'newuserhelpline@gmail.com'}?subject=ACC%20Support`}
+                className="py-2.5 px-3 bg-gradient-to-b from-[#2874f0] to-[#1258c7] hover:from-[#1e63d8] hover:to-[#0f4bb0] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-[0_3px_8px_rgba(40,116,240,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)] active:translate-y-0.5 border border-blue-400/40"
+              >
+                <div className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center shrink-0">
+                  <Mail className="w-3.5 h-3.5 text-white" />
+                </div>
+                <span className="whitespace-nowrap">ईमेल हेल्प</span>
+              </a>
+            )}
             <a
               href={siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE'}
               target="_blank"

@@ -425,9 +425,11 @@ export const UserGuidelines: React.FC<UserGuidelinesProps> = ({
                   href={siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE'}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full py-2 bg-[#229ED9] hover:bg-[#1e8ec3] text-white rounded-lg font-bold flex items-center justify-center gap-1.5 transition shadow-xs"
+                  className="w-full py-2.5 bg-gradient-to-b from-[#229ed9] via-[#0088cc] to-[#006699] hover:from-[#2eb0ee] hover:to-[#005580] text-white rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-[0_3px_0_#004466,0_6px_12px_rgba(0,136,204,0.25)] active:translate-y-0.5 active:shadow-[0_1px_0_#004466] transition-all cursor-pointer whitespace-nowrap"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  <div className="w-5 h-5 rounded-md bg-white/20 border-t border-white/40 flex items-center justify-center shadow-inner">
+                    <ExternalLink className="w-3.5 h-3.5 text-white" />
+                  </div>
                   <span>https://t.me/NEWUSERHELPLINE</span>
                 </a>
               </div>
@@ -448,47 +450,53 @@ export const UserGuidelines: React.FC<UserGuidelinesProps> = ({
                 </p>
                 <a
                   href={`mailto:${siteConfig.officialEmail || 'newuserhelpline@gmail.com'}`}
-                  className="w-full py-2 bg-[#2874f0] hover:bg-[#1258c7] text-white rounded-lg font-bold flex items-center justify-center gap-1.5 transition shadow-xs font-mono"
+                  className="w-full py-2.5 bg-gradient-to-b from-[#2874f0] via-[#1a65dc] to-[#0f4eb8] hover:from-[#367ff5] hover:to-[#1258c7] text-white rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-[0_3px_0_#0a3782,0_6px_12px_rgba(40,116,240,0.25)] active:translate-y-0.5 active:shadow-[0_1px_0_#0a3782] transition-all cursor-pointer whitespace-nowrap font-mono"
                 >
-                  <Mail className="w-3.5 h-3.5" />
+                  <div className="w-5 h-5 rounded-md bg-white/20 border-t border-white/40 flex items-center justify-center shadow-inner">
+                    <Mail className="w-3.5 h-3.5 text-white" />
+                  </div>
                   <span>{siteConfig.officialEmail || 'newuserhelpline@gmail.com'}</span>
                 </a>
               </div>
             </div>
 
             {/* WhatsApp & Call Helpline */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs pt-1">
-              <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-300 space-y-2">
-                <div className="flex items-center gap-2 text-emerald-800 font-bold">
-                  <MessageCircle className="w-4 h-4 text-emerald-600" />
-                  <span>व्हाट्सएप हेल्पलाइन (WhatsApp Chat):</span>
+            <div className={`grid grid-cols-1 ${siteConfig.showWhatsAppSupport === true ? 'sm:grid-cols-2' : ''} gap-4 text-xs pt-1`}>
+              {siteConfig.showWhatsAppSupport === true && (
+                <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-300 space-y-2">
+                  <div className="flex items-center gap-2 text-emerald-800 font-bold">
+                    <MessageCircle className="w-4 h-4 text-emerald-600" />
+                    <span>व्हाट्सएप हेल्पलाइन (WhatsApp Chat):</span>
+                  </div>
+                  <a
+                    href={`https://api.whatsapp.com/send?phone=91${(siteConfig.whatsappNumber || '8877490845').replace(/[^0-9]/g, '')}&text=${encodeURIComponent(
+                      'नमस्ते ACC एडमिन, मुझे सहायता चाहिए।'
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-emerald-700 font-bold text-sm hover:underline block font-mono-acc"
+                  >
+                    {siteConfig.whatsappNumber || '+91 8877490845'}
+                  </a>
+                  <span className="text-[10px] text-slate-500 block">त्वरित चैट व वेरिफिकेशन सपोर्ट</span>
                 </div>
-                <a
-                  href={`https://api.whatsapp.com/send?phone=918877490845&text=${encodeURIComponent(
-                    'नमस्ते ACC एडमिन, मुझे सहायता चाहिए।'
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-emerald-700 font-bold text-sm hover:underline block font-mono-acc"
-                >
-                  {siteConfig.whatsappNumber || '+91 8877490845'}
-                </a>
-                <span className="text-[10px] text-slate-500 block">त्वरित चैट व वेरिफिकेशन सपोर्ट</span>
-              </div>
+              )}
 
-              <div className="p-4 bg-slate-50 rounded-xl border border-gray-300 space-y-2">
-                <div className="flex items-center gap-2 text-slate-800 font-bold">
-                  <Phone className="w-4 h-4 text-[#2874f0]" />
-                  <span>कॉल हेल्पलाइन (Helpline Calling):</span>
+              {siteConfig.showCallSupport !== false && (
+                <div className="p-4 bg-slate-50 rounded-xl border border-gray-300 space-y-2">
+                  <div className="flex items-center gap-2 text-slate-800 font-bold">
+                    <Phone className="w-4 h-4 text-[#2874f0]" />
+                    <span>कॉल हेल्पलाइन (Helpline Calling):</span>
+                  </div>
+                  <a
+                    href={`tel:${siteConfig.helplinePhone || '+918877490845'}`}
+                    className="text-[#2874f0] font-bold text-sm hover:underline block font-mono-acc"
+                  >
+                    {siteConfig.helplinePhone || '+91 8877490845'}
+                  </a>
+                  <span className="text-[10px] text-slate-500 block">कार्य समय: सुबह 10:00 से शाम 07:00 तक</span>
                 </div>
-                <a
-                  href={`tel:${siteConfig.helplinePhone || '+918877490845'}`}
-                  className="text-[#2874f0] font-bold text-sm hover:underline block font-mono-acc"
-                >
-                  {siteConfig.helplinePhone || '+91 8877490845'}
-                </a>
-                <span className="text-[10px] text-slate-500 block">कार्य समय: सुबह 10:00 से शाम 07:00 तक</span>
-              </div>
+              )}
             </div>
 
             {/* Security Warning Notice */}

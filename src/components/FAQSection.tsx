@@ -16,6 +16,8 @@ import {
   FileText,
   Clock,
   ExternalLink,
+  Mail,
+  Send,
 } from 'lucide-react';
 import { SiteConfig } from '../types';
 
@@ -603,31 +605,71 @@ export const FAQSection: React.FC<FAQSectionProps> = ({ onGoToRegister, siteConf
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 shrink-0 justify-center">
-          <a
-            href={`https://wa.me/${cleanWhatsApp}?text=${encodeURIComponent('नमस्ते ACC सपोर्ट टीम, मुझे प्लान व सिस्टम के बारे में जानकारी चाहिए।')}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-xs flex items-center gap-1.5 transition"
-          >
-            <MessageCircle className="w-4 h-4" />
-            <span>व्हाट्सएप सहायता</span>
-          </a>
+          {/* Telegram Support Button */}
+          {siteConfig?.showTelegramSupport !== false && (
+            <a
+              href={siteConfig?.telegramLink || 'https://t.me/NEWUSERHELPLINE'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="relative inline-flex items-center gap-2 px-3.5 py-2.5 bg-gradient-to-b from-[#229ed9] via-[#0088cc] to-[#006699] hover:from-[#2eb0ee] hover:to-[#005580] text-white font-black text-xs rounded-xl shadow-[0_3px_0_#004466,0_6px_12px_rgba(0,136,204,0.3)] active:translate-y-0.5 active:shadow-[0_1px_0_#004466] transition-all cursor-pointer whitespace-nowrap"
+            >
+              <div className="w-5 h-5 rounded-md bg-white/20 border-t border-white/40 flex items-center justify-center shadow-inner">
+                <Send className="w-3.5 h-3.5 text-white" />
+              </div>
+              <span>टेलीग्राम सहायता</span>
+            </a>
+          )}
 
-          <a
-            href={`tel:${cleanPhone}`}
-            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-lg border border-gray-200 flex items-center gap-1.5 transition"
-          >
-            <Phone className="w-4 h-4 text-slate-600" />
-            <span>{helpline}</span>
-          </a>
+          {/* Email Support Button */}
+          {siteConfig?.showEmailSupport !== false && (
+            <a
+              href={`mailto:${siteConfig?.officialEmail || 'newuserhelpline@gmail.com'}`}
+              className="relative inline-flex items-center gap-2 px-3.5 py-2.5 bg-gradient-to-b from-[#2874f0] via-[#1a65dc] to-[#0f4eb8] hover:from-[#367ff5] hover:to-[#1258c7] text-white font-black text-xs rounded-xl shadow-[0_3px_0_#0a3782,0_6px_12px_rgba(40,116,240,0.3)] active:translate-y-0.5 active:shadow-[0_1px_0_#0a3782] transition-all cursor-pointer whitespace-nowrap"
+            >
+              <div className="w-5 h-5 rounded-md bg-white/20 border-t border-white/40 flex items-center justify-center shadow-inner">
+                <Mail className="w-3.5 h-3.5 text-white" />
+              </div>
+              <span>ईमेल हेल्प</span>
+            </a>
+          )}
+
+          {/* WhatsApp Support Button - only if enabled in Admin Panel */}
+          {siteConfig?.showWhatsAppSupport === true && (
+            <a
+              href={`https://wa.me/${cleanWhatsApp}?text=${encodeURIComponent('नमस्ते ACC सपोर्ट टीम, मुझे प्लान व सिस्टम के बारे में जानकारी चाहिए।')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="relative inline-flex items-center gap-2 px-3.5 py-2.5 bg-gradient-to-b from-[#25D366] via-[#1ebe5b] to-[#128C7E] hover:from-[#2be66f] hover:to-[#0f7267] text-white font-black text-xs rounded-xl shadow-[0_3px_0_#075E54,0_6px_12px_rgba(37,211,102,0.3)] active:translate-y-0.5 active:shadow-[0_1px_0_#075E54] transition-all cursor-pointer whitespace-nowrap"
+            >
+              <div className="w-5 h-5 rounded-md bg-white/20 border-t border-white/40 flex items-center justify-center shadow-inner">
+                <MessageCircle className="w-3.5 h-3.5 text-white fill-white" />
+              </div>
+              <span>व्हाट्सएप</span>
+            </a>
+          )}
+
+          {/* Helpline Phone Button */}
+          {siteConfig?.showCallSupport !== false && (
+            <a
+              href={`tel:${cleanPhone}`}
+              className="relative inline-flex items-center gap-2 px-3.5 py-2.5 bg-gradient-to-b from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-800 font-black text-xs rounded-xl border border-gray-300 shadow-[0_2px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none transition-all cursor-pointer whitespace-nowrap"
+            >
+              <div className="w-5 h-5 rounded-md bg-slate-300/60 flex items-center justify-center">
+                <Phone className="w-3.5 h-3.5 text-slate-700" />
+              </div>
+              <span>{helpline}</span>
+            </a>
+          )}
 
           {onGoToRegister && (
             <button
               type="button"
               onClick={onGoToRegister}
-              className="px-4 py-2.5 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold text-xs rounded-lg shadow-sm flex items-center gap-1.5 transition"
+              className="relative inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-b from-[#fb641b] via-[#ea580c] to-[#c2410c] hover:from-[#ff752b] hover:to-[#b03608] text-white font-black text-xs rounded-xl shadow-[0_3px_0_#7c2d12,0_6px_12px_rgba(251,100,27,0.35)] active:translate-y-0.5 active:shadow-[0_1px_0_#7c2d12] transition-all cursor-pointer whitespace-nowrap"
             >
-              <Sparkles className="w-4 h-4 text-yellow-300" />
+              <div className="w-5 h-5 rounded-md bg-white/20 border-t border-white/40 flex items-center justify-center shadow-inner">
+                <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+              </div>
               <span>रजिस्ट्रेशन करें (₹{siteConfig?.activationFee || 249})</span>
             </button>
           )}

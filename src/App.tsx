@@ -667,46 +667,54 @@ export default function App() {
           <div className="space-y-2">
             <h4 className="text-white font-bold text-xs uppercase tracking-wider text-slate-400">संपर्क व सहायता</h4>
             <div className="text-slate-400 text-[11px] space-y-1">
-              <p>
-                हेल्पलाइन:{' '}
-                <a
-                  href={`tel:${(siteConfig.helplinePhone || '+91 8877490845').replace(/[^0-9]/g, '')}`}
-                  className="text-emerald-400 font-bold hover:underline"
-                >
-                  {siteConfig.helplinePhone || '+91 8877490845'}
-                </a>
-              </p>
-              <p>
-                WhatsApp:{' '}
-                <a
-                  href={`https://api.whatsapp.com/send?phone=${(siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '')}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-emerald-400 font-bold hover:underline"
-                >
-                  {siteConfig.whatsappNumber || '+91 8877490845'}
-                </a>
-              </p>
-              <p>
-                Telegram:{' '}
-                <a
-                  href={siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sky-400 font-bold hover:underline"
-                >
-                  @NEWUSERHELPLINE
-                </a>
-              </p>
-              <p>
-                Full Support Desk:{' '}
-                <a
-                  href={`mailto:${siteConfig.officialEmail || 'newuserhelpline@gmail.com'}`}
-                  className="text-yellow-300 font-bold hover:underline"
-                >
-                  {siteConfig.officialEmail || 'newuserhelpline@gmail.com'}
-                </a>
-              </p>
+              {siteConfig.showCallSupport !== false && (
+                <p>
+                  हेल्पलाइन:{' '}
+                  <a
+                    href={`tel:${(siteConfig.helplinePhone || '+91 8877490845').replace(/[^0-9]/g, '')}`}
+                    className="text-emerald-400 font-bold hover:underline"
+                  >
+                    {siteConfig.helplinePhone || '+91 8877490845'}
+                  </a>
+                </p>
+              )}
+              {siteConfig.showWhatsAppSupport === true && (
+                <p>
+                  WhatsApp:{' '}
+                  <a
+                    href={`https://api.whatsapp.com/send?phone=${(siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-emerald-400 font-bold hover:underline"
+                  >
+                    {siteConfig.whatsappNumber || '+91 8877490845'}
+                  </a>
+                </p>
+              )}
+              {siteConfig.showTelegramSupport !== false && (
+                <p>
+                  Telegram:{' '}
+                  <a
+                    href={siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sky-400 font-bold hover:underline"
+                  >
+                    @NEWUSERHELPLINE
+                  </a>
+                </p>
+              )}
+              {siteConfig.showEmailSupport !== false && (
+                <p>
+                  Full Support Desk:{' '}
+                  <a
+                    href={`mailto:${siteConfig.officialEmail || 'newuserhelpline@gmail.com'}`}
+                    className="text-yellow-300 font-bold hover:underline"
+                  >
+                    {siteConfig.officialEmail || 'newuserhelpline@gmail.com'}
+                  </a>
+                </p>
+              )}
               <p>
                 कार्यालय: {siteConfig.officialAddress || 'Scheme No. 54, Vijay Nagar, Indore (M.P.) - 452001'}
               </p>
