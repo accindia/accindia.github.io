@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   HelpCircle,
   Search,
@@ -35,6 +35,8 @@ export interface FAQItem {
 interface FAQSectionProps {
   onGoToRegister?: () => void;
   siteConfig?: SiteConfig;
+  externalSearchQuery?: string;
+  onSearchQueryChange?: (q: string) => void;
 }
 
 export const FAQ_DATA: FAQItem[] = [
@@ -264,9 +266,24 @@ export const FAQ_DATA: FAQItem[] = [
   },
 ];
 
-export const FAQSection: React.FC<FAQSectionProps> = ({ onGoToRegister, siteConfig }) => {
+export const FAQSection: React.FC<FAQSectionProps> = ({
+  onGoToRegister,
+  siteConfig,
+  externalSearchQuery,
+  onSearchQueryChange,
+}) => {
   const [activeCategory, setActiveCategory] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [internalSearchQuery, setInternalSearchQuery] = useState<string>('');
+
+  const searchQuery = externalSearchQuery !== undefined ? externalSearchQuery : internalSearchQuery;
+  const handleSearchChange = (q: string) => {
+    if (externalSearchQuery !== undefined && onSearchQueryChange) {
+      onSearchQueryChange(q);
+    } else {
+      setInternalSearchQuery(q);
+    }
+  };
+
   const [openIds, setOpenIds] = useState<Record<string, boolean>>({
     'swis-1': true, // Open first SWIS question by default
     'twis-1': true, // Open first TWIS question by default
@@ -308,6 +325,17 @@ export const FAQSection: React.FC<FAQSectionProps> = ({ onGoToRegister, siteConf
       );
     });
   }, [activeCategory, searchQuery]);
+
+  // Auto-expand all matching questions when user types a search query
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const allMatching: Record<string, boolean> = {};
+      filteredFAQs.forEach((item) => {
+        allMatching[item.id] = true;
+      });
+      setOpenIds(allMatching);
+    }
+  }, [searchQuery, filteredFAQs]);
 
   const categories = [
     { id: 'all', label: 'सभी सवाल (All)', count: FAQ_DATA.length, icon: <HelpCircle className="w-3.5 h-3.5" /> },
@@ -397,14 +425,14 @@ export const FAQSection: React.FC<FAQSectionProps> = ({ onGoToRegister, siteConf
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="अपने प्रश्न या कीवर्ड से खोजें (उदा. SWIS, TWIS, 3.30%, ₹150, पेआउट, UTR, ID कार्ड)..."
             className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-gray-300 rounded-lg text-xs sm:text-sm text-slate-900 focus:outline-none focus:border-[#2874f0] focus:ring-2 focus:ring-blue-100 transition"
           />
           {searchQuery && (
             <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-700 bg-slate-200 rounded-full w-5 h-5 flex items-center justify-center"
+              onClick={() => handleSearchChange('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-700 bg-slate-200 rounded-full w-5 h-5 flex items-center justify-center cursor-pointer"
               title="सर्च साफ करें"
             >
               ×
@@ -466,8 +494,8 @@ export const FAQSection: React.FC<FAQSectionProps> = ({ onGoToRegister, siteConf
             सर्च परिणाम: <strong>"{searchQuery}"</strong> के लिए <strong>{filteredFAQs.length}</strong> सवाल मिले
           </span>
           <button
-            onClick={() => setSearchQuery('')}
-            className="text-[#2874f0] font-bold hover:underline"
+            onClick={() => handleSearchChange('')}
+            className="text-[#2874f0] font-bold hover:underline cursor-pointer"
           >
             सभी दिखाएँ
           </button>
@@ -488,10 +516,10 @@ export const FAQSection: React.FC<FAQSectionProps> = ({ onGoToRegister, siteConf
             <div className="flex items-center justify-center gap-2 pt-2">
               <button
                 onClick={() => {
-                  setSearchQuery('');
+                  handleSearchChange('');
                   setActiveCategory('all');
                 }}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-lg transition"
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-lg transition cursor-pointer"
               >
                 सभी प्रश्न देखें
               </button>

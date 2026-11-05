@@ -37,6 +37,7 @@ import {
   downloadBothSidesIdCard,
 } from '../utils/idCardGenerator';
 import { AvatarWith3DFrame } from './AvatarWith3DFrame';
+import { AccLogo } from '../assets/logo';
 
 interface DigitalIdCardProps {
   member: Member;
@@ -258,13 +259,8 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
           <div className="absolute -bottom-16 -left-16 w-44 h-44 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
           {/* Official ACC Background Watermark */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.08] select-none z-0">
-            <img
-              src="/src/assets/images/acc_official_logo_1793842923620.jpg"
-              alt="ACC Security Watermark"
-              className="w-56 h-56 sm:w-64 sm:h-64 object-contain"
-              referrerPolicy="no-referrer"
-            />
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
+            <AccLogo watermark size="custom" className="w-56 h-56 sm:w-64 sm:h-64" />
           </div>
 
           {/* Click to Expand Floating Hint (only in inline view) */}
@@ -298,14 +294,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
           {/* Top Gold Header */}
           <div className="relative z-10 border-b border-amber-500/30 pb-3 mb-3 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-amber-600 via-amber-400 to-yellow-300 p-0.5 shadow-md shrink-0 overflow-hidden">
-                <img
-                  src="/src/assets/images/acc_official_logo_1793842923620.jpg"
-                  alt="ACC Official Logo"
-                  className="w-full h-full object-cover rounded-[10px]"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
+              <AccLogo size="custom" className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 drop-shadow-[0_4px_10px_rgba(0,0,0,0.45)]" />
               <div className="min-w-0">
                 <h2 className="font-display font-black text-sm sm:text-base tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-yellow-300 truncate">
                   ACHIEVERS CLUB
@@ -554,26 +543,14 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
         className={`relative w-full ${isModalView ? 'max-w-[460px]' : 'max-w-[430px]'} mx-auto bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 rounded-2xl border-2 border-amber-500/80 shadow-[0_0_35px_rgba(245,158,11,0.2)] overflow-hidden text-slate-100 p-3.5 sm:p-5 select-none transition-all space-y-3`}
       >
         {/* Official ACC Background Watermark */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.06] select-none z-0">
-          <img
-            src="/src/assets/images/acc_official_logo_1793842923620.jpg"
-            alt="ACC Security Watermark"
-            className="w-56 h-56 sm:w-64 sm:h-64 object-contain"
-            referrerPolicy="no-referrer"
-          />
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
+          <AccLogo watermark size="custom" className="w-56 h-56 sm:w-64 sm:h-64" />
         </div>
 
         {/* Top Gold Header */}
         <div className="relative z-10 border-b border-amber-500/30 pb-2.5 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-600 via-amber-400 to-yellow-300 p-0.5 shadow-md shrink-0 overflow-hidden">
-              <img
-                src="/src/assets/images/acc_official_logo_1793842923620.jpg"
-                alt="ACC Official Logo"
-                className="w-full h-full object-cover rounded-[10px]"
-                referrerPolicy="no-referrer"
-              />
-            </div>
+            <AccLogo size="custom" className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 drop-shadow-[0_3px_8px_rgba(0,0,0,0.35)]" />
             <div>
               <h3 className="font-display font-black text-xs sm:text-sm tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-yellow-300">
                 ACHIEVERS CLUB COMMUNITY (ACC)
@@ -654,14 +631,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
           </div>
 
           <div className="text-right shrink-0">
-            <div className="w-11 h-11 rounded-full p-0.5 bg-gradient-to-tr from-amber-500 via-yellow-300 to-amber-600 shadow-md mx-auto mb-1 overflow-hidden border border-amber-300">
-              <img
-                src="/src/assets/images/acc_official_logo_1793842923620.jpg"
-                alt="Official ACC Legal Seal"
-                className="w-full h-full object-cover rounded-full"
-                referrerPolicy="no-referrer"
-              />
-            </div>
+            <AccLogo size="custom" className="w-11 h-11 shrink-0 mx-auto mb-1 drop-shadow-md" />
             <p className="text-[7.5px] text-slate-400 font-semibold">Authorised Signatory</p>
             <p className="text-[8.5px] font-mono-acc text-amber-400 font-bold italic">
               {siteConfig.adminSignatoryName || 'Vikas Kumar'} (Admin)

@@ -78,7 +78,9 @@ import { compressImage } from '../utils/imageCompressor';
 import { DigitalIdCard } from './DigitalIdCard';
 import { ImageCropperModal, CropShape } from './ImageCropperModal';
 import { AvatarWith3DFrame, AVATAR_FRAMES } from './AvatarWith3DFrame';
+import { AccLogo } from '../assets/logo';
 import { PrivateChatBox } from './PrivateChatBox';
+import { ReferralTrendChart } from './ReferralTrendChart';
 
 interface UserDashboardProps {
   currentUser: Member;
@@ -501,7 +503,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
 
   // Referrals & Masked Privacy Modal State
   const [showReferralsPrivacyModal, setShowReferralsPrivacyModal] = useState(false);
-  const [referralModalTab, setReferralModalTab] = useState<'members' | 'privacy'>('members');
+  const [referralModalTab, setReferralModalTab] = useState<'members' | 'chart' | 'privacy'>('members');
   const [maskingEnabled, setMaskingEnabled] = useState(true);
   const [isSavingPrivacy, setIsSavingPrivacy] = useState(false);
   const [privacySaveSuccessMsg, setPrivacySaveSuccessMsg] = useState('');
@@ -1146,13 +1148,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
         <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Official ACC Background Watermark */}
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 w-48 h-48 opacity-[0.06] pointer-events-none select-none z-0">
-          <img
-            src="/src/assets/images/acc_official_logo_1793842923620.jpg"
-            alt="ACC Watermark"
-            className="w-full h-full object-contain"
-            referrerPolicy="no-referrer"
-          />
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 w-48 h-48 pointer-events-none select-none z-0">
+          <AccLogo watermark size="custom" className="w-full h-full" />
         </div>
 
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -1346,18 +1343,32 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
           <div>
             <div className="flex items-center justify-between gap-1">
               <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider truncate">👥 TWIS रेफरल (₹150)</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setReferralModalTab('members');
-                  setShowReferralsPrivacyModal(true);
-                }}
-                className="text-[10px] font-bold text-[#2874f0] hover:text-[#1258c7] flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded border border-blue-200 transition shadow-xs cursor-pointer shrink-0"
-                title="रेफरल सदस्य देखें (मास्क्ड प्राइवेसी के साथ)"
-              >
-                <span>सदस्य</span>
-                <Eye className="w-3 h-3" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReferralModalTab('chart');
+                    setShowReferralsPrivacyModal(true);
+                  }}
+                  className="text-[10px] font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded border border-amber-200 transition shadow-xs cursor-pointer shrink-0"
+                  title="30 दिन का रेफरल ट्रेंड चार्ट देखें"
+                >
+                  <TrendingUp className="w-3 h-3 text-amber-600" />
+                  <span>30D चार्ट</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReferralModalTab('members');
+                    setShowReferralsPrivacyModal(true);
+                  }}
+                  className="text-[10px] font-bold text-[#2874f0] hover:text-[#1258c7] flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-1.5 py-0.5 rounded border border-blue-200 transition shadow-xs cursor-pointer shrink-0"
+                  title="रेफरल सदस्य देखें (मास्क्ड प्राइवेसी के साथ)"
+                >
+                  <span>सदस्य</span>
+                  <Eye className="w-3 h-3" />
+                </button>
+              </div>
             </div>
             <span className="font-mono-acc font-black text-2xl text-[#2874f0] block mt-1 tabular-nums">
               ₹{currentUser.twisEarnings.toFixed(2)}
@@ -1944,6 +1955,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
               </button>
             </div>
           </div>
+
+          {/* 30-Day Referral Trend Chart using Recharts */}
+          <ReferralTrendChart referrals={referrals} />
 
           {/* Real Team Members List - Clean White Card */}
           <div className="bg-white border border-gray-200 rounded-xl p-5 sm:p-6 space-y-4 shadow-xs">
@@ -3449,7 +3463,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                 }`}
               >
                 <Users className="w-4 h-4" />
-                <span>1. मेरे रेफरल छात्र/सदस्य ({referrals.length})</span>
+                <span>1. मेरे रेफरल छात्र ({referrals.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setReferralModalTab('chart')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                  referralModalTab === 'chart'
+                    ? 'bg-[#2874f0] text-white shadow-xs'
+                    : 'bg-white text-slate-700 hover:bg-slate-200 border border-gray-200'
+                }`}
+              >
+                <TrendingUp className="w-4 h-4" />
+                <span>2. 📈 30-दिन ट्रेंड चार्ट</span>
               </button>
 
               <button
@@ -3462,7 +3489,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                 }`}
               >
                 <Lock className="w-4 h-4" />
-                <span>2. प्राइवेसी सेटिंग्स (पब्लिक / प्राइवेट चयन)</span>
+                <span>3. प्राइवेसी सेटिंग्स</span>
               </button>
             </div>
 
@@ -3617,7 +3644,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                 </div>
               )}
 
-              {/* TAB 2: PRIVACY SELECTION CONTROLS (PUBLIC vs PRIVATE) */}
+              {/* TAB 2: 30-DAY REFERRAL TREND CHART USING RECHARTS */}
+              {referralModalTab === 'chart' && (
+                <div className="space-y-4">
+                  <ReferralTrendChart referrals={referrals} />
+                </div>
+              )}
+
+              {/* TAB 3: PRIVACY SELECTION CONTROLS (PUBLIC vs PRIVATE) */}
               {referralModalTab === 'privacy' && (
                 <div className="space-y-4">
                   <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4 space-y-1">

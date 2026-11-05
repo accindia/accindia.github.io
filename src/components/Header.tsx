@@ -29,6 +29,7 @@ import {
 import { ActiveWindow, Member, SiteConfig } from '../types';
 import { StorageService, subscribeToSync } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
+import { AccLogo } from '../assets/logo';
 
 interface HeaderProps {
   activeWindow: ActiveWindow;
@@ -314,15 +315,8 @@ export const Header: React.FC<HeaderProps> = ({
             className="flex items-center gap-1.5 sm:gap-2.5 cursor-pointer group select-none min-w-0 shrink"
             title="Achievers Club Community - होम"
           >
-            {/* Official 3D Embossed ACC Emblem Logo */}
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl overflow-hidden p-0.5 bg-gradient-to-tr from-amber-400 via-yellow-200 to-amber-500 shadow-[0_3px_8px_rgba(0,0,0,0.3)] border border-yellow-200 group-hover:scale-105 active:translate-y-0.5 transition-all shrink-0">
-              <img
-                src="/src/assets/images/acc_official_logo_1793842923620.jpg"
-                alt="ACC Official Logo"
-                className="w-full h-full object-cover rounded-lg"
-                referrerPolicy="no-referrer"
-              />
-            </div>
+            {/* Official 3D ACC Emblem Logo (Frameless, Complete & No Side Cut) */}
+            <AccLogo size="custom" className="w-8 h-8 sm:w-10 sm:h-10 group-hover:scale-105 active:translate-y-0.5" />
             <div className="flex flex-col min-w-0 justify-center">
               <span className="font-display font-black text-xs sm:text-base md:text-lg tracking-tight text-white leading-tight truncate drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]">
                 Achievers Club

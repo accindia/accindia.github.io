@@ -29,6 +29,7 @@ import {
 import { ActiveWindow, Member, SiteConfig, AppServiceItem, PromotionalPoster } from '../types';
 import { StorageService, subscribeToSync } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
+import { AccLogo } from '../assets/logo';
 
 interface HomeViewProps {
   onNavigate: (view: ActiveWindow) => void;
@@ -196,14 +197,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             <div className="bg-white text-slate-900 border border-gray-200 rounded-xl p-5 shadow-lg relative overflow-hidden">
               <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-3">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-xl overflow-hidden shadow-md border border-amber-300 p-0.5 bg-gradient-to-tr from-amber-400 via-yellow-200 to-amber-500 shrink-0">
-                    <img
-                      src="/src/assets/images/acc_official_logo_1793842923620.jpg"
-                      alt="ACC Official Logo"
-                      className="w-full h-full object-cover rounded-[10px]"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
+                  <AccLogo size="custom" className="w-10 h-10" />
                   <div>
                     <span className="text-xs font-bold text-slate-900 block leading-tight">ACHIEVERS CLUB</span>
                     <span className="text-[10px] text-[#2874f0] font-semibold italic">Community Assured ✓</span>
@@ -301,13 +295,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   style={{ transform: 'translateZ(0)' }}
                 >
                   {/* Official ACC Watermark on Poster Background */}
-                  <div className="absolute -right-8 -bottom-8 w-44 h-44 opacity-15 pointer-events-none select-none z-0">
-                    <img
-                      src="/src/assets/images/acc_official_logo_1793842923620.jpg"
-                      alt="ACC Watermark"
-                      className="w-full h-full object-contain"
-                      referrerPolicy="no-referrer"
-                    />
+                  <div className="absolute -right-8 -bottom-8 w-44 h-44 pointer-events-none select-none z-0">
+                    <AccLogo watermark size="custom" className="w-full h-full" />
                   </div>
 
                   <div className="relative z-10">
@@ -318,12 +307,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         </span>
                       )}
                       <div className="flex items-center gap-1.5 bg-black/30 backdrop-blur-xs px-2 py-0.5 rounded-full border border-white/20">
-                        <img
-                          src="/src/assets/images/acc_official_logo_1793842923620.jpg"
-                          alt="ACC"
-                          className="w-4 h-4 rounded-full object-cover"
-                          referrerPolicy="no-referrer"
-                        />
+                        <AccLogo size="custom" className="w-4 h-4" />
                         <span className="text-[10px] font-bold text-yellow-300">ACC OFFICIAL</span>
                       </div>
                     </div>

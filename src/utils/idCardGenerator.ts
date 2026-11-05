@@ -1,4 +1,5 @@
 import { Member } from '../types';
+import { ACC_LOGO_URL } from '../assets/logo';
 
 // Helper to load image
 const loadImage = (src: string): Promise<HTMLImageElement | null> => {
@@ -32,8 +33,8 @@ export async function drawIdCardFront(
   const W = 840;
   const H = 1320;
 
-  // Load Official Logo
-  const logoImg = await loadImage('/acc_logo.jpg') || await loadImage('/src/assets/images/acc_official_logo_1793842923620.jpg');
+  // Load Official Logo (Bundled Vite asset -> ./acc_logo.jpg -> /acc_logo.jpg)
+  const logoImg = await loadImage(ACC_LOGO_URL) || await loadImage('./acc_logo.jpg') || await loadImage('/acc_logo.jpg');
 
   // 1. Background gradient - Deep Luxury Slate Navy
   const bgGrad = ctx.createLinearGradient(0, 0, W, H);
@@ -88,19 +89,15 @@ export async function drawIdCardFront(
   ctx.lineWidth = 1.5;
   ctx.strokeRect(36, 36, W - 72, 110);
 
-  // Official ACC Gold & Blue 3D Logo Emblem
+  // Official ACC Gold & Blue 3D Circular Logo Emblem (Frameless, No Clipping)
   if (logoImg) {
     ctx.save();
-    ctx.beginPath();
-    ctx.roundRect(54, 50, 80, 80, 14);
-    ctx.clip();
-    ctx.drawImage(logoImg, 54, 50, 80, 80);
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 4;
+    ctx.drawImage(logoImg, 52, 48, 84, 84);
     ctx.restore();
-    ctx.strokeStyle = '#fbbf24';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.roundRect(54, 50, 80, 80, 14);
-    ctx.stroke();
   } else {
     ctx.fillStyle = '#f59e0b';
     ctx.beginPath();
@@ -451,8 +448,8 @@ export async function drawIdCardBack(
   const W = 840;
   const H = 1320;
 
-  // Load Official Logo
-  const logoImg = await loadImage('/acc_logo.jpg') || await loadImage('/src/assets/images/acc_official_logo_1793842923620.jpg');
+  // Load Official Logo (Bundled Vite asset -> ./acc_logo.jpg -> /acc_logo.jpg)
+  const logoImg = await loadImage(ACC_LOGO_URL) || await loadImage('./acc_logo.jpg') || await loadImage('/acc_logo.jpg');
 
   // 1. Background gradient - Deep Luxury Slate Navy
   const bgGrad = ctx.createLinearGradient(0, 0, W, H);
@@ -507,19 +504,15 @@ export async function drawIdCardBack(
   ctx.lineWidth = 1.5;
   ctx.strokeRect(36, 36, W - 72, 105);
 
-  // Official ACC Gold & Blue 3D Logo Emblem
+  // Official ACC Gold & Blue 3D Circular Logo Emblem (Frameless, No Clipping)
   if (logoImg) {
     ctx.save();
-    ctx.beginPath();
-    ctx.roundRect(54, 48, 76, 76, 12);
-    ctx.clip();
-    ctx.drawImage(logoImg, 54, 48, 76, 76);
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 4;
+    ctx.drawImage(logoImg, 52, 46, 82, 82);
     ctx.restore();
-    ctx.strokeStyle = '#fbbf24';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.roundRect(54, 48, 76, 76, 12);
-    ctx.stroke();
   } else {
     ctx.fillStyle = '#f59e0b';
     ctx.beginPath();
@@ -663,19 +656,13 @@ export async function drawIdCardBack(
   ctx.fillText('💬 टेलीग्राम: https://t.me/NEWUSERHELPLINE', 75, box4Y + 145);
   ctx.fillText('🌐 पोर्टल: www.achieversclub.in', 75, box4Y + 175);
 
-  // Authority Stamp & Signature
+  // Authority Stamp & Signature Seal (Natural Circular Logo)
   if (logoImg) {
     ctx.save();
-    ctx.beginPath();
-    ctx.arc(630, box4Y + 95, 45, 0, Math.PI * 2);
-    ctx.clip();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+    ctx.shadowBlur = 8;
     ctx.drawImage(logoImg, 630 - 45, box4Y + 95 - 45, 90, 90);
     ctx.restore();
-    ctx.beginPath();
-    ctx.arc(630, box4Y + 95, 45, 0, Math.PI * 2);
-    ctx.strokeStyle = '#fef08a';
-    ctx.lineWidth = 3;
-    ctx.stroke();
   } else {
     ctx.beginPath();
     ctx.arc(630, box4Y + 95, 45, 0, Math.PI * 2);

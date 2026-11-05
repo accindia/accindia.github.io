@@ -42,6 +42,7 @@ interface NavButtonProps {
   onClick: () => void;
   title?: string;
   textBoxBg?: string;
+  style?: React.CSSProperties;
 }
 
 const Nav3DButton: React.FC<NavButtonProps> = ({
@@ -54,13 +55,14 @@ const Nav3DButton: React.FC<NavButtonProps> = ({
   onClick,
   title,
   textBoxBg,
+  style,
 }) => {
   // Theme color styles for 3D Icon Capsules and Button Boxes
   const colorStyles = {
     blue: {
-      activeBox: 'bg-gradient-to-b from-blue-50 to-blue-100 border-2 border-[#2874f0] shadow-[0_4px_12px_rgba(40,116,240,0.25),inset_0_1px_1px_rgba(255,255,255,0.9)] text-[#2874f0]',
-      inactiveBox: 'bg-gradient-to-b from-white via-slate-50 to-slate-100 border border-slate-200/90 text-slate-700 hover:border-blue-300 hover:bg-blue-50/50 shadow-[0_2px_5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.9)]',
-      iconCapsule: 'bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white shadow-[0_3px_6px_rgba(40,116,240,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)]',
+      activeBox: 'bg-[#1d25ad] border-2 border-yellow-300 shadow-[0_4px_12px_rgba(29,37,173,0.4),inset_0_1px_1px_rgba(255,255,255,0.6)] text-white',
+      inactiveBox: 'bg-[#1d25ad] border border-blue-400/50 text-white hover:border-yellow-300 hover:bg-blue-900/60 shadow-[0_2px_5px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.3)]',
+      iconCapsule: 'bg-gradient-to-b from-blue-400 to-[#1258c7] text-white shadow-[0_3px_6px_rgba(0,0,0,0.3),inset_0_1px_1px_rgba(255,255,255,0.4)]',
     },
     orange: {
       activeBox: 'bg-gradient-to-b from-orange-50 to-amber-100 border-2 border-[#fb641b] shadow-[0_4px_14px_rgba(251,100,27,0.3),inset_0_1px_1px_rgba(255,255,255,0.9)] text-[#fb641b]',
@@ -102,6 +104,10 @@ const Nav3DButton: React.FC<NavButtonProps> = ({
       type="button"
       onClick={onClick}
       title={title || label}
+      style={{
+        backgroundColor: style?.backgroundColor || (themeColor === 'blue' ? '#1d25ad' : undefined),
+        ...style,
+      }}
       className={`group relative flex flex-col items-center justify-between py-0.5 px-0.5 sm:px-1 rounded-lg transition-all active:translate-y-0.5 cursor-pointer min-w-0 w-full ${
         isActive ? colorStyles.activeBox : colorStyles.inactiveBox
       }`}
@@ -124,7 +130,7 @@ const Nav3DButton: React.FC<NavButtonProps> = ({
       >
         <span
           className={`text-[8px] sm:text-[9px] font-black tracking-tight leading-none block w-full whitespace-nowrap overflow-visible ${
-            textBoxBg || (isSpecial && !isActive) ? 'text-white' : ''
+            textBoxBg || (isSpecial && !isActive) || themeColor === 'blue' || style?.backgroundColor ? 'text-white' : ''
           }`}
         >
           {label}
@@ -132,7 +138,7 @@ const Nav3DButton: React.FC<NavButtonProps> = ({
         {subLabel && (
           <span
             className={`text-[6.5px] sm:text-[7.5px] font-bold leading-none block mt-0.5 font-mono ${
-              textBoxBg ? 'text-yellow-300' : isSpecial && !isActive ? 'text-yellow-200' : 'text-slate-500'
+              textBoxBg ? 'text-yellow-300' : isSpecial && !isActive ? 'text-yellow-200' : themeColor === 'blue' || style?.backgroundColor ? 'text-blue-100' : 'text-slate-500'
             }`}
           >
             {subLabel}
@@ -171,7 +177,10 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 w-full select-none shadow-[0_-4px_25px_rgba(0,0,0,0.18)] border-t border-slate-300 bg-white/95 backdrop-blur-md">
+    <div 
+      className="fixed bottom-0 left-0 right-0 z-50 w-full select-none shadow-[0_-4px_25px_rgba(0,0,0,0.25)] border-t border-blue-400/40 bg-[#1d25ad] backdrop-blur-md"
+      style={{ backgroundColor: '#1d25ad' }}
+    >
       {/* ------------------------------------------------------------- */}
       {/* 1. DEDICATED LIVE NEWS & ANNOUNCEMENT SINGLE LINE (100% WIDTH) */}
       {/* ------------------------------------------------------------- */}
@@ -280,6 +289,7 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
                 themeColor="blue"
                 onClick={() => setActiveWindow('home')}
                 title="मुख्य होम पेज"
+                style={{ backgroundColor: '#1d25ad' }}
               />
 
               <Nav3DButton
@@ -339,6 +349,7 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
                 themeColor="blue"
                 onClick={() => setActiveWindow('home')}
                 title="मुख्य होम पेज"
+                style={{ backgroundColor: '#1d25ad' }}
               />
 
               <Nav3DButton
@@ -411,6 +422,7 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
                 themeColor="blue"
                 onClick={() => setActiveWindow('home')}
                 title="मुख्य होम पेज"
+                style={{ backgroundColor: '#1d25ad' }}
               />
 
               <Nav3DButton
