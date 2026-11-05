@@ -43,6 +43,46 @@ export interface ProfileEditAuditLog {
   changes: ProfileFieldChange[];
 }
 
+export type AvatarFrameType = 'none' | 'fire' | 'water' | 'work_hard' | 'royal_gold' | 'neon_cyber';
+
+export interface OriginalRegistrationData {
+  submittedAt: string;
+  registeredAt?: string;
+  fullName: string;
+  mobile: string;
+  email: string;
+  password?: string;
+  qualification: string;
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+  plan: PlanType;
+  sponsorId: string;
+  sponsorName?: string;
+  utrNumber: string;
+  paymentDate: string;
+  paymentScreenshotUrl?: string;
+  screenshotUrl?: string;
+  activationCharge: number;
+}
+
+export interface PrivateMessage {
+  id: string;
+  userAccId: string; // Conversation identifier (the student's ACC ID)
+  senderRole: 'admin' | 'user';
+  senderAccId: string;
+  senderName: string;
+  text: string;
+  mediaType?: 'text' | 'image' | 'video' | 'link';
+  mediaUrl?: string;
+  mediaCaption?: string;
+  linkUrl?: string;
+  linkTitle?: string;
+  timestamp: string;
+  isRead?: boolean;
+}
+
 export interface Member {
   id: string;
   accId: string; // e.g. ACC249SWISRK01 or ACC249TWISRK01
@@ -62,6 +102,7 @@ export interface Member {
   activationCharge: number; // 249
   utrNumber: string;
   paymentScreenshotUrl?: string;
+  screenshotUrl?: string;
   paymentDate: string;
   status: VerificationStatus;
   isActive: boolean;
@@ -91,6 +132,10 @@ export interface Member {
   sponsorCommissionAmount?: number;
   editHistory?: ProfileEditAuditLog[];
   lastEditedAt?: string;
+  avatarFrame?: AvatarFrameType;
+  avatarFrameActive?: boolean;
+  telegramUsername?: string;
+  originalFormData?: OriginalRegistrationData;
 }
 
 export type ServiceType = 
@@ -174,7 +219,8 @@ export type ActiveWindow =
   | 'terms'
   | 'contact'
   | 'faq'
-  | 'guidelines';
+  | 'guidelines'
+  | 'refer';
 
 export interface AppServiceItem {
   id: string;
@@ -223,6 +269,14 @@ export interface SiteConfig {
   showTelegramSupport?: boolean; // When true (default), Telegram is active
   showEmailSupport?: boolean; // When true (default), Email is active
   showCallSupport?: boolean; // Calling support toggle
+  // App Download & Real App Delivery Settings
+  appDownloadUrl?: string; // e.g. "https://achieversclub.in/download/acc-official-v2.apk"
+  showAppDownload?: boolean; // When true (default), shows App Download portal/badges
+  appName?: string; // e.g. "Achievers Club Community (ACC) Official Android APK"
+  appVersion?: string; // e.g. "v2.4.0 (Latest)"
+  appFileSize?: string; // e.g. "18.5 MB"
+  autoGrantAppLinkOnVerification?: boolean; // When true (default), automatically grants real app link upon member verification
+  appDownloadNotice?: string; // User installation guidelines and tips
   services: AppServiceItem[];
   promotionalPosters: PromotionalPoster[];
 }

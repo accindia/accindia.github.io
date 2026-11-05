@@ -128,19 +128,41 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
     }
   }, []);
 
-  const handleVerifySponsor = () => {
+  const handleVerifySponsor = async () => {
+    const clean = sponsorId.trim().toUpperCase();
+    if (!clean) {
+      setSponsorVerified(false);
+      setSponsorName('');
+      setErrorMessage('कृपया स्पॉन्सर 🆔 दर्ज करें');
+      return;
+    }
+
+    if (clean === 'ACC249SWISADMIN01' || clean === 'ACC249SWISADMIN') {
+      setSponsorName('Achievers Club Official Team');
+      setSponsorVerified(true);
+      setErrorMessage('');
+      return;
+    }
+
     const members = StorageService.getMembers();
-    const found = members.find(m => m.accId.toUpperCase() === sponsorId.trim().toUpperCase());
+    let found = members.find(m => m.accId.toUpperCase() === clean);
+    if (!found) {
+      try {
+        const cloudMembers = await FirestoreService.getMembers();
+        found = cloudMembers.find(m => m.accId.toUpperCase() === clean);
+      } catch (err) {
+        console.warn('Firestore sponsor verify err:', err);
+      }
+    }
+
     if (found) {
       setSponsorName(found.fullName);
       setSponsorVerified(true);
       setErrorMessage('');
-    } else if (sponsorId.trim().length >= 6) {
-      setSponsorVerified(true);
-      setErrorMessage('');
     } else {
       setSponsorVerified(false);
-      setErrorMessage('कृपया मान्य Sponsor ID दर्ज करें (उदा. ACC249SWISRK01)');
+      setSponsorName('');
+      setErrorMessage(`❌ अमान्य स्पॉन्सर 🆔! "${clean}" सिस्टम में मौजूद नहीं है। कृपया सही स्पॉन्सर 🆔 दर्ज करें या नीचे "कंपनी डायरेक्ट" चुनें।`);
     }
   };
 
@@ -263,10 +285,25 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
   };
 
   const validateStep2 = () => {
-    if (!sponsorId.trim() || sponsorId.trim().length < 4) {
-      setErrorMessage('कृपया मान्य Sponsor ID दर्ज करें');
+    const clean = sponsorId.trim().toUpperCase();
+    if (!clean || clean.length < 4) {
+      setErrorMessage('कृपया मान्य स्पॉन्सर 🆔 दर्ज करें या नीचे "कंपनी डायरेक्ट" विकल्प चुनें');
       return false;
     }
+
+    if (clean === 'ACC249SWISADMIN01' || clean === 'ACC249SWISADMIN') {
+      setErrorMessage('');
+      return true;
+    }
+
+    const members = StorageService.getMembers();
+    const found = members.find(m => m.accId.toUpperCase() === clean);
+    if (!found) {
+      setSponsorVerified(false);
+      setErrorMessage(`❌ अमान्य स्पॉन्सर 🆔! "${clean}" सिस्टम में मौजूद नहीं है। गलत या मनगढ़ंत स्पॉन्सर अस्वीकृत है। कृपया सही स्पॉन्सर 🆔 दर्ज करें या "कंपनी डायरेक्ट" चुनें।`);
+      return false;
+    }
+
     setErrorMessage('');
     return true;
   };
@@ -395,6 +432,24 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
           accountNumber: payoutAccountNumber.trim() || undefined,
           ifsc: payoutIfsc.trim().toUpperCase() || undefined,
           updatedAt: new Date().toISOString(),
+        },
+        originalFormData: {
+          submittedAt: new Date().toISOString(),
+          fullName: fullName.trim(),
+          mobile: mobile.trim(),
+          email: email.trim(),
+          qualification,
+          address: address.trim(),
+          city: city.trim(),
+          state,
+          pincode: pincode.trim(),
+          plan,
+          sponsorId: sponsorId.trim() || 'ACC249SWISRK01',
+          sponsorName: sponsorName.trim() || 'Achievers Core Team',
+          utrNumber: utrNumber.trim(),
+          paymentDate: new Date().toISOString().split('T')[0],
+          paymentScreenshotUrl: paymentScreenshotUrl,
+          activationCharge: 249,
         },
       };
 
@@ -1022,6 +1077,26 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                     )}
                   </div>
                 </div>
+              </div>
+
+              {/* Company Direct Option if user has no sponsor */}
+              <div className="mt-3 pt-2.5 border-t border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+                <span className="text-[11px] text-slate-600 font-semibold">
+                  यदि आपके पास कोई स्पॉन्सर 🆔 नहीं है:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSponsorId('ACC249SWISADMIN01');
+                    setSponsorName('Achievers Club Official Team');
+                    setSponsorVerified(true);
+                    setErrorMessage('');
+                  }}
+                  className="px-3 py-1 bg-white hover:bg-blue-50 text-[#2874f0] border border-[#2874f0]/40 rounded text-xs font-bold flex items-center gap-1 transition cursor-pointer shadow-2xs"
+                >
+                  <Building2 className="w-3.5 h-3.5 text-[#2874f0]" />
+                  <span>कंपनी डायरेक्ट ₹249 चुनें (बिना स्पॉन्सर)</span>
+                </button>
               </div>
             </div>
 

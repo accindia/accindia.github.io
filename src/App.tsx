@@ -15,11 +15,13 @@ import { IdCardAccessGate } from './components/IdCardAccessGate';
 import { PromotionBrandingHub } from './components/PromotionBrandingHub';
 import { LockedFooterBar } from './components/LockedFooterBar';
 import { UserGuidelines } from './components/UserGuidelines';
+import { ReferAndEarnModal } from './components/ReferAndEarnModal';
 import { ActiveWindow, Member, SiteConfig } from './types';
 import { StorageService, subscribeToSync } from './services/storage';
 import { FirestoreService } from './services/firestore';
 import {
   FileText,
+  Users,
   Video,
   CreditCard,
   LayoutDashboard,
@@ -159,15 +161,16 @@ export default function App() {
 
   const handleNavigateWithScroll = (windowName: ActiveWindow) => {
     setActiveWindow(windowName);
-    scrollToTopSection(false);
-    requestAnimationFrame(() => {
+    if (windowName === 'home') {
       scrollToTopSection(false);
-    });
+    }
   };
 
-  // Automatically scroll to top whenever active window/dialog changes
+  // Automatically scroll to top when returning to home
   useEffect(() => {
-    scrollToTopSection();
+    if (activeWindow === 'home') {
+      scrollToTopSection();
+    }
   }, [activeWindow]);
 
   const handleLogout = () => {
@@ -187,17 +190,12 @@ export default function App() {
   };
 
   // Dedicated navigation for ID card:
-  // 1. If logged in -> show user's own card
-  // 2. If visited via sponsor link -> show sponsor's card
-  // 3. If normal visitor without sponsor -> open registration popup directly!
+  // Always opens the ID Card portal ('idcard'):
+  // - If logged in: shows user's own card
+  // - If visited with sponsor: shows sponsor's certified card
+  // - If visitor without sponsor: opens IdCardAccessGate with sponsor verification, rejection, and direct company registration
   const handleNavigateToIdCard = () => {
-    if (currentUser) {
-      handleNavigateWithScroll('idcard');
-    } else if (referralSponsor) {
-      handleNavigateWithScroll('idcard');
-    } else {
-      handleNavigateWithScroll('register');
-    }
+    handleNavigateWithScroll('idcard');
   };
 
   return (
@@ -213,25 +211,23 @@ export default function App() {
       />
 
       {/* Spacer ensuring page content starts right below the permanently fixed header */}
-      <div className="h-[80px] md:h-[114px] w-full shrink-0" aria-hidden="true" />
+      <div className="h-[96px] md:h-[96px] w-full shrink-0" aria-hidden="true" />
 
       {/* Main Container - 100% Mobile Fluid Fit */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-2 sm:p-4 md:p-6 pb-24 overflow-x-hidden">
-        {/* VIEW: HOME */}
-        {activeWindow === 'home' && (
-          <HomeView
-            onNavigate={(view) => {
-              if (view === 'idcard') {
-                handleNavigateToIdCard();
-              } else {
-                handleNavigateWithScroll(view);
-              }
-            }}
-            currentUser={currentUser}
-            referralSponsor={referralSponsor}
-            onNavigateToIdCard={handleNavigateToIdCard}
-          />
-        )}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-2 sm:p-4 md:p-6 pb-16 overflow-x-hidden">
+        {/* VIEW: HOME (Persistent base view - stays active under modal popups) */}
+        <HomeView
+          onNavigate={(view) => {
+            if (view === 'idcard') {
+              handleNavigateToIdCard();
+            } else {
+              handleNavigateWithScroll(view);
+            }
+          }}
+          currentUser={currentUser}
+          referralSponsor={referralSponsor}
+          onNavigateToIdCard={handleNavigateToIdCard}
+        />
 
         {/* VIEW: VIDEO TRAINING */}
         {activeWindow === 'video' && (
@@ -367,8 +363,34 @@ export default function App() {
               </div>
             ) : (
               <IdCardAccessGate
-                onGoToLogin={() => setActiveWindow('login')}
-                onGoToRegister={() => setActiveWindow('register')}
+                onGoToLogin={() => handleNavigateWithScroll('login')}
+                onGoToRegister={() => handleNavigateWithScroll('register')}
+                onSelectSponsor={(sponsor) => setReferralSponsor(sponsor)}
+              />
+            )}
+          </WindowFrame>
+        )}
+
+        {/* VIEW: REFER & EARN (TWIS Referral & Promotion Kit Hub) */}
+        {activeWindow === 'refer' && (
+          <WindowFrame
+            title={currentUser ? `रेफर & कमाएं हब (${currentUser.fullName})` : 'रेफर & कमाएं हब (TWIS Refer & Earn)'}
+            subtitle="प्रति रेफरल ₹150 तुरंत पेआउट बैंक/UPI में • लाइफटाइम 3.30% रिचार्ज कमीशन • प्रचार किट व स्टेटस"
+            icon={<Users className="w-4 h-4 text-orange-500" />}
+            onClose={() => handleNavigateWithScroll('home')}
+          >
+            {currentUser ? (
+              <ReferAndEarnModal
+                currentUser={currentUser}
+                onClose={() => handleNavigateWithScroll('home')}
+                onGoToPromotions={() => handleNavigateWithScroll('promotions')}
+                onGoToIdCard={() => handleNavigateWithScroll('idcard')}
+              />
+            ) : (
+              <StudentPortalGate
+                onLoginSuccess={handleLoginSuccess}
+                onGoToRegister={() => handleNavigateWithScroll('register')}
+                onCancel={() => handleNavigateWithScroll('home')}
               />
             )}
           </WindowFrame>

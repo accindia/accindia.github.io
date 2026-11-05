@@ -58,13 +58,27 @@ import {
   FileSpreadsheet,
   Eye,
   Send,
+  Flame,
+  Droplets,
+  Crown,
+  Gem,
 } from 'lucide-react';
-import { Member, PrivacySettings, WithdrawalRequest, ReferralRecord, ProfileFieldChange, ProfileEditAuditLog } from '../types';
+import {
+  Member,
+  PrivacySettings,
+  WithdrawalRequest,
+  ReferralRecord,
+  ProfileFieldChange,
+  ProfileEditAuditLog,
+  AvatarFrameType,
+} from '../types';
 import { StorageService } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
 import { compressImage } from '../utils/imageCompressor';
 import { DigitalIdCard } from './DigitalIdCard';
 import { ImageCropperModal, CropShape } from './ImageCropperModal';
+import { AvatarWith3DFrame, AVATAR_FRAMES } from './AvatarWith3DFrame';
+import { PrivateChatBox } from './PrivateChatBox';
 
 interface UserDashboardProps {
   currentUser: Member;
@@ -73,11 +87,42 @@ interface UserDashboardProps {
 }
 
 export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpdateUser, onNavigateToPromotions }) => {
-  const [activeTab, setActiveTab] = useState<'applink' | 'twis' | 'swis' | 'idcard' | 'kit' | 'courses' | 'profile'>('applink');
+  const [activeTab, setActiveTab] = useState<'applink' | 'twis' | 'swis' | 'idcard' | 'kit' | 'courses' | 'profile' | 'support_chat'>('applink');
   const tabContentRef = useRef<HTMLDivElement>(null);
 
+  // 3D Avatar Frame Selection Modal State
+  const [showFrameModal, setShowFrameModal] = useState<boolean>(false);
+  const [framePreview, setFramePreview] = useState<AvatarFrameType>(currentUser.avatarFrame || 'fire');
+  const [isSavingFrame, setIsSavingFrame] = useState<boolean>(false);
+  const [frameSuccessMsg, setFrameSuccessMsg] = useState<string>('');
+
+  const handleSelectAndSaveFrame = async (newFrame: AvatarFrameType) => {
+    setFramePreview(newFrame);
+    setIsSavingFrame(true);
+    setFrameSuccessMsg('');
+    try {
+      const updated = StorageService.updateMemberWithAudit(currentUser.accId, { avatarFrame: newFrame }, 'USER');
+      await FirestoreService.updateMember(currentUser.accId, { avatarFrame: newFrame });
+      if (updated) {
+        onUpdateUser(updated);
+      }
+      setFrameSuccessMsg('✓ 3D लाइव अवतार फ्रेम सफलतापूर्वक सक्रिय हो गया!');
+      try {
+        confetti({ particleCount: 75, spread: 70, origin: { y: 0.6 } });
+      } catch {}
+      setTimeout(() => {
+        setFrameSuccessMsg('');
+        setShowFrameModal(false);
+      }, 1500);
+    } catch (err) {
+      console.warn('Error saving frame:', err);
+    } finally {
+      setIsSavingFrame(false);
+    }
+  };
+
   // Directly navigate & smoothly scroll user straight to the target section/tab
-  const handleSelectTab = (tab: 'applink' | 'twis' | 'swis' | 'idcard' | 'kit' | 'courses' | 'profile') => {
+  const handleSelectTab = (tab: 'applink' | 'twis' | 'swis' | 'idcard' | 'kit' | 'courses' | 'profile' | 'support_chat') => {
     setActiveTab(tab);
     setTimeout(() => {
       if (tabContentRef.current) {
@@ -1093,80 +1138,159 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
   // Only accessible when status === 'verified'
   // =========================================================================
   return (
-    <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6 animate-fadeIn">
-      {/* Top Welcome Bar - Flipkart Style Blue Banner (100% Responsive for All Devices) */}
-      <div className="bg-gradient-to-r from-[#2874f0] via-[#1c52b8] to-[#124296] text-white rounded-xl p-3.5 sm:p-5 md:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4 shadow-sm border border-blue-400/20">
-        <div className="flex items-center gap-3 sm:gap-4 min-w-0 w-full md:w-auto">
-          <div className="relative shrink-0">
-            {currentUser.avatarUrl ? (
-              <img
-                src={currentUser.avatarUrl}
-                alt={currentUser.fullName}
-                className="w-13 h-13 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-white shadow-sm"
-              />
-            ) : (
-              <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-full bg-[#ffe500] text-[#2874f0] flex items-center justify-center font-black text-base sm:text-xl shadow-sm border-2 border-white">
-                {currentUser.fullName.substring(0, 2).toUpperCase()}
-              </div>
-            )}
-            <label
-              className="absolute -bottom-1 -right-1 bg-white hover:bg-slate-100 text-[#2874f0] p-1.5 rounded-full shadow-md border border-gray-200 transition cursor-pointer"
-              title="प्रोफाइल DP बदलें व क्रॉप करें"
-            >
-              <Camera className="w-3.5 h-3.5" />
-              <input type="file" accept="image/*" onChange={handleAvatarFileSelected} className="hidden" />
-            </label>
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-              <h2 className="text-base sm:text-xl font-black text-white tracking-wide truncate">
-                {currentUser.fullName}
-              </h2>
-              <span className="text-[10px] sm:text-xs text-blue-100 bg-blue-900/60 px-2 py-0.5 rounded font-medium border border-blue-400/30 truncate">
-                {currentUser.qualification || 'छात्र सदस्य'}
-              </span>
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-1.5 text-xs">
-              <span className="text-blue-200 text-[11px] font-bold">🆔:</span>
-              <span className="font-mono-acc font-black text-[#ffe500] text-[11px] sm:text-xs bg-blue-950/70 px-2 py-0.5 rounded border border-yellow-300/40">
-                {currentUser.accId}
-              </span>
-              <button
-                type="button"
-                onClick={handleCopyId}
-                className="text-blue-200 hover:text-white p-1 rounded hover:bg-white/10 transition cursor-pointer"
-                title="Copy ID"
-              >
-                {copiedId ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
-              </button>
-              <span className="text-blue-300/60">|</span>
-              <span className="text-[10px] sm:text-[11px] font-black text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-400/30 flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3 shrink-0" /> {currentUser.plan} Plan
-              </span>
-            </div>
-          </div>
+    <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6 animate-fadeIn pb-24 sm:pb-32">
+      {/* Top Welcome Bar - Telegram App Style Ultra-Premium Hub (100% Responsive for All Devices) */}
+      <div className="bg-gradient-to-r from-[#17212b] via-[#202b36] to-[#0e1621] text-white rounded-2xl p-4 sm:p-5 md:p-6 shadow-xl border-2 border-[#2481cc]/50 relative overflow-hidden space-y-4">
+        {/* Subtle Telegram Ambient Glow */}
+        <div className="absolute -top-12 -right-12 w-48 h-48 bg-[#2481cc]/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Official ACC Background Watermark */}
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 w-48 h-48 opacity-[0.06] pointer-events-none select-none z-0">
+          <img
+            src="/src/assets/images/acc_official_logo_1793842923620.jpg"
+            alt="ACC Watermark"
+            className="w-full h-full object-contain"
+            referrerPolicy="no-referrer"
+          />
         </div>
 
-        {/* Real App Status Card with Direct Link Switch */}
-        <div className="bg-blue-950/70 border border-blue-400/30 rounded-xl p-2.5 sm:p-3 w-full md:w-auto flex items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-emerald-500 text-white shadow-xs">
-              <CheckCircle2 className="w-5 h-5" />
+        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          {/* Left: 3D Avatar + Telegram User Details */}
+          <div className="flex items-center gap-4 min-w-0 w-full md:w-auto">
+            {/* 3D Animated Live Avatar Frame Container */}
+            <div className="relative shrink-0 flex flex-col items-center">
+              <AvatarWith3DFrame
+                avatarUrl={currentUser.avatarUrl}
+                name={currentUser.fullName}
+                frame={currentUser.avatarFrame || 'fire'}
+                size="lg"
+              />
+
+              {/* Action Buttons Below / On Avatar */}
+              <div className="flex items-center gap-1.5 mt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFramePreview(currentUser.avatarFrame || 'fire');
+                    setShowFrameModal(true);
+                  }}
+                  className="px-2 py-0.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-[10px] rounded-full shadow-[0_2px_0_#9a3412] active:translate-y-0.5 active:shadow-none flex items-center gap-1 transition cursor-pointer"
+                  title="3D लाइव फ्रेम बदलें (Fire, Water, Work Hard, etc.)"
+                >
+                  <Sparkles className="w-2.5 h-2.5 text-slate-950" />
+                  <span>3D फ्रेम</span>
+                </button>
+
+                <label
+                  className="bg-[#2481cc] hover:bg-[#1f73b6] text-white p-1 rounded-full shadow-md border border-white/20 transition cursor-pointer"
+                  title="प्रोफाइल DP बदलें व क्रॉप करें"
+                >
+                  <Camera className="w-3 h-3" />
+                  <input type="file" accept="image/*" onChange={handleAvatarFileSelected} className="hidden" />
+                </label>
+              </div>
             </div>
-            <div className="min-w-0">
-              <span className="text-[10px] text-blue-200 uppercase font-bold tracking-wider block">Real App स्थिति</span>
-              <span className="text-xs font-bold text-emerald-300 truncate block">
-                सक्रिय (Verified ✓)
-              </span>
+
+            {/* User Telegram Meta & Badges */}
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/70 border border-emerald-500/40 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>ऑनलाइन • Telegram ACC Profile</span>
+                </span>
+                <span className="text-[10px] font-mono-acc text-sky-200 bg-[#2481cc]/30 border border-[#2481cc]/40 px-2 py-0.5 rounded-full">
+                  @{currentUser.telegram ? currentUser.telegram.replace('@', '') : currentUser.fullName.toLowerCase().replace(/\s+/g, '_')}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg sm:text-2xl font-black text-white tracking-wide truncate drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">
+                  {currentUser.fullName}
+                </h2>
+                <span className="text-[10px] sm:text-xs text-sky-200 bg-[#2481cc]/25 px-2 py-0.5 rounded font-medium border border-[#2481cc]/40 truncate">
+                  {currentUser.qualification || 'छात्र सदस्य'}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs pt-0.5">
+                <span className="text-slate-400 text-[11px] font-bold">यूनिक 🆔:</span>
+                <span className="font-mono-acc font-black text-amber-300 text-xs sm:text-sm bg-black/50 px-2 py-0.5 rounded border border-amber-400/40">
+                  {currentUser.accId}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCopyId}
+                  className="text-sky-300 hover:text-white p-1 rounded hover:bg-white/10 transition cursor-pointer"
+                  title="Copy ID"
+                >
+                  {copiedId ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+                <span className="text-slate-600">|</span>
+                <span className="text-[10px] sm:text-[11px] font-black text-emerald-300 bg-emerald-950/70 px-2 py-0.5 rounded border border-emerald-400/40 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 shrink-0" /> {currentUser.plan} Plan (सत्यापित ✓)
+                </span>
+              </div>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => handleSelectTab('applink')}
-            className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded text-[11px] font-bold border border-white/20 transition cursor-pointer shrink-0"
-          >
-            ऐप लिंक खोलें
-          </button>
+
+          {/* Right: Real App APK Status & Telegram Quick Actions */}
+          <div className="flex flex-col sm:flex-row md:flex-col gap-2 w-full md:w-auto shrink-0">
+            {/* Real App Status */}
+            <div className="bg-[#17212b]/90 border border-[#2481cc]/40 rounded-xl p-2.5 sm:p-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-emerald-500 text-white shadow-xs">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[10px] text-sky-200 uppercase font-bold tracking-wider block">Real App स्थिति</span>
+                  <span className="text-xs font-bold text-emerald-300 truncate block">
+                    सक्रिय (Verified ✓)
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleSelectTab('applink')}
+                className="px-2.5 py-1 bg-[#2481cc] hover:bg-[#1d6fae] text-white rounded text-[11px] font-bold border border-white/20 transition cursor-pointer shrink-0"
+              >
+                ऐप लिंक
+              </button>
+            </div>
+
+            {/* Quick 3D Action Buttons */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={() => {
+                  setFramePreview(currentUser.avatarFrame || 'fire');
+                  setShowFrameModal(true);
+                }}
+                className="flex-1 sm:flex-none px-3 py-1.5 bg-gradient-to-b from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-lg text-[11px] font-black shadow-[0_2px_0_#9a3412] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1 transition cursor-pointer whitespace-nowrap"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-slate-950" />
+                <span>3D फ्रेम</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectTab('support_chat')}
+                className="flex-1 sm:flex-none px-3 py-1.5 bg-gradient-to-b from-[#229ed9] to-[#0088cc] hover:from-[#2eb0ee] hover:to-[#0077b3] text-white rounded-lg text-[11px] font-black shadow-[0_2px_0_#005580] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1 transition cursor-pointer whitespace-nowrap"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>💬 एडमिन चैट</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectTab('idcard')}
+                className="flex-1 sm:flex-none px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-[11px] font-bold border border-white/20 flex items-center justify-center gap-1 transition cursor-pointer whitespace-nowrap"
+              >
+                <CreditCard className="w-3.5 h-3.5 text-amber-400" />
+                <span>🪪 ID कार्ड</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1296,12 +1420,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
             {activeTab === 'swis' && '⚡ SWIS रिचार्ज (3.30%)'}
             {activeTab === 'idcard' && '🪪 डिजिटल ID कार्ड'}
             {activeTab === 'profile' && '✏️ प्रोफाइल एडिट'}
+            {activeTab === 'support_chat' && '💬 एडमिन हेल्पडेस्क चैट'}
             {activeTab === 'courses' && '🎓 स्टूडेंट अकेडमी'}
           </span>
         </div>
 
-        {/* 7 Clean Touch-Friendly Buttons Grid: Perfectly Symmetrical on Mobile (7th spans 2 cols) */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-1.5 sm:gap-2 bg-slate-50/90 p-1.5 rounded-lg w-full max-w-full">
+        {/* 8 Clean Touch-Friendly Buttons Grid: Perfectly Symmetrical on Mobile (4x2 on tablet, 8x1 on desktop) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 sm:gap-2 bg-slate-50/90 p-1.5 rounded-lg w-full max-w-full">
           <button
             type="button"
             onClick={() => handleSelectTab('applink')}
@@ -1364,7 +1489,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
             }`}
           >
             <Edit3 className={`w-4 h-4 shrink-0 ${activeTab === 'profile' ? 'text-white' : 'text-[#fb641b]'}`} />
-            <span className="truncate">✏️ प्रोफाइल एडिट</span>
+            <span className="truncate">✏️ प्रोफाइल</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSelectTab('support_chat')}
+            className={`min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+              activeTab === 'support_chat'
+                ? 'bg-[#229ed9] text-white shadow-xs ring-2 ring-[#229ed9]'
+                : 'bg-sky-50 text-sky-900 hover:bg-sky-100 border border-sky-300 font-extrabold shadow-xs'
+            }`}
+          >
+            <MessageCircle className={`w-4 h-4 shrink-0 ${activeTab === 'support_chat' ? 'text-white' : 'text-[#229ed9]'}`} />
+            <span className="truncate">💬 एडमिन चैट</span>
           </button>
 
           <button
@@ -1377,21 +1515,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
             }`}
           >
             <BookOpen className={`w-4 h-4 shrink-0 ${activeTab === 'kit' ? 'text-white' : 'text-indigo-600'}`} />
-            <span className="truncate">📚 किट व गाइड</span>
+            <span className="truncate">📚 किट</span>
           </button>
 
-          {/* 7th item: spans full 2 columns on mobile so it looks balanced and purposeful */}
           <button
             type="button"
             onClick={() => handleSelectTab('courses')}
-            className={`col-span-2 sm:col-span-1 min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+            className={`min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'courses'
                 ? 'bg-purple-600 text-white shadow-xs ring-2 ring-purple-600'
                 : 'bg-white text-slate-700 hover:text-purple-700 hover:bg-purple-50/50 border border-gray-200'
             }`}
           >
             <GraduationCap className={`w-4 h-4 shrink-0 ${activeTab === 'courses' ? 'text-white' : 'text-purple-600'}`} />
-            <span className="truncate">🎓 स्टूडेंट अकेडमी</span>
+            <span className="truncate">🎓 अकेडमी</span>
           </button>
         </div>
       </div>
@@ -1444,49 +1581,97 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                   </div>
                 </div>
 
-                {/* Real App Download URL */}
-                <div className="p-3 bg-white rounded border border-green-200 font-mono-acc text-[#2874f0] break-all text-xs font-semibold">
-                  {currentUser.realAppLink || 'https://achieversclub.in/download/acc-official-v2.apk'}
+                {/* Real App Download URL & Meta Badges */}
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700">
+                    <span className="bg-blue-100 text-[#2874f0] px-2 py-0.5 rounded border border-blue-200 font-mono-acc">
+                      {siteConfig.appVersion || 'v2.4.0 (Latest)'}
+                    </span>
+                    <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-gray-200 font-mono-acc">
+                      {siteConfig.appFileSize || '18.5 MB'}
+                    </span>
+                    <span className="text-emerald-700 font-semibold">100% वेरिफाइड & सिक्योर</span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 font-mono-acc">
+                    {siteConfig.appName || 'ACC Official Android APK'}
+                  </span>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                <div className="p-3 bg-white rounded-lg border border-green-200 font-mono-acc text-[#2874f0] break-all text-xs font-semibold select-all">
+                  {currentUser.realAppLink || siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk'}
+                </div>
+
+                {siteConfig.appDownloadNotice && (
+                  <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-[11px] leading-relaxed">
+                    💡 <strong>इंस्टालेशन निर्देश:</strong> {siteConfig.appDownloadNotice}
+                  </div>
+                )}
+
+                <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
                   <a
-                    href={currentUser.realAppLink || 'https://achieversclub.in/download/acc-official-v2.apk'}
+                    href={currentUser.realAppLink || siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk'}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-sm text-center flex items-center justify-center gap-2 transition shadow-sm"
+                    className="flex-1 py-3 bg-gradient-to-b from-emerald-600 via-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-800 text-white font-black rounded-xl text-center flex items-center justify-center gap-2 transition-all shadow-[0_4px_0_#065f46,0_8px_16px_rgba(16,185,129,0.35)] active:translate-y-0.5 active:shadow-[0_1px_0_#065f46] text-xs sm:text-sm cursor-pointer"
                   >
-                    <Download className="w-4 h-4" />
-                    <span>सीधे डाउनलोड करें (APK Download)</span>
+                    <div className="w-5 h-5 rounded-md bg-white/20 border-t border-white/40 flex items-center justify-center shadow-inner">
+                      <Download className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    <span>सीधे डाउनलोड करें (Official APK Download)</span>
                   </a>
+
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(currentUser.realAppLink || 'https://achieversclub.in/download/acc-official-v2.apk');
+                      navigator.clipboard.writeText(currentUser.realAppLink || siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk');
                       alert('Real App Link क्लिपबोर्ड में कॉपी हो गया!');
                     }}
-                    className="px-4 py-2.5 bg-white border border-gray-300 hover:bg-slate-50 text-slate-700 font-bold rounded-sm flex items-center justify-center gap-1.5 transition"
+                    className="px-4 py-3 bg-gradient-to-b from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 border border-gray-300 text-slate-800 font-black rounded-xl flex items-center justify-center gap-1.5 shadow-[0_2px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none transition-all cursor-pointer text-xs"
                   >
-                    <Copy className="w-4 h-4" />
+                    <Copy className="w-3.5 h-3.5 text-slate-700" />
                     <span>Copy Link</span>
                   </button>
                 </div>
 
-                {/* WhatsApp App Link Request Button right below the download box */}
-                <div className="pt-2 border-t border-green-200/80">
-                  <a
-                    href={`https://api.whatsapp.com/send?phone=${(siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '')}&text=${encodeURIComponent(
-                      `नमस्ते एडमिन! मुझे Achievers Club Community (ACC) की ऑफिशियल Real Android APK ऐप लिंक WhatsApp पर चाहिए।\n\n🆔 मेरी Member ID: ${currentUser.accId}\n👤 मेरा नाम: ${currentUser.fullName}\n📱 मोबाइल: ${currentUser.mobile}\n🤝 मेरी Sponsor ID: ${currentUser.sponsorId || 'ACC249SWISRK01'}\n💼 प्लान: ${currentUser.plan}\n💳 UTR Number: ${currentUser.utrNumber}\n\nकृपया मुझे ऑफिशियल Real App APK डाउनलोड लिंक WhatsApp पर भेजें। धन्यवाद!`
-                    )}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-2.5 px-4 bg-[#25D366] hover:bg-[#20ba59] text-white font-bold rounded-sm text-center flex items-center justify-center gap-2 transition shadow-sm text-xs sm:text-sm group"
-                  >
-                    <MessageCircle className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                    <span>📲 WhatsApp पर Real App लिंक मंगाएं (Request Link on WhatsApp)</span>
-                  </a>
-                  <span className="text-[10px] text-emerald-800 block text-center mt-1">
-                    यदि डाउनलोड में कोई समस्या आ रही हो, तो WhatsApp पर एक क्लिक में सीधे APK लिंक प्राप्त करें।
+                {/* Direct Delivery Support Options */}
+                <div className="pt-2.5 border-t border-green-200/80 space-y-2">
+                  <span className="text-[11px] font-bold text-slate-700 block">
+                    सपोर्ट व वैकल्पिक ऐप लिंक डिलीवरी माध्यम:
                   </span>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <a
+                      href={siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 py-2 px-3 bg-gradient-to-b from-[#229ed9] to-[#0088cc] hover:from-[#2eb0ee] hover:to-[#0077b3] text-white font-bold rounded-lg text-center flex items-center justify-center gap-1.5 transition text-xs shadow-xs"
+                    >
+                      <Send className="w-3.5 h-3.5 text-white" />
+                      <span>Telegram पर सहायता</span>
+                    </a>
+
+                    <a
+                      href={`mailto:${siteConfig.officialEmail || 'newuserhelpline@gmail.com'}?subject=${encodeURIComponent(
+                        `Real App Link Help - Member ID: ${currentUser.accId}`
+                      )}`}
+                      className="flex-1 py-2 px-3 bg-gradient-to-b from-[#2874f0] to-[#1258c7] hover:from-[#367ff5] hover:to-[#0f4eb8] text-white font-bold rounded-lg text-center flex items-center justify-center gap-1.5 transition text-xs shadow-xs"
+                    >
+                      <Mail className="w-3.5 h-3.5 text-white" />
+                      <span>ईमेल सपोर्ट</span>
+                    </a>
+
+                    {siteConfig.showWhatsAppSupport === true && (
+                      <a
+                        href={`https://api.whatsapp.com/send?phone=${(siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '')}&text=${encodeURIComponent(
+                          `नमस्ते एडमिन! मुझे Achievers Club Community (ACC) की ऑफिशियल Real Android APK ऐप लिंक WhatsApp पर चाहिए।\n\n🆔 मेरी Member ID: ${currentUser.accId}\n👤 मेरा नाम: ${currentUser.fullName}\n📱 मोबाइल: ${currentUser.mobile}\n🤝 मेरी Sponsor ID: ${currentUser.sponsorId || 'ACC249SWISRK01'}\n💼 प्लान: ${currentUser.plan}\n💳 UTR Number: ${currentUser.utrNumber}\n\nकृपया मुझे ऑफिशियल Real App APK डाउनलोड लिंक WhatsApp पर भेजें। धन्यवाद!`
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 py-2 px-3 bg-gradient-to-b from-[#25D366] to-[#128C7E] hover:from-[#2be66f] hover:to-[#0f7267] text-white font-bold rounded-lg text-center flex items-center justify-center gap-1.5 transition text-xs shadow-xs"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5 text-white" />
+                        <span>WhatsApp पर मंगाएं</span>
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -3049,6 +3234,44 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
           </div>
         </div>
       )}
+
+      {/* TAB: PRIVATE ADMIN SUPPORT CHAT (Direct 1-on-1 Helpdesk) */}
+      {activeTab === 'support_chat' && (
+        <div className="bg-white border-2 border-sky-300 rounded-2xl p-4 sm:p-6 shadow-md space-y-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#229ed9] to-[#0088cc] text-white flex items-center justify-center font-bold shadow-sm">
+                <MessageCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
+                  <span>💬 एडमिन हेल्पडेस्क चैट (Private Support Desk)</span>
+                  <span className="text-[10px] bg-sky-100 text-[#0088cc] border border-sky-300 px-2 py-0.5 rounded-full font-bold">
+                    100% प्राइवेट
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  यहाँ आप एडमिन को सीधे संदेश, लिंक, फोटो या सवाल भेज सकते हैं और एडमिन द्वारा भेजे गए संदेश व वीडियो देख सकते हैं।
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full font-bold flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>एडमिन ऑनलाइन</span>
+              </span>
+            </div>
+          </div>
+
+          <PrivateChatBox
+            userAccId={currentUser.accId}
+            currentUserRole="user"
+            currentUserName={currentUser.fullName}
+            currentUserAccId={currentUser.accId}
+          />
+        </div>
+      )}
       </div>
 
       {/* Withdrawal Modal - Flipkart Style */}
@@ -4156,6 +4379,137 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                 className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition"
               >
                 बंद करें
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 3D LIVE AVATAR FRAME SELECTION MODAL */}
+      {/* ========================================================================= */}
+      {showFrameModal && (
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 pt-3 pb-28 bg-black/85 backdrop-blur-md animate-fadeIn overflow-y-auto">
+          <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto bg-gradient-to-b from-slate-900 via-slate-950 to-black border-2 border-amber-500/60 rounded-3xl p-5 sm:p-6 pb-8 shadow-[0_0_50px_rgba(245,158,11,0.3)] space-y-5 text-white animate-scaleUp my-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-600 text-slate-950 flex items-center justify-center font-black shadow-md">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                    <span>🎨 3D लाइव अवतार फ्रेम सेलेक्टर</span>
+                    <span className="text-[10px] bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full font-black">
+                      PREMIUM
+                    </span>
+                  </h3>
+                  <p className="text-xs text-amber-200/80">
+                    अपनी प्रोफाइल फोटो व डिजिटल ID कार्ड के लिए 3D एनिमेटेड लाइव फ्रेम चुनें
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowFrameModal(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {frameSuccessMsg && (
+              <div className="p-3 bg-emerald-500/20 border border-emerald-400 text-emerald-200 text-xs font-bold rounded-xl flex items-center gap-2 animate-fadeIn">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{frameSuccessMsg}</span>
+              </div>
+            )}
+
+            {/* Live Center Preview with Circular Flaming Ring */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-5 sm:p-6 flex flex-col items-center justify-center gap-3 text-center overflow-visible">
+              <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold">
+                लाइव 3D अग्नि चक्र प्रीव्यू (Live 360° Ring Preview)
+              </span>
+              <div className="py-4 my-1 overflow-visible flex items-center justify-center">
+                <AvatarWith3DFrame
+                  avatarUrl={currentUser.avatarUrl}
+                  name={currentUser.fullName}
+                  frame={framePreview}
+                  size="xl"
+                />
+              </div>
+              <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                <span>चयनित:</span>
+                <span className="text-white bg-white/10 px-2.5 py-0.5 rounded-full border border-white/15">
+                  {AVATAR_FRAMES.find((f) => f.id === framePreview)?.name}
+                </span>
+              </div>
+            </div>
+
+            {/* Frame Options Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              {AVATAR_FRAMES.map((f) => {
+                const isSelected = framePreview === f.id;
+                return (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setFramePreview(f.id)}
+                    className={`p-3 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
+                      isSelected
+                        ? 'border-amber-400 bg-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.4)] ring-2 ring-amber-400/50'
+                        : 'border-white/10 bg-white/5 hover:bg-white/10'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-lg">{f.icon}</span>
+                        {currentUser.avatarFrame === f.id && (
+                          <span className="text-[9px] bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 px-1.5 py-0.2 rounded font-bold">
+                            सक्रिय
+                          </span>
+                        )}
+                      </div>
+                      <strong className="text-xs font-black text-white block">{f.name}</strong>
+                      <p className="text-[10px] text-slate-300 mt-0.5 leading-snug">{f.desc}</p>
+                    </div>
+
+                    <div className="mt-2 pt-1 border-t border-white/10 text-[10px] flex items-center justify-between">
+                      <span className="text-amber-300 font-bold">{f.badge}</span>
+                      <span className={isSelected ? 'text-amber-400 font-bold' : 'text-slate-500'}>
+                        {isSelected ? '✓ चयनित' : 'देखें'}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setShowFrameModal(false)}
+                className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-slate-300 font-bold text-xs rounded-xl transition cursor-pointer"
+              >
+                रद्द करें
+              </button>
+
+              <button
+                type="button"
+                disabled={isSavingFrame}
+                onClick={() => handleSelectAndSaveFrame(framePreview)}
+                className="px-6 py-2.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black text-xs rounded-xl shadow-lg flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+              >
+                {isSavingFrame ? (
+                  <span>सहेज रहे हैं...</span>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 text-slate-950" />
+                    <span>✓ यह 3D फ्रेम प्रोफाइल में सेव करें</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

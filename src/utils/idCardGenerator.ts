@@ -32,6 +32,9 @@ export async function drawIdCardFront(
   const W = 840;
   const H = 1320;
 
+  // Load Official Logo
+  const logoImg = await loadImage('/acc_logo.jpg') || await loadImage('/src/assets/images/acc_official_logo_1793842923620.jpg');
+
   // 1. Background gradient - Deep Luxury Slate Navy
   const bgGrad = ctx.createLinearGradient(0, 0, W, H);
   bgGrad.addColorStop(0, '#090d16');
@@ -39,6 +42,15 @@ export async function drawIdCardFront(
   bgGrad.addColorStop(1, '#050811');
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, W, H);
+
+  // Central Security Logo Watermark
+  if (logoImg) {
+    ctx.save();
+    ctx.globalAlpha = 0.08;
+    const wmSize = 420;
+    ctx.drawImage(logoImg, (W - wmSize) / 2, (H - wmSize) / 2 - 30, wmSize, wmSize);
+    ctx.restore();
+  }
 
   // Subtle Guilloche Security Pattern
   ctx.strokeStyle = 'rgba(245, 158, 11, 0.04)';
@@ -76,15 +88,29 @@ export async function drawIdCardFront(
   ctx.lineWidth = 1.5;
   ctx.strokeRect(36, 36, W - 72, 110);
 
-  // ACC Gold Logo Emblem
-  ctx.fillStyle = '#f59e0b';
-  ctx.beginPath();
-  ctx.roundRect(54, 50, 80, 80, 14);
-  ctx.fill();
-  ctx.fillStyle = '#050811';
-  ctx.font = '900 36px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('ACC', 94, 103);
+  // Official ACC Gold & Blue 3D Logo Emblem
+  if (logoImg) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(54, 50, 80, 80, 14);
+    ctx.clip();
+    ctx.drawImage(logoImg, 54, 50, 80, 80);
+    ctx.restore();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(54, 50, 80, 80, 14);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = '#f59e0b';
+    ctx.beginPath();
+    ctx.roundRect(54, 50, 80, 80, 14);
+    ctx.fill();
+    ctx.fillStyle = '#050811';
+    ctx.font = '900 36px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('ACC', 94, 103);
+  }
 
   // Brand Titles
   ctx.textAlign = 'left';
@@ -425,6 +451,9 @@ export async function drawIdCardBack(
   const W = 840;
   const H = 1320;
 
+  // Load Official Logo
+  const logoImg = await loadImage('/acc_logo.jpg') || await loadImage('/src/assets/images/acc_official_logo_1793842923620.jpg');
+
   // 1. Background gradient - Deep Luxury Slate Navy
   const bgGrad = ctx.createLinearGradient(0, 0, W, H);
   bgGrad.addColorStop(0, '#050811');
@@ -432,6 +461,15 @@ export async function drawIdCardBack(
   bgGrad.addColorStop(1, '#030712');
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, W, H);
+
+  // Central Security Logo Watermark
+  if (logoImg) {
+    ctx.save();
+    ctx.globalAlpha = 0.07;
+    const wmSize = 420;
+    ctx.drawImage(logoImg, (W - wmSize) / 2, (H - wmSize) / 2 - 30, wmSize, wmSize);
+    ctx.restore();
+  }
 
   // Subtle Guilloche Security Pattern
   ctx.strokeStyle = 'rgba(245, 158, 11, 0.04)';
@@ -469,15 +507,29 @@ export async function drawIdCardBack(
   ctx.lineWidth = 1.5;
   ctx.strokeRect(36, 36, W - 72, 105);
 
-  // ACC Gold Logo Emblem
-  ctx.fillStyle = '#f59e0b';
-  ctx.beginPath();
-  ctx.roundRect(54, 48, 76, 76, 12);
-  ctx.fill();
-  ctx.fillStyle = '#050811';
-  ctx.font = '900 32px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('ACC', 92, 98);
+  // Official ACC Gold & Blue 3D Logo Emblem
+  if (logoImg) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(54, 48, 76, 76, 12);
+    ctx.clip();
+    ctx.drawImage(logoImg, 54, 48, 76, 76);
+    ctx.restore();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(54, 48, 76, 76, 12);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = '#f59e0b';
+    ctx.beginPath();
+    ctx.roundRect(54, 48, 76, 76, 12);
+    ctx.fill();
+    ctx.fillStyle = '#050811';
+    ctx.font = '900 32px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('ACC', 92, 98);
+  }
 
   // Brand Titles
   ctx.textAlign = 'left';
@@ -612,19 +664,33 @@ export async function drawIdCardBack(
   ctx.fillText('🌐 पोर्टल: www.achieversclub.in', 75, box4Y + 175);
 
   // Authority Stamp & Signature
-  ctx.beginPath();
-  ctx.arc(630, box4Y + 95, 45, 0, Math.PI * 2);
-  ctx.fillStyle = '#f59e0b';
-  ctx.fill();
-  ctx.strokeStyle = '#fef08a';
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
+  if (logoImg) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(630, box4Y + 95, 45, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(logoImg, 630 - 45, box4Y + 95 - 45, 90, 90);
+    ctx.restore();
+    ctx.beginPath();
+    ctx.arc(630, box4Y + 95, 45, 0, Math.PI * 2);
+    ctx.strokeStyle = '#fef08a';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.arc(630, box4Y + 95, 45, 0, Math.PI * 2);
+    ctx.fillStyle = '#f59e0b';
+    ctx.fill();
+    ctx.strokeStyle = '#fef08a';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
 
-  ctx.fillStyle = '#0f172a';
-  ctx.font = '900 12px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('ACC LEGAL', 630, box4Y + 92);
-  ctx.fillText('VERIFIED', 630, box4Y + 108);
+    ctx.fillStyle = '#0f172a';
+    ctx.font = '900 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('ACC LEGAL', 630, box4Y + 92);
+    ctx.fillText('VERIFIED', 630, box4Y + 108);
+  }
 
   ctx.textAlign = 'center';
   ctx.fillStyle = '#fbbf24';

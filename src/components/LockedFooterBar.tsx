@@ -19,6 +19,8 @@ import {
   Send,
   Award,
   Mail,
+  ShieldCheck,
+  Users,
 } from 'lucide-react';
 import { ActiveWindow, Member, SiteConfig } from '../types';
 
@@ -39,6 +41,7 @@ interface NavButtonProps {
   themeColor: 'blue' | 'orange' | 'emerald' | 'amber' | 'indigo' | 'rose';
   onClick: () => void;
   title?: string;
+  textBoxBg?: string;
 }
 
 const Nav3DButton: React.FC<NavButtonProps> = ({
@@ -50,6 +53,7 @@ const Nav3DButton: React.FC<NavButtonProps> = ({
   themeColor,
   onClick,
   title,
+  textBoxBg,
 }) => {
   // Theme color styles for 3D Icon Capsules and Button Boxes
   const colorStyles = {
@@ -98,32 +102,37 @@ const Nav3DButton: React.FC<NavButtonProps> = ({
       type="button"
       onClick={onClick}
       title={title || label}
-      className={`group relative flex flex-col items-center justify-between py-1 px-0.5 sm:px-1.5 rounded-xl transition-all active:translate-y-0.5 cursor-pointer min-w-0 w-full ${
+      className={`group relative flex flex-col items-center justify-between py-0.5 px-0.5 sm:px-1 rounded-lg transition-all active:translate-y-0.5 cursor-pointer min-w-0 w-full ${
         isActive ? colorStyles.activeBox : colorStyles.inactiveBox
       }`}
     >
       {/* 3D Embossed Icon Capsule */}
       <div
-        className={`w-7 h-7 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 border border-white/50 transition-transform group-hover:scale-105 ${colorStyles.iconCapsule}`}
+        className={`w-5 h-5 sm:w-6 sm:h-6 rounded-md flex items-center justify-center shrink-0 border border-white/50 transition-transform group-hover:scale-105 ${colorStyles.iconCapsule}`}
       >
-        <span className="drop-shadow-[0_1.5px_2px_rgba(0,0,0,0.35)] flex items-center justify-center">
+        <span className="drop-shadow-[0_1px_1px_rgba(0,0,0,0.3)] flex items-center justify-center [&>svg]:w-2.5 [&>svg]:h-2.5 sm:[&>svg]:w-3 sm:[&>svg]:h-3">
           {icon}
         </span>
       </div>
 
       {/* Structured Text Box - Zero Cutoff on Mobile */}
-      <div className="w-full text-center mt-1 flex flex-col items-center justify-center min-h-[22px] px-0.5">
+      <div
+        className={`w-full text-center mt-0.5 flex flex-col items-center justify-center min-h-[13px] sm:min-h-[15px] px-0.5 ${
+          textBoxBg ? 'rounded-xs' : ''
+        }`}
+        style={textBoxBg ? { backgroundColor: textBoxBg } : undefined}
+      >
         <span
-          className={`text-[9.5px] sm:text-[11.5px] font-black tracking-tight leading-tight block w-full whitespace-nowrap overflow-visible ${
-            isSpecial && !isActive ? 'text-white' : ''
+          className={`text-[8px] sm:text-[9px] font-black tracking-tight leading-none block w-full whitespace-nowrap overflow-visible ${
+            textBoxBg || (isSpecial && !isActive) ? 'text-white' : ''
           }`}
         >
           {label}
         </span>
         {subLabel && (
           <span
-            className={`text-[8px] sm:text-[9px] font-bold leading-none block mt-0.5 font-mono ${
-              isSpecial && !isActive ? 'text-yellow-200' : 'text-slate-500'
+            className={`text-[6.5px] sm:text-[7.5px] font-bold leading-none block mt-0.5 font-mono ${
+              textBoxBg ? 'text-yellow-300' : isSpecial && !isActive ? 'text-yellow-200' : 'text-slate-500'
             }`}
           >
             {subLabel}
@@ -164,83 +173,91 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 w-full select-none shadow-[0_-4px_25px_rgba(0,0,0,0.18)] border-t border-slate-300 bg-white/95 backdrop-blur-md">
       {/* ------------------------------------------------------------- */}
-      {/* 1. Live Running Announcement Bar                              */}
+      {/* 1. DEDICATED LIVE NEWS & ANNOUNCEMENT SINGLE LINE (100% WIDTH) */}
       {/* ------------------------------------------------------------- */}
-      <div className="bg-slate-950 text-white px-2.5 sm:px-4 py-1 text-xs flex items-center justify-between gap-2.5 border-b border-slate-800">
-        <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
-          {/* Announcement Tag */}
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] sm:text-[11px] font-black uppercase tracking-wider shrink-0 bg-yellow-400 text-slate-950 shadow-xs">
-            <Megaphone className="w-3.5 h-3.5 text-slate-950 shrink-0 animate-bounce" />
-            <span>लाइव सूचना</span>
-          </div>
+      <div className="bg-[#090d16] text-white px-2 sm:px-3 py-1 text-xs flex items-center justify-between gap-2 border-b border-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] w-full">
+        {/* LIVE NEWS Badge */}
+        <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-red-600 via-rose-600 to-red-700 text-white font-black text-[10px] sm:text-[11px] tracking-wider uppercase shrink-0 shadow-[0_2px_8px_rgba(225,29,72,0.5)] border border-red-400/40 select-none">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-300"></span>
+          </span>
+          <span className="flex items-center gap-1">
+            <Megaphone className="w-3 h-3 text-yellow-300 shrink-0" />
+            <span>LIVE NEWS</span>
+          </span>
+        </div>
 
-          {/* Running Live Announcement Marquee */}
-          <div className="overflow-hidden whitespace-nowrap text-[11px] sm:text-xs text-yellow-200 font-medium tracking-tight flex-1">
-            <div className="inline-block animate-marquee hover:[animation-play-state:paused] cursor-default">
+        {/* Continuous Full-Width Crystal Clear Announcement Marquee */}
+        <div className="overflow-hidden whitespace-nowrap text-[11px] sm:text-xs text-yellow-300 font-bold tracking-tight flex-1 relative flex items-center">
+          <div className="inline-block animate-marquee hover:[animation-play-state:paused] cursor-default drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">
+            <span className="inline-block px-4">
               {currentUser ? (
-                <span>
-                  📢 नमस्ते {currentUser.fullName} ({currentUser.accId}) · वॉलेट बैलेंस: ₹{currentUser.walletBalance?.toFixed(2) || '0.00'} · ⚡ SWIS रिचार्ज पर 3.30% फिक्स कमीशन तुरंत वॉलेट में · 👥 TWIS में प्रत्येक डायरेक्ट रेफरल पर ₹150 तुरंत पेआउट · 💳 माता-पिता का UPI व बैंक अकाउंट 100% मान्य · 🆔 डिजिटल ID कार्ड डाउनलोड करें · 📱 ऑफिशियल Real Android APK डाउनलोड करें
-                </span>
+                <>
+                  📢 नमस्ते <strong className="text-white underline">{currentUser.fullName} ({currentUser.accId})</strong> · 💰 वॉलेट बैलेंस: <strong className="text-emerald-400 font-mono">₹{currentUser.walletBalance?.toFixed(2) || '0.00'}</strong> · ⚡ <span className="text-yellow-400">SWIS:</span> मोबाइल व DTH रिचार्ज पर <strong className="text-white">3.30% फिक्स कमीशन</strong> तुरंत वॉलेट में जमा · 👥 <span className="text-yellow-400">TWIS:</span> प्रत्येक डायरेक्ट रेफरल पर <strong className="text-emerald-400 font-mono">₹150</strong> तुरंत पेआउट बैंक/UPI में ट्रांसफर · 💳 माता-पिता का UPI व बैंक अकाउंट 100% मान्य · 🆔 डिजिटल ID कार्ड डाउनलोड करें · 📱 ऑफिशियल Real Android APK डाउनलोड करें · 24x7 सपोर्ट उपलब्ध!
+                </>
               ) : referralSponsor ? (
-                <span>
-                  📢 स्पॉन्सर: {referralSponsor.fullName} ({referralSponsor.accId}) के रेफरल लिंक से जुड़े हैं · 🔥 बिना निवेश लाइफटाइम अर्निंग शुरू करें · ⚡ SWIS रिचार्ज पर 3.30% फिक्स कमीशन · 👥 TWIS रेफरल पर ₹150 तुरंत पेआउट बैंक/UPI में · 💳 माता-पिता का खाता मान्य · 📱 ऑफिशियल Real APK डाउनलोड करें
-                </span>
+                <>
+                  📢 आप अधिकृत स्पॉन्सर <strong className="text-white underline">{referralSponsor.fullName} ({referralSponsor.accId})</strong> के इनविटेशन लिंक से जुड़े हैं · 🚀 <strong className="text-white">₹{siteConfig.activationFee || 249}</strong> में लाइफटाइम डिजिटल ID एक्टिवेट करें · ⚡ <span className="text-yellow-400">SWIS:</span> 3.30% रिचार्ज कमीशन तुरंत वॉलेट में · 👥 <span className="text-yellow-400">TWIS:</span> ₹150 डायरेक्ट पेआउट बैंक/UPI में ट्रांसफर · 💳 माता-पिता का UPI/बैंक खाता 100% मान्य · 📱 ऑफिशियल Real APK डाउनलोड करें!
+                </>
               ) : (
-                <span>
-                  {siteConfig.announcementMarquee 
-                    ? `📢 ${siteConfig.announcementMarquee} · ⚡ SWIS 3.30% फिक्स रिचार्ज कमीशन तुरंत वॉलेट में · 👥 TWIS ₹150 डायरेक्ट पेआउट · 💳 माता-पिता का UPI/बैंक खाता 100% मान्य · 🆔 लाइफटाइम डिजिटल ID कार्ड · 📱 ऑफिशियल Real APK उपलब्ध`
-                    : '📢 ACC लाइव सूचना: ⚡ SWIS रिचार्ज पर 3.30% फिक्स कमीशन तुरंत वॉलेट में जमा • 👥 TWIS में प्रत्येक डायरेक्ट रेफरल पर ₹150 तुरंत पेआउट बैंक/UPI में ट्रांसफर • 💳 माता-पिता का UPI व बैंक खाता 100% मान्य • 🆔 लाइफटाइम डिजिटल ID कार्ड • 📱 ऑफिशियल Real Android APK डाउनलोड करें • 24x7 WhatsApp सपोर्ट उपलब्ध!'}
-                </span>
+                <>
+                  {siteConfig.announcementMarquee ? (
+                    <span>📢 {siteConfig.announcementMarquee} · ⚡ SWIS: 3.30% फिक्स रिचार्ज कमीशन तुरंत वॉलेट में जमा · 👥 TWIS: ₹150 डायरेक्ट पेआउट बैंक/UPI में ट्रांसफर · 💳 माता-पिता का UPI/बैंक खाता 100% मान्य · 🆔 लाइफटाइम डिजिटल ID कार्ड · 📱 ऑफिशियल Real Android APK डाउनलोड करें · 24x7 हेल्पलाइन सपोर्ट!</span>
+                  ) : (
+                    <span>📢 <strong className="text-white">ACC ऑफिशियल लाइव सूचना:</strong> ⚡ <span className="text-yellow-400">SWIS:</span> मोबाइल व DTH रिचार्ज पर <strong className="text-white">3.30% फिक्स कमीशन</strong> तुरंत वॉलेट में जमा • 👥 <span className="text-yellow-400">TWIS:</span> प्रत्येक डायरेक्ट रेफरल पर <strong className="text-emerald-400 font-mono">₹150</strong> तुरंत पेआउट बैंक/UPI में ट्रांसफर • 💳 माता-पिता का UPI व बैंक खाता 100% मान्य • 🆔 लाइफटाइम डिजिटल ID कार्ड तुरंत एक्टिवेट करें • 📱 ऑफिशियल Real Android APK उपलब्ध • 24x7 हेल्पलाइन व WhatsApp सहायता उपलब्ध!</span>
+                  )}
+                </>
               )}
-            </div>
+            </span>
+            <span className="inline-block px-4">
+              {currentUser ? (
+                <>
+                  📢 नमस्ते <strong className="text-white underline">{currentUser.fullName} ({currentUser.accId})</strong> · 💰 वॉलेट बैलेंस: <strong className="text-emerald-400 font-mono">₹{currentUser.walletBalance?.toFixed(2) || '0.00'}</strong> · ⚡ <span className="text-yellow-400">SWIS:</span> 3.30% फिक्स कमीशन तुरंत वॉलेट में · 👥 <span className="text-yellow-400">TWIS:</span> ₹150 तुरंत पेआउट · 💳 माता-पिता का UPI मान्य!
+                </>
+              ) : referralSponsor ? (
+                <>
+                  📢 अधिकृत स्पॉन्सर: <strong className="text-white underline">{referralSponsor.fullName} ({referralSponsor.accId})</strong> · 🚀 ₹{siteConfig.activationFee || 249} लाइफटाइम डिजिटल ID एक्टिवेशन · ⚡ SWIS 3.30% · 👥 TWIS ₹150 तुरंत पेआउट!
+                </>
+              ) : (
+                <>
+                  📢 ⚡ <span className="text-yellow-400">SWIS:</span> 3.30% फिक्स रिचार्ज कमीशन तुरंत वॉलेट में जमा • 👥 <span className="text-yellow-400">TWIS:</span> प्रत्येक डायरेक्ट रेफरल पर ₹150 तुरंत पेआउट • 💳 माता-पिता का UPI/बैंक खाता 100% मान्य • 🆔 लाइफटाइम डिजिटल ID कार्ड • 📱 ऑफिशियल Real APK डाउनलोड करें!
+                </>
+              )}
+            </span>
           </div>
         </div>
 
-        {/* Action buttons on right of announcement strip - 3D Tactile Buttons */}
+        {/* Right Corner: Always Visible Official Telegram Helpdesk Button & Toggle */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {siteConfig.showWhatsAppSupport ? (
-            <button
-              onClick={handleOpenWhatsAppAdmin}
-              className="text-[10px] sm:text-[11px] bg-gradient-to-b from-emerald-500 to-teal-700 hover:from-emerald-400 hover:to-teal-600 text-white px-2 py-1 rounded-lg font-black flex items-center gap-1 shadow-[0_2px_4px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.4)] active:translate-y-0.5 border border-emerald-400/40 transition cursor-pointer"
-              title="24x7 WhatsApp सपोर्ट"
-            >
-              <div className="w-3.5 h-3.5 rounded bg-white/20 flex items-center justify-center shrink-0">
-                <MessageCircle className="w-2.5 h-2.5 text-white" />
-              </div>
-              <span className="whitespace-nowrap">WhatsApp</span>
-            </button>
-          ) : (
-            <a
-              href={`mailto:${siteConfig.officialEmail || 'newuserhelpline@gmail.com'}?subject=ACC%20Support`}
-              className="text-[10px] sm:text-[11px] bg-gradient-to-b from-blue-500 to-blue-700 hover:from-blue-400 hover:to-blue-600 text-white px-2 py-1 rounded-lg font-black flex items-center gap-1 shadow-[0_2px_4px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.4)] active:translate-y-0.5 border border-blue-400/40 transition cursor-pointer"
-              title="ईमेल सपोर्ट (newuserhelpline@gmail.com)"
-            >
-              <div className="w-3.5 h-3.5 rounded bg-white/20 flex items-center justify-center shrink-0">
-                <Mail className="w-2.5 h-2.5 text-white" />
-              </div>
-              <span className="whitespace-nowrap">ईमेल हेल्प</span>
-            </a>
-          )}
-
           <a
             href={siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE'}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[10px] sm:text-[11px] bg-gradient-to-b from-[#229ED9] to-[#1579a8] hover:from-[#2eb0f1] hover:to-[#229ED9] text-white px-2 py-1 rounded-lg font-black flex items-center gap-1 shadow-[0_2px_4px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.4)] active:translate-y-0.5 border border-cyan-400/40 transition cursor-pointer"
-            title="Telegram हेल्पडेस्क (@NEWUSERHELPLINE)"
+            className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-black text-[10px] sm:text-[11px] shadow-sm transition active:scale-95 border border-sky-300/40"
+            title="24x7 ऑफिशियल Telegram सहायता केंद्र (@NEWUSERHELPLINE)"
           >
-            <div className="w-3.5 h-3.5 rounded bg-white/20 flex items-center justify-center shrink-0">
-              <Send className="w-2.5 h-2.5 text-white" />
-            </div>
-            <span className="whitespace-nowrap">Telegram</span>
+            <Send className="w-3 h-3 text-white shrink-0" />
+            <span className="hidden xs:inline font-bold">Telegram</span>
           </a>
 
+          {/* Minimal Expand/Collapse Toggle on Right */}
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="text-slate-300 hover:text-white bg-white/10 hover:bg-white/20 p-1 rounded-lg transition flex items-center justify-center text-[10px] cursor-pointer shadow-xs active:translate-y-0.5"
+            className="text-slate-300 hover:text-white bg-white/10 hover:bg-white/20 px-2 py-0.5 rounded-md transition flex items-center justify-center text-[10px] cursor-pointer shadow-xs active:translate-y-0.5 shrink-0 border border-white/10"
             title={isExpanded ? 'बार छोटा करें' : 'बार खोलें'}
           >
-            {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+            {isExpanded ? (
+              <span className="flex items-center gap-1 font-bold">
+                <ChevronDown className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline text-[9.5px]">छिपाएं</span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 font-bold text-yellow-300">
+                <ChevronUp className="w-3.5 h-3.5" />
+                <span className="text-[9.5px]">मेनू खोलें</span>
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -249,14 +266,14 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
       {/* 2. Main 5 Distinct 3D Action Buttons Grid (Zero Text Cutoff)  */}
       {/* ------------------------------------------------------------- */}
       {isExpanded && (
-        <div className="px-1.5 sm:px-4 py-1.5 sm:py-2 max-w-4xl mx-auto">
+        <div className="px-1 sm:px-2 py-0.5 max-w-2xl mx-auto">
           {/* ========================================================= */}
           {/* CATEGORY 1: LOGGED IN USER (5 SEPARATE 3D BUTTONS)        */}
           {/* ========================================================= */}
           {currentUser && (
-            <div className="grid grid-cols-5 gap-1 sm:gap-2.5 text-center">
+            <div className="grid grid-cols-5 gap-0.5 sm:gap-1 text-center">
               <Nav3DButton
-                icon={<Home className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                icon={<Home className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
                 label="होम"
                 subLabel="Home"
                 isActive={activeWindow === 'home'}
@@ -266,7 +283,7 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
               />
 
               <Nav3DButton
-                icon={<LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                icon={<LayoutDashboard className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
                 label="डैशबोर्ड"
                 subLabel="Panel"
                 isActive={activeWindow === 'dashboard'}
@@ -276,16 +293,18 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
               />
 
               <Nav3DButton
-                icon={<Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
-                label="SWIS·TWIS"
-                subLabel="3.30% · ₹150"
-                themeColor="emerald"
-                onClick={() => setActiveWindow('dashboard')}
-                title="SWIS 3.30% रिचार्ज व TWIS ₹150 रेफरल"
+                icon={<Users className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-pulse" />}
+                label="रेफर & कमाएं"
+                subLabel="₹150 पेआउट"
+                isActive={activeWindow === 'refer'}
+                isSpecial={true}
+                themeColor="orange"
+                onClick={() => setActiveWindow('refer')}
+                title="रेफर & कमाएं हब - रेफरल लिंक, शेयर, WhatsApp स्टेटस टेम्प्लेट्स व ₹150 पेआउट"
               />
 
               <Nav3DButton
-                icon={<CreditCard className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                icon={<CreditCard className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
                 label="ID कार्ड"
                 subLabel="Digital ID"
                 isActive={activeWindow === 'idcard'}
@@ -295,12 +314,14 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
               />
 
               <Nav3DButton
-                icon={<Edit3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
-                label="प्रोफाइल"
-                subLabel="Edit Info"
-                themeColor="orange"
-                onClick={() => setActiveWindow('dashboard')}
-                title="प्रोफाइल व संपर्क विवरण एडिट करें"
+                icon={<Send className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
+                label="Telegram"
+                subLabel="हेल्पलाइन"
+                isSpecial={true}
+                themeColor="blue"
+                onClick={() => window.open(siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE', '_blank')}
+                title="24x7 ऑफिशियल Telegram सहायता केंद्र (@NEWUSERHELPLINE)"
+                textBoxBg="#000000"
               />
             </div>
           )}
@@ -309,9 +330,9 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
           {/* CATEGORY 2: REFERRED VISITOR WITH SPONSOR (5 3D BUTTONS)  */}
           {/* ========================================================= */}
           {!currentUser && referralSponsor && (
-            <div className="grid grid-cols-5 gap-1 sm:gap-2.5 text-center">
+            <div className="grid grid-cols-5 gap-0.5 sm:gap-1 text-center">
               <Nav3DButton
-                icon={<Home className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                icon={<Home className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
                 label="होम"
                 subLabel="Home"
                 isActive={activeWindow === 'home'}
@@ -321,7 +342,7 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
               />
 
               <Nav3DButton
-                icon={<Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-pulse" />}
+                icon={<Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-pulse" />}
                 label="रजिस्टर"
                 subLabel={`₹${siteConfig.activationFee || 249}`}
                 isActive={activeWindow === 'register'}
@@ -332,7 +353,7 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
               />
 
               <Nav3DButton
-                icon={<LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                icon={<LogIn className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
                 label="लॉगिन"
                 subLabel="Login"
                 isActive={activeWindow === 'login'}
@@ -342,7 +363,7 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
               />
 
               <Nav3DButton
-                icon={<CreditCard className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                icon={<CreditCard className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
                 label="स्पॉन्सर ID"
                 subLabel="Preview"
                 isActive={activeWindow === 'idcard'}
@@ -353,23 +374,25 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
 
               {siteConfig.showWhatsAppSupport ? (
                 <Nav3DButton
-                  icon={<MessageCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                  icon={<MessageCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
                   label="WhatsApp"
                   subLabel="चैट करें"
                   isSpecial={true}
                   themeColor="emerald"
                   onClick={handleOpenWhatsAppSponsor}
                   title={`स्पॉन्सर ${referralSponsor.fullName} से सीधे WhatsApp पर बात करें`}
+                  textBoxBg="#000000"
                 />
               ) : (
                 <Nav3DButton
-                  icon={<Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                  icon={<Send className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
                   label="Telegram"
                   subLabel="हेल्पडेस्क"
                   isSpecial={true}
                   themeColor="blue"
                   onClick={() => window.open(siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE', '_blank')}
                   title="ऑफिशियल Telegram सहायता केंद्र (@NEWUSERHELPLINE)"
+                  textBoxBg="#000000"
                 />
               )}
             </div>
@@ -379,9 +402,9 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
           {/* CATEGORY 3: DIRECT VISITOR WITHOUT SPONSOR (5 3D BUTTONS) */}
           {/* ========================================================= */}
           {!currentUser && !referralSponsor && (
-            <div className="grid grid-cols-5 gap-1 sm:gap-2.5 text-center">
+            <div className="grid grid-cols-5 gap-0.5 sm:gap-1 text-center">
               <Nav3DButton
-                icon={<Home className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                icon={<Home className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
                 label="होम"
                 subLabel="Home"
                 isActive={activeWindow === 'home'}
@@ -391,7 +414,7 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
               />
 
               <Nav3DButton
-                icon={<Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-pulse" />}
+                icon={<Building2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-pulse" />}
                 label="रजिस्टर"
                 subLabel={`₹${siteConfig.activationFee || 249}`}
                 isActive={activeWindow === 'register'}
@@ -402,7 +425,7 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
               />
 
               <Nav3DButton
-                icon={<LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                icon={<LogIn className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
                 label="लॉगिन"
                 subLabel="Login"
                 isActive={activeWindow === 'login'}
@@ -412,34 +435,36 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
               />
 
               <Nav3DButton
-                icon={<Video className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
-                label="वीडियो"
-                subLabel="Training"
-                isActive={activeWindow === 'video'}
-                themeColor="rose"
-                onClick={() => setActiveWindow('video')}
-                title="सिस्टम ट्रेनिंग वीडियो देखें"
+                icon={<CreditCard className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
+                label="डिजिटल ID"
+                subLabel="Sponsor ID"
+                isActive={activeWindow === 'idcard'}
+                themeColor="amber"
+                onClick={() => setActiveWindow('idcard')}
+                title="डिजिटल 🆔 कार्ड एवं स्पॉन्सर सत्यापन"
               />
 
               {siteConfig.showWhatsAppSupport ? (
                 <Nav3DButton
-                  icon={<MessageCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                  icon={<MessageCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
                   label="WhatsApp"
                   subLabel="सपोर्ट"
                   isSpecial={true}
                   themeColor="emerald"
                   onClick={handleOpenWhatsAppAdmin}
                   title="24x7 एडमिन हेल्पलाइन व WhatsApp सहायता"
+                  textBoxBg="#000000"
                 />
               ) : (
                 <Nav3DButton
-                  icon={<Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                  icon={<Send className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
                   label="Telegram"
                   subLabel="हेल्पडेस्क"
                   isSpecial={true}
                   themeColor="blue"
                   onClick={() => window.open(siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE', '_blank')}
                   title="24x7 एडमिन Telegram सहायता (@NEWUSERHELPLINE)"
+                  textBoxBg="#000000"
                 />
               )}
             </div>

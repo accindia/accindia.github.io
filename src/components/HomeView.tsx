@@ -195,9 +195,14 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <div className="shrink-0 w-full max-w-sm">
             <div className="bg-white text-slate-900 border border-gray-200 rounded-xl p-5 shadow-lg relative overflow-hidden">
               <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded bg-[#2874f0] text-[#ffe500] flex items-center justify-center font-black text-xs">
-                    ACC
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-xl overflow-hidden shadow-md border border-amber-300 p-0.5 bg-gradient-to-tr from-amber-400 via-yellow-200 to-amber-500 shrink-0">
+                    <img
+                      src="/src/assets/images/acc_official_logo_1793842923620.jpg"
+                      alt="ACC Official Logo"
+                      className="w-full h-full object-cover rounded-[10px]"
+                      referrerPolicy="no-referrer"
+                    />
                   </div>
                   <div>
                     <span className="text-xs font-bold text-slate-900 block leading-tight">ACHIEVERS CLUB</span>
@@ -265,10 +270,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 onClick={() => {
                   if (onNavigateToIdCard) {
                     onNavigateToIdCard();
-                  } else if (currentUser || referralSponsor) {
-                    onNavigate('idcard');
                   } else {
-                    onNavigate('register');
+                    onNavigate('idcard');
                   }
                 }}
                 className="w-full py-3 bg-gradient-to-b from-[#2874f0] to-[#1258c7] hover:from-[#1e63d8] hover:to-[#0f4bb0] text-white font-black text-xs sm:text-sm rounded-xl shadow-[0_4px_10px_rgba(40,116,240,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)] active:translate-y-0.5 flex items-center justify-center gap-2 transition cursor-pointer"
@@ -277,7 +280,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   <CreditCard className="w-3.5 h-3.5 text-slate-950" />
                 </div>
                 <span className="leading-tight">
-                  {currentUser ? 'मेरा डिजिटल 🆔 कार्ड खोलें' : referralSponsor ? 'स्पॉन्सर डिजिटल 🆔 कार्ड देखें' : 'डिजिटल 🆔 कार्ड (रजिस्ट्रेशन आवश्यक)'}
+                  {currentUser ? 'मेरा डिजिटल 🆔 कार्ड खोलें' : referralSponsor ? 'स्पॉन्सर डिजिटल 🆔 कार्ड देखें' : 'डिजिटल 🆔 कार्ड एवं स्पॉन्सर सत्यापन'}
                 </span>
               </button>
             </div>
@@ -294,14 +297,36 @@ export const HomeView: React.FC<HomeViewProps> = ({
               .map((poster) => (
                 <div
                   key={poster.id}
-                  className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white rounded-xl p-5 shadow-sm border border-amber-400/40 flex flex-col justify-between"
+                  className="relative overflow-hidden bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white rounded-xl p-5 shadow-sm border border-amber-400/40 flex flex-col justify-between"
+                  style={{ transform: 'translateZ(0)' }}
                 >
-                  <div>
-                    {poster.badge && (
-                      <span className="inline-block text-[10px] bg-black/25 text-yellow-200 font-bold px-2.5 py-0.5 rounded uppercase tracking-wider mb-2">
-                        {poster.badge}
-                      </span>
-                    )}
+                  {/* Official ACC Watermark on Poster Background */}
+                  <div className="absolute -right-8 -bottom-8 w-44 h-44 opacity-15 pointer-events-none select-none z-0">
+                    <img
+                      src="/src/assets/images/acc_official_logo_1793842923620.jpg"
+                      alt="ACC Watermark"
+                      className="w-full h-full object-contain"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      {poster.badge && (
+                        <span className="inline-block text-[10px] bg-black/25 text-yellow-200 font-bold px-2.5 py-0.5 rounded uppercase tracking-wider">
+                          {poster.badge}
+                        </span>
+                      )}
+                      <div className="flex items-center gap-1.5 bg-black/30 backdrop-blur-xs px-2 py-0.5 rounded-full border border-white/20">
+                        <img
+                          src="/src/assets/images/acc_official_logo_1793842923620.jpg"
+                          alt="ACC"
+                          className="w-4 h-4 rounded-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                        <span className="text-[10px] font-bold text-yellow-300">ACC OFFICIAL</span>
+                      </div>
+                    </div>
                     <h3 className="font-bold text-base sm:text-lg leading-snug drop-shadow-xs">
                       {poster.title}
                     </h3>
@@ -312,15 +337,15 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     )}
                     {poster.imageUrl && (
                       <div className="mt-3 h-32 rounded-lg overflow-hidden border border-white/20 bg-black/20">
-                        <img src={poster.imageUrl} alt={poster.title} className="w-full h-full object-cover" />
+                        <img src={poster.imageUrl} alt={poster.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       </div>
                     )}
                   </div>
 
-                  <div className="pt-4 flex items-center justify-between">
+                  <div className="pt-4 flex items-center justify-between relative z-10">
                     <button
                       onClick={() => onNavigate((poster.ctaLink as any) || 'register')}
-                      className="px-4 py-2 bg-white hover:bg-slate-100 text-orange-700 font-black text-xs rounded-sm shadow-md flex items-center gap-1.5 transition"
+                      className="px-4 py-2 bg-white hover:bg-slate-100 text-orange-700 font-black text-xs rounded-sm shadow-md flex items-center gap-1.5 transition cursor-pointer"
                     >
                       <Sparkles className="w-3.5 h-3.5 text-orange-600" />
                       <span>{poster.ctaText || 'अभी देखें'}</span>

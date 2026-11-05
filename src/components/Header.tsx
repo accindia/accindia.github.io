@@ -21,6 +21,10 @@ import {
   BookOpen,
   Send,
   Mail,
+  FileText,
+  ChevronDown,
+  MoreHorizontal,
+  Users,
 } from 'lucide-react';
 import { ActiveWindow, Member, SiteConfig } from '../types';
 import { StorageService, subscribeToSync } from '../services/storage';
@@ -46,6 +50,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [currentTime, setCurrentTime] = useState<string>('');
   const [currentDate, setCurrentDate] = useState<string>('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [siteConfig, setSiteConfig] = useState<SiteConfig>(() => StorageService.getSiteConfig());
   const [featureIndex, setFeatureIndex] = useState(0);
 
@@ -153,7 +158,7 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  const navItems = [
+  const primaryNavItems = [
     {
       id: 'home' as ActiveWindow,
       label: 'होम',
@@ -161,32 +166,16 @@ export const Header: React.FC<HeaderProps> = ({
       colorClass: 'from-amber-400 to-amber-600 text-white',
     },
     {
-      id: 'video' as ActiveWindow,
-      label: 'ट्रेनिंग वीडियो',
-      icon: <Video className="w-3.5 h-3.5" />,
-      colorClass: 'from-rose-500 to-rose-700 text-white',
+      id: 'register' as ActiveWindow,
+      label: 'रजिस्ट्रेशन',
+      icon: <FileText className="w-3.5 h-3.5" />,
+      colorClass: 'from-orange-500 to-amber-600 text-white',
     },
     {
-      id: 'calculator' as ActiveWindow,
-      label: 'कैलकुलेटर',
-      icon: <Calculator className="w-3.5 h-3.5" />,
-      colorClass: 'from-emerald-500 to-emerald-700 text-white',
-    },
-    ...(!currentUser
-      ? [
-          {
-            id: 'register' as ActiveWindow,
-            label: 'रजिस्ट्रेशन',
-            icon: <Sparkles className="w-3.5 h-3.5" />,
-            colorClass: 'from-orange-500 to-amber-600 text-white',
-          },
-        ]
-      : []),
-    {
-      id: 'idcard' as ActiveWindow,
-      label: 'डिजिटल ID',
-      icon: <CreditCard className="w-3.5 h-3.5" />,
-      colorClass: 'from-cyan-500 to-blue-600 text-white',
+      id: 'login' as ActiveWindow,
+      label: 'लॉगिन',
+      icon: <LogIn className="w-3.5 h-3.5" />,
+      colorClass: 'from-indigo-600 to-blue-700 text-white',
     },
     {
       id: 'dashboard' as ActiveWindow,
@@ -195,42 +184,80 @@ export const Header: React.FC<HeaderProps> = ({
       colorClass: 'from-[#2874f0] to-blue-700 text-white',
     },
     {
-      id: 'promotions' as ActiveWindow,
-      label: 'प्रमोशन किट',
-      icon: <Megaphone className="w-3.5 h-3.5" />,
-      colorClass: 'from-amber-500 to-orange-600 text-white',
-    },
-    {
-      id: 'guidelines' as ActiveWindow,
-      label: 'गाइड केंद्र',
-      icon: <BookOpen className="w-3.5 h-3.5" />,
-      colorClass: 'from-emerald-600 to-teal-700 text-white',
-    },
-    {
       id: 'admin' as ActiveWindow,
       label: 'एडमिन पैनल',
       icon: <ShieldCheck className="w-3.5 h-3.5" />,
       colorClass: 'from-red-500 to-rose-700 text-white',
     },
     {
+      id: 'idcard' as ActiveWindow,
+      label: 'डिजिटल ID',
+      icon: <CreditCard className="w-3.5 h-3.5" />,
+      colorClass: 'from-cyan-500 to-blue-600 text-white',
+    },
+  ];
+
+  const moreNavItems = [
+    {
+      id: 'refer' as ActiveWindow,
+      label: 'रेफर & कमाएं',
+      desc: 'प्रति रेफरल ₹150 तुरंत पेआउट व प्रचार सामग्री',
+      icon: <Users className="w-3.5 h-3.5" />,
+      colorClass: 'from-orange-500 to-amber-600 text-white',
+    },
+    {
+      id: 'video' as ActiveWindow,
+      label: 'ट्रेनिंग वीडियो',
+      desc: 'YouTube ट्रेनिंग व बिजनेस प्लान',
+      icon: <Video className="w-3.5 h-3.5" />,
+      colorClass: 'from-rose-500 to-rose-700 text-white',
+    },
+    {
+      id: 'calculator' as ActiveWindow,
+      label: 'कैलकुलेटर',
+      desc: 'SWIS 3.30% बचत व कमीशन कैलकुलेटर',
+      icon: <Calculator className="w-3.5 h-3.5" />,
+      colorClass: 'from-emerald-500 to-emerald-700 text-white',
+    },
+    {
+      id: 'promotions' as ActiveWindow,
+      label: 'प्रमोशन किट',
+      desc: 'विजिटिंग कार्ड व सोशल मीडिया पोस्टर्स',
+      icon: <Megaphone className="w-3.5 h-3.5" />,
+      colorClass: 'from-amber-500 to-orange-600 text-white',
+    },
+    {
+      id: 'guidelines' as ActiveWindow,
+      label: 'गाइड केंद्र',
+      desc: 'नए व पुराने सदस्यों की सम्पूर्ण गाइड',
+      icon: <BookOpen className="w-3.5 h-3.5" />,
+      colorClass: 'from-emerald-600 to-teal-700 text-white',
+    },
+    {
       id: 'faq' as ActiveWindow,
       label: 'FAQ',
+      desc: 'अक्सर पूछे जाने वाले महत्वपूर्ण सवाल',
       icon: <HelpCircle className="w-3.5 h-3.5" />,
       colorClass: 'from-yellow-400 to-amber-500 text-slate-900',
     },
     {
       id: 'about' as ActiveWindow,
       label: 'हमारे बारे में',
+      desc: 'ACC विजन, मिशन व कम्युनिटी विवरण',
       icon: <Award className="w-3.5 h-3.5" />,
       colorClass: 'from-blue-500 to-indigo-600 text-white',
     },
     {
       id: 'contact' as ActiveWindow,
-      label: 'सपोर्ट',
+      label: 'सपोर्ट व हेल्प',
+      desc: '24x7 हेल्पलाइन, ईमेल व टेलीग्राम',
       icon: <Phone className="w-3.5 h-3.5" />,
       colorClass: 'from-green-500 to-emerald-700 text-white',
     },
   ];
+
+  const navItems = [...primaryNavItems, ...moreNavItems];
+  const isMoreItemActive = moreNavItems.some((item) => item.id === activeWindow);
 
   const cleanPhone = (siteConfig.helplinePhone || '+91 8877490845').replace(/[^0-9]/g, '');
   const cleanWhatsApp = (siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '');
@@ -287,9 +314,14 @@ export const Header: React.FC<HeaderProps> = ({
             className="flex items-center gap-1.5 sm:gap-2.5 cursor-pointer group select-none min-w-0 shrink"
             title="Achievers Club Community - होम"
           >
-            {/* 3D Embossed ACC Emblem */}
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-b from-[#fff777] via-[#ffe500] to-[#e6cf00] text-[#1258c7] flex items-center justify-center font-black text-xs sm:text-base tracking-wider shadow-[0_3px_8px_rgba(0,0,0,0.3),inset_0_1.5px_1px_rgba(255,255,255,0.95),inset_0_-1.5px_1px_rgba(0,0,0,0.2)] border border-yellow-200 group-hover:scale-105 active:translate-y-0.5 transition-all shrink-0">
-              <span className="drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">ACC</span>
+            {/* Official 3D Embossed ACC Emblem Logo */}
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl overflow-hidden p-0.5 bg-gradient-to-tr from-amber-400 via-yellow-200 to-amber-500 shadow-[0_3px_8px_rgba(0,0,0,0.3)] border border-yellow-200 group-hover:scale-105 active:translate-y-0.5 transition-all shrink-0">
+              <img
+                src="/src/assets/images/acc_official_logo_1793842923620.jpg"
+                alt="ACC Official Logo"
+                className="w-full h-full object-cover rounded-lg"
+                referrerPolicy="no-referrer"
+              />
             </div>
             <div className="flex flex-col min-w-0 justify-center">
               <span className="font-display font-black text-xs sm:text-base md:text-lg tracking-tight text-white leading-tight truncate drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]">
@@ -418,32 +450,33 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* ------------------------------------------------------------- */}
-      {/* 3. Navigation Sub-bar - 3D Buttons for Desktop                */}
+      {/* 3. Universal Navigation Bar - 3D Buttons with MORE Dropdown   */}
       {/* ------------------------------------------------------------- */}
-      <div className="hidden md:block bg-white border-b border-gray-200 px-3 py-1.5 shadow-xs w-full">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-1 lg:gap-1.5">
-          {navItems.map((item) => {
+      <div className="block bg-white border-b border-gray-200 px-1 sm:px-2 py-0.5 sm:py-1 shadow-xs w-full relative">
+        <div className="max-w-7xl mx-auto flex items-center justify-start sm:justify-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+          {/* Primary Action Buttons */}
+          {primaryNavItems.map((item) => {
             const isActive = activeWindow === item.id;
             return (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => handleNavClick(item.id)}
-                className={`group flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap active:translate-y-0.5 ${
+                className={`group flex items-center gap-1 px-1.5 lg:px-2 py-0.5 text-[10px] lg:text-[11px] rounded-md font-bold transition-all cursor-pointer whitespace-nowrap active:translate-y-0.5 shrink-0 ${
                   isActive
-                    ? 'bg-gradient-to-b from-blue-50 to-blue-100 text-[#2874f0] border-2 border-[#2874f0] shadow-[0_3px_8px_rgba(40,116,240,0.25),inset_0_1px_1px_rgba(255,255,255,0.9)]'
-                    : 'bg-gradient-to-b from-white via-slate-50 to-slate-100 text-slate-700 hover:text-[#2874f0] border border-slate-200/90 hover:border-blue-300 shadow-[0_2px_4px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.9)]'
+                    ? 'bg-gradient-to-b from-blue-50 to-blue-100 text-[#2874f0] border-2 border-[#2874f0] shadow-[0_1.5px_4px_rgba(40,116,240,0.2),inset_0_0.5px_0.5px_rgba(255,255,255,0.9)]'
+                    : 'bg-gradient-to-b from-white via-slate-50 to-slate-100 text-slate-700 hover:text-[#2874f0] border border-slate-200/90 hover:border-blue-300 shadow-[0_1px_2px_rgba(0,0,0,0.04),inset_0_0.5px_0_rgba(255,255,255,0.9)]'
                 }`}
               >
                 {/* 3D Icon Capsule */}
                 <div
-                  className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 border border-white/50 ${
+                  className={`w-3.5 h-3.5 lg:w-4 lg:h-4 rounded flex items-center justify-center shrink-0 border border-white/50 ${
                     isActive
-                      ? 'bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white shadow-[0_2px_4px_rgba(40,116,240,0.35),inset_0_1px_0.5px_rgba(255,255,255,0.5)]'
-                      : `bg-gradient-to-b ${item.colorClass} shadow-[0_1.5px_3px_rgba(0,0,0,0.15),inset_0_1px_0.5px_rgba(255,255,255,0.6)]`
+                      ? 'bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white shadow-[0_1px_2px_rgba(40,116,240,0.3),inset_0_0.5px_0.5px_rgba(255,255,255,0.5)]'
+                      : `bg-gradient-to-b ${item.colorClass} shadow-[0_0.5px_1.5px_rgba(0,0,0,0.12),inset_0_0.5px_0.5px_rgba(255,255,255,0.6)]`
                   }`}
                 >
-                  <span className="drop-shadow-[0_1px_1px_rgba(0,0,0,0.25)] flex items-center justify-center">
+                  <span className="drop-shadow-[0_1px_1px_rgba(0,0,0,0.25)] flex items-center justify-center [&>svg]:w-2 [&>svg]:h-2 lg:[&>svg]:w-2.5 lg:[&>svg]:h-2.5">
                     {item.icon}
                   </span>
                 </div>
@@ -451,7 +484,94 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             );
           })}
+
+          {/* MORE (अन्य सेवाएं) Dropdown Trigger Button */}
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => setMoreMenuOpen(!moreMenuOpen)}
+              className={`group flex items-center gap-1 px-2 py-0.5 text-[10px] lg:text-[11px] rounded-md font-bold transition-all cursor-pointer whitespace-nowrap active:translate-y-0.5 ${
+                isMoreItemActive || moreMenuOpen
+                  ? 'bg-gradient-to-b from-amber-50 to-yellow-100 text-amber-900 border-2 border-amber-500 shadow-[0_1.5px_4px_rgba(245,158,11,0.25),inset_0_0.5px_0.5px_rgba(255,255,255,0.9)]'
+                  : 'bg-gradient-to-b from-white via-slate-50 to-slate-100 text-slate-700 hover:text-amber-700 border border-slate-200/90 hover:border-amber-300 shadow-[0_1px_2px_rgba(0,0,0,0.04),inset_0_0.5px_0_rgba(255,255,255,0.9)]'
+              }`}
+              title="अन्य सुविधाएं व मेनू (More Options)"
+            >
+              <div className="w-3.5 h-3.5 lg:w-4 lg:h-4 rounded flex items-center justify-center shrink-0 border border-white/50 bg-gradient-to-b from-amber-400 to-amber-600 text-white shadow-[0_0.5px_1.5px_rgba(0,0,0,0.15)]">
+                <MoreHorizontal className="w-2.5 h-2.5" />
+              </div>
+              <span className="leading-tight">More (अन्य)</span>
+              <ChevronDown
+                className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${
+                  moreMenuOpen ? 'rotate-180 text-amber-700' : ''
+                }`}
+              />
+            </button>
+          </div>
         </div>
+
+        {/* MORE Dropdown Popover (Placed OUTSIDE overflow-x-auto container so it is NEVER clipped) */}
+        {moreMenuOpen && (
+          <div className="fixed inset-0 z-50 flex items-start justify-center sm:justify-end max-w-7xl mx-auto px-4 pt-[90px] sm:pt-[96px] pointer-events-none">
+            {/* Clickable backdrop */}
+            <div
+              className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs z-40 pointer-events-auto animate-fadeIn"
+              onClick={() => setMoreMenuOpen(false)}
+            />
+            {/* Dropdown Card */}
+            <div className="relative w-full max-w-xs sm:w-72 bg-white rounded-2xl shadow-2xl border-2 border-blue-400/40 p-2 z-50 pointer-events-auto animate-scaleUp overflow-hidden">
+              <div className="px-3 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100 rounded-xl mb-1.5 flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-5 h-5 rounded-md bg-gradient-to-b from-amber-400 to-amber-600 text-white flex items-center justify-center shadow-xs">
+                    <MoreHorizontal className="w-3 h-3" />
+                  </div>
+                  <span className="text-xs font-black text-slate-800">अन्य सभी सुविधाएं (More)</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMoreMenuOpen(false)}
+                  className="w-5 h-5 rounded-full bg-slate-200 hover:bg-rose-500 hover:text-white flex items-center justify-center text-slate-600 transition text-[10px] cursor-pointer"
+                  title="बंद करें"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+
+              <div className="space-y-1 max-h-[60vh] overflow-y-auto pr-0.5">
+                {moreNavItems.map((item) => {
+                  const isActive = activeWindow === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        setMoreMenuOpen(false);
+                        handleNavClick(item.id);
+                      }}
+                      className={`w-full flex items-center gap-2.5 p-2 rounded-xl text-left transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-blue-50 text-[#2874f0] font-bold border border-blue-200 shadow-xs'
+                          : 'hover:bg-slate-50 text-slate-700 hover:text-slate-900 border border-transparent'
+                      }`}
+                    >
+                      <div
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-gradient-to-b ${item.colorClass} shadow-xs border border-white/50 text-white`}
+                      >
+                        <span className="[&>svg]:w-3.5 [&>svg]:h-3.5 flex items-center justify-center">
+                          {item.icon}
+                        </span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold leading-tight">{item.label}</p>
+                        <p className="text-[10px] text-slate-400 truncate">{item.desc}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ------------------------------------------------------------- */}

@@ -10,7 +10,7 @@ import {
   onSnapshot,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { Member, RechargeTransaction, ReferralRecord, WithdrawalRequest, SiteConfig, ProfileEditAuditLog } from '../types';
+import { Member, RechargeTransaction, ReferralRecord, WithdrawalRequest, SiteConfig, ProfileEditAuditLog, PrivateMessage } from '../types';
 import { ensureSafeFirestoreSize } from '../utils/imageCompressor';
 
 // Collections
@@ -520,6 +520,62 @@ export const FirestoreService = {
       );
     } catch (e) {
       console.warn('Could not subscribe to profile audit logs:', e);
+      return () => {};
+    }
+  },
+
+  // Save private message
+  async savePrivateMessage(msg: PrivateMessage): Promise<boolean> {
+    try {
+      const cleanMsg: PrivateMessage = JSON.parse(JSON.stringify(msg));
+      if (cleanMsg.mediaUrl && cleanMsg.mediaUrl.startsWith('data:image')) {
+        try {
+          cleanMsg.mediaUrl = await ensureSafeFirestoreSize(cleanMsg.mediaUrl, 800, 0.7);
+        } catch {
+          // ignore
+        }
+      }
+      await setDoc(doc(db, 'private_messages', msg.id), cleanMsg);
+      return true;
+    } catch (err) {
+      console.warn('Firestore savePrivateMessage error:', err);
+      return false;
+    }
+  },
+
+  // Get private messages
+  async getPrivateMessages(userAccId?: string): Promise<PrivateMessage[]> {
+    try {
+      const snap = await getDocs(collection(db, 'private_messages'));
+      let msgs = snap.docs.map((d) => d.data() as PrivateMessage);
+      if (userAccId) {
+        msgs = msgs.filter((m) => (m.userAccId || '').toUpperCase() === userAccId.toUpperCase());
+      }
+      return msgs.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    } catch (err) {
+      console.warn('Firestore getPrivateMessages error:', err);
+      return [];
+    }
+  },
+
+  // Real-time subscribe to private messages
+  subscribeToPrivateMessages(userAccId: string, onUpdate: (msgs: PrivateMessage[]) => void): () => void {
+    try {
+      return onSnapshot(
+        collection(db, 'private_messages'),
+        (snap) => {
+          const msgs = snap.docs
+            .map((d) => d.data() as PrivateMessage)
+            .filter((m) => (m.userAccId || '').toUpperCase() === userAccId.toUpperCase())
+            .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+          onUpdate(msgs);
+        },
+        (error) => {
+          console.warn('Firestore subscribeToPrivateMessages error:', error);
+        }
+      );
+    } catch (e) {
+      console.warn('Could not subscribe to private messages:', e);
       return () => {};
     }
   },

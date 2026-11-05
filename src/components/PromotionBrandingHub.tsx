@@ -935,8 +935,13 @@ export const PromotionBrandingHub: React.FC<PromotionBrandingHubProps> = ({
                   {/* Top Header Row */}
                   <div className="flex items-center justify-between border-b border-white/20 pb-2.5">
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-[#ffe500] text-[#2874f0] flex items-center justify-center font-black text-xs shadow-xs">
-                        ACC
+                      <div className="w-9 h-9 rounded-lg overflow-hidden p-0.5 bg-gradient-to-tr from-amber-400 via-yellow-200 to-amber-500 shadow-md shrink-0">
+                        <img
+                          src="/src/assets/images/acc_official_logo_1793842923620.jpg"
+                          alt="ACC Official Logo"
+                          className="w-full h-full object-cover rounded-md"
+                          referrerPolicy="no-referrer"
+                        />
                       </div>
                       <div>
                         <span className="font-black text-xs sm:text-sm tracking-tight text-white block leading-tight">
@@ -1095,8 +1100,13 @@ export const PromotionBrandingHub: React.FC<PromotionBrandingHubProps> = ({
                       >
                         <div className="flex items-center justify-between border-b border-white/20 pb-2.5">
                           <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg bg-[#ffe500] text-[#2874f0] flex items-center justify-center font-black text-xs">
-                              ACC
+                            <div className="w-9 h-9 rounded-lg overflow-hidden p-0.5 bg-gradient-to-tr from-amber-400 via-yellow-200 to-amber-500 shadow-md shrink-0">
+                              <img
+                                src="/src/assets/images/acc_official_logo_1793842923620.jpg"
+                                alt="ACC Official Logo"
+                                className="w-full h-full object-cover rounded-md"
+                                referrerPolicy="no-referrer"
+                              />
                             </div>
                             <div>
                               <span className="font-black text-sm tracking-tight text-white block">
@@ -1258,14 +1268,42 @@ export const PromotionBrandingHub: React.FC<PromotionBrandingHubProps> = ({
                   }`}
                   title="पोस्टर को पॉप-अप में बड़ा देखने हेतु क्लिक करें"
                 >
+                  {/* Official Background Watermark */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10 select-none z-0">
+                    <img
+                      src="/src/assets/images/acc_official_logo_1793842923620.jpg"
+                      alt="ACC Watermark"
+                      className="w-72 h-72 object-contain"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+
                   {/* Poster Header */}
-                  <div className="text-center space-y-1 border-b border-white/20 pb-3">
-                    <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest bg-yellow-400 text-slate-900 px-3 py-0.5 rounded-full inline-block">
-                      ★ भारत सरकार मान्यता प्राप्त MSME पार्टनर ★
-                    </span>
-                    <h3 className="text-base sm:text-2xl font-black text-white">
-                      ACHIEVERS CLUB COMMUNITY
-                    </h3>
+                  <div className="relative z-10 flex items-center justify-between border-b border-white/20 pb-3 gap-2">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl overflow-hidden p-0.5 bg-gradient-to-tr from-amber-400 via-yellow-200 to-amber-500 shadow-md shrink-0">
+                      <img
+                        src="/src/assets/images/acc_official_logo_1793842923620.jpg"
+                        alt="ACC Official Logo"
+                        className="w-full h-full object-cover rounded-[10px]"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                    <div className="text-center space-y-1 flex-1">
+                      <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest bg-yellow-400 text-slate-900 px-3 py-0.5 rounded-full inline-block">
+                        ★ भारत सरकार मान्यता प्राप्त MSME पार्टनर ★
+                      </span>
+                      <h3 className="text-base sm:text-2xl font-black text-white">
+                        ACHIEVERS CLUB COMMUNITY
+                      </h3>
+                    </div>
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl overflow-hidden p-0.5 bg-gradient-to-tr from-amber-400 via-yellow-200 to-amber-500 shadow-md shrink-0">
+                      <img
+                        src="/src/assets/images/acc_official_logo_1793842923620.jpg"
+                        alt="ACC Official Logo"
+                        className="w-full h-full object-cover rounded-[10px]"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
                   </div>
 
                   {/* Main Poster Content Banner */}

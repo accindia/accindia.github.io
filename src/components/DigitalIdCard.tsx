@@ -36,6 +36,7 @@ import {
   downloadPremiumIdCardBack,
   downloadBothSidesIdCard,
 } from '../utils/idCardGenerator';
+import { AvatarWith3DFrame } from './AvatarWith3DFrame';
 
 interface DigitalIdCardProps {
   member: Member;
@@ -256,9 +257,19 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
           <div className="absolute -top-16 -right-16 w-44 h-44 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-16 -left-16 w-44 h-44 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
+          {/* Official ACC Background Watermark */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.08] select-none z-0">
+            <img
+              src="/src/assets/images/acc_official_logo_1793842923620.jpg"
+              alt="ACC Security Watermark"
+              className="w-56 h-56 sm:w-64 sm:h-64 object-contain"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+
           {/* Click to Expand Floating Hint (only in inline view) */}
           {!isModalView && (
-            <div className="mb-2 flex items-center justify-between text-[10px] text-amber-300/90 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-lg backdrop-blur-xs">
+            <div className="mb-2 flex items-center justify-between text-[10px] text-amber-300/90 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-lg backdrop-blur-xs relative z-10">
               <span className="flex items-center gap-1 font-semibold">
                 <Maximize2 className="w-3 h-3 text-amber-400 shrink-0" />
                 <span>कार्ड पर क्लिक करें: <strong>फुल-स्क्रीन पॉप-अप विंडो</strong></span>
@@ -271,7 +282,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
 
           {/* Sponsor Privacy Header Notice */}
           {isSponsorOrOther && (
-            <div className="mb-2.5 p-2 bg-gradient-to-r from-amber-950/90 via-slate-900 to-amber-950/90 border border-amber-500/40 rounded-xl flex items-center justify-between text-xs gap-2">
+            <div className="mb-2.5 p-2 bg-gradient-to-r from-amber-950/90 via-slate-900 to-amber-950/90 border border-amber-500/40 rounded-xl flex items-center justify-between text-xs gap-2 relative z-10">
               <div className="flex items-center gap-1.5 min-w-0">
                 <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
                 <span className="text-[10px] sm:text-[10.5px] font-bold text-amber-300 truncate">
@@ -285,12 +296,15 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
           )}
 
           {/* Top Gold Header */}
-          <div className="relative border-b border-amber-500/30 pb-3 mb-3 flex items-center justify-between gap-2">
+          <div className="relative z-10 border-b border-amber-500/30 pb-3 mb-3 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-amber-600 via-amber-400 to-yellow-300 p-0.5 shadow-md shrink-0">
-                <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-                  <span className="font-extrabold text-amber-400 text-base sm:text-lg font-display">ACC</span>
-                </div>
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-amber-600 via-amber-400 to-yellow-300 p-0.5 shadow-md shrink-0 overflow-hidden">
+                <img
+                  src="/src/assets/images/acc_official_logo_1793842923620.jpg"
+                  alt="ACC Official Logo"
+                  className="w-full h-full object-cover rounded-[10px]"
+                  referrerPolicy="no-referrer"
+                />
               </div>
               <div className="min-w-0">
                 <h2 className="font-display font-black text-sm sm:text-base tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-yellow-300 truncate">
@@ -326,27 +340,15 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
 
           {/* Member Profile Body (Avatar + Personal Info) */}
           <div className="flex gap-3 sm:gap-4 items-center mb-3.5">
-            {/* Avatar / Photo */}
-            <div className="relative shrink-0">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 p-0.5 shadow-lg">
-                <div className="w-full h-full bg-slate-900 rounded-[10px] flex items-center justify-center overflow-hidden">
-                  {member.avatarUrl ? (
-                    <img
-                      src={member.avatarUrl}
-                      alt={member.fullName}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center text-amber-400">
-                      <User className="w-7 h-7 sm:w-8 sm:h-8 text-slate-400" />
-                      <span className="text-[7.5px] sm:text-[8px] font-bold text-amber-300 mt-0.5 font-mono-acc">
-                        ACC MEMBER
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="absolute -bottom-1 -right-1 bg-amber-500 text-slate-950 p-1 rounded-full shadow">
+            {/* Avatar / Photo with 3D Live Frame */}
+            <div className="relative shrink-0 p-1">
+              <AvatarWith3DFrame
+                avatarUrl={member.avatarUrl}
+                name={member.fullName}
+                frame={member.avatarFrame || 'royal_gold'}
+                size="md"
+              />
+              <div className="absolute -bottom-1 -right-1 bg-amber-500 text-slate-950 p-1 rounded-full shadow z-20">
                 <ShieldCheck className="w-3 h-3" />
               </div>
             </div>
@@ -551,13 +553,26 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
         id="printable-id-card-back"
         className={`relative w-full ${isModalView ? 'max-w-[460px]' : 'max-w-[430px]'} mx-auto bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 rounded-2xl border-2 border-amber-500/80 shadow-[0_0_35px_rgba(245,158,11,0.2)] overflow-hidden text-slate-100 p-3.5 sm:p-5 select-none transition-all space-y-3`}
       >
+        {/* Official ACC Background Watermark */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.06] select-none z-0">
+          <img
+            src="/src/assets/images/acc_official_logo_1793842923620.jpg"
+            alt="ACC Security Watermark"
+            className="w-56 h-56 sm:w-64 sm:h-64 object-contain"
+            referrerPolicy="no-referrer"
+          />
+        </div>
+
         {/* Top Gold Header */}
-        <div className="relative border-b border-amber-500/30 pb-2.5 flex items-center justify-between gap-2">
+        <div className="relative z-10 border-b border-amber-500/30 pb-2.5 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-600 via-amber-400 to-yellow-300 p-0.5 shadow-md shrink-0">
-              <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-                <span className="font-extrabold text-amber-400 text-base font-display">ACC</span>
-              </div>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-600 via-amber-400 to-yellow-300 p-0.5 shadow-md shrink-0 overflow-hidden">
+              <img
+                src="/src/assets/images/acc_official_logo_1793842923620.jpg"
+                alt="ACC Official Logo"
+                className="w-full h-full object-cover rounded-[10px]"
+                referrerPolicy="no-referrer"
+              />
             </div>
             <div>
               <h3 className="font-display font-black text-xs sm:text-sm tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-yellow-300">
@@ -639,9 +654,13 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
           </div>
 
           <div className="text-right shrink-0">
-            <div className="w-10 h-10 rounded-full bg-amber-500/20 border border-amber-400/40 flex flex-col items-center justify-center mx-auto mb-1 text-amber-300 font-bold">
-              <span className="text-[7px]">ACC</span>
-              <span className="text-[6.5px]">LEGAL</span>
+            <div className="w-11 h-11 rounded-full p-0.5 bg-gradient-to-tr from-amber-500 via-yellow-300 to-amber-600 shadow-md mx-auto mb-1 overflow-hidden border border-amber-300">
+              <img
+                src="/src/assets/images/acc_official_logo_1793842923620.jpg"
+                alt="Official ACC Legal Seal"
+                className="w-full h-full object-cover rounded-full"
+                referrerPolicy="no-referrer"
+              />
             </div>
             <p className="text-[7.5px] text-slate-400 font-semibold">Authorised Signatory</p>
             <p className="text-[8.5px] font-mono-acc text-amber-400 font-bold italic">

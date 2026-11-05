@@ -64,6 +64,12 @@ import {
   ChevronDown,
   AlertCircle,
   Save,
+  EyeOff,
+  MessageSquare,
+  Flame,
+  Droplets,
+  Crown,
+  Gem,
 } from 'lucide-react';
 import {
   Member,
@@ -77,10 +83,13 @@ import {
   ProfileFieldChange,
   RechargeTransaction,
   ReferralRecord,
+  AvatarFrameType,
 } from '../types';
 import { StorageService, subscribeToSync, SEED_MEMBERS } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
 import { downloadPremiumIdCard } from '../utils/idCardGenerator';
+import { PrivateChatBox } from './PrivateChatBox';
+import { AvatarWith3DFrame, AVATAR_FRAMES } from './AvatarWith3DFrame';
 
 interface AdminPanelProps {
   onRefresh: () => void;
@@ -102,8 +111,44 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   const [auditLogs, setAuditLogs] = useState<ProfileEditAuditLog[]>(() => StorageService.getAuditLogs());
   const [auditSearchQuery, setAuditSearchQuery] = useState('');
   const [selectedMemberFor360, setSelectedMemberFor360] = useState<Member | null>(null);
-  const [member360ActiveTab, setMember360ActiveTab] = useState<'profile_info' | 'audit_history' | 'financials' | 'recharges' | 'referrals' | 'withdrawals'>('profile_info');
+  const [member360ActiveTab, setMember360ActiveTab] = useState<
+    'profile_info' | 'audit_history' | 'financials' | 'recharges' | 'referrals' | 'withdrawals' | 'original_form' | 'private_chat'
+  >('profile_info');
   const [expandedMemberInline360, setExpandedMemberInline360] = useState<string | null>(null);
+
+  // Direct Profile & Password Edit State in 360 Inspector
+  const [isEditingUser360, setIsEditingUser360] = useState<boolean>(false);
+  const [showUserPasswordIn360, setShowUserPasswordIn360] = useState<boolean>(false);
+  const [userEditForm, setUserEditForm] = useState<{
+    fullName: string;
+    mobile: string;
+    email: string;
+    password: string;
+    qualification: string;
+    city: string;
+    state: string;
+    pincode: string;
+    address: string;
+    upiId: string;
+    avatarFrame: AvatarFrameType;
+  }>({
+    fullName: '',
+    mobile: '',
+    email: '',
+    password: '',
+    qualification: '',
+    city: '',
+    state: '',
+    pincode: '',
+    address: '',
+    upiId: '',
+    avatarFrame: 'none',
+  });
+  const [userEditStatus, setUserEditStatus] = useState<{ isSaving: boolean; msg: string; error: string }>({
+    isSaving: false,
+    msg: '',
+    error: '',
+  });
 
   const [members, setMembers] = useState<Member[]>(StorageService.getMembers());
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>(StorageService.getWithdrawals());
@@ -120,6 +165,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   const [showWhatsAppToggle, setShowWhatsAppToggle] = useState<boolean>(siteConfig.showWhatsAppSupport === true);
   const [showTelegramToggle, setShowTelegramToggle] = useState<boolean>(siteConfig.showTelegramSupport !== false);
   const [showEmailToggle, setShowEmailToggle] = useState<boolean>(siteConfig.showEmailSupport !== false);
+
+  // Real App APK Download & Delivery Settings
+  const [appDownloadUrlInput, setAppDownloadUrlInput] = useState(siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk');
+  const [showAppDownloadToggle, setShowAppDownloadToggle] = useState<boolean>(siteConfig.showAppDownload !== false);
+  const [appNameInput, setAppNameInput] = useState(siteConfig.appName || 'ACC Official Android APK');
+  const [appVersionInput, setAppVersionInput] = useState(siteConfig.appVersion || 'v2.4.0 (Latest)');
+  const [appFileSizeInput, setAppFileSizeInput] = useState(siteConfig.appFileSize || '18.5 MB');
+  const [autoGrantAppLinkToggle, setAutoGrantAppLinkToggle] = useState<boolean>(siteConfig.autoGrantAppLinkOnVerification !== false);
+  const [appDownloadNoticeInput, setAppDownloadNoticeInput] = useState(siteConfig.appDownloadNotice || 'केवल अधिकृत ACC वेबसाइट से ही APK डाउनलोड करें। इंस्टालेशन के समय "Install from Unknown Sources" को अनुमति दें।');
+  const [bulkGrantSuccessMsg, setBulkGrantSuccessMsg] = useState('');
 
   // Address & Legal settings form
   const [officialAddressInput, setOfficialAddressInput] = useState(siteConfig.officialAddress || 'Scheme No. 54, Vijay Nagar, Indore, Madhya Pradesh - 452001');
@@ -163,6 +218,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   const [filterSponsor, setFilterSponsor] = useState<'ALL' | 'WITH_SPONSOR' | 'COMMISSION_PENDING' | 'COMMISSION_PAID' | 'DIRECT'>('ALL');
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [actionSuccess, setActionSuccess] = useState('');
+
+  // Filtered Member Details Popup Modal State (Triggered by clicking on 4 Stats Cards)
+  const [statsPopupFilter, setStatsPopupFilter] = useState<'ALL' | VerificationStatus | null>(null);
+  const [statsPopupSearch, setStatsPopupSearch] = useState('');
 
   // Commission Payout Modal State
   const [commissionPayMember, setCommissionPayMember] = useState<Member | null>(null);
@@ -254,7 +313,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
 
   // Modal for sharing Real App Link to approved user
   const [linkModalMember, setLinkModalMember] = useState<Member | null>(null);
-  const [customAppLink, setCustomAppLink] = useState('https://achieversclub.in/download/acc-official-v2.apk');
+  const [customAppLink, setCustomAppLink] = useState(siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk');
   const [linkShareSuccess, setLinkShareSuccess] = useState('');
 
   // Change Admin Password Modal
@@ -298,7 +357,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   };
 
   // Subtab switcher for 360 inspector modal - smooth scroll to top of details
-  const handleSelect360SubTab = (tab: 'profile_info' | 'audit_history' | 'financials' | 'recharges' | 'referrals' | 'withdrawals') => {
+  const handleSelect360SubTab = (
+    tab: 'profile_info' | 'audit_history' | 'financials' | 'recharges' | 'referrals' | 'withdrawals' | 'original_form' | 'private_chat'
+  ) => {
     setMember360ActiveTab(tab);
     setTimeout(() => {
       if (modal360BodyRef.current) {
@@ -309,6 +370,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
 
   const isAnyModalOpen = Boolean(
     selectedMemberFor360 ||
+    statsPopupFilter !== null ||
     formResponseModalMember ||
     screenshotModalMember ||
     rejectionModalMember ||
@@ -347,6 +409,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   // When 360 modal opens or sub-tab changes, automatically reset modal body to top: 0
   useEffect(() => {
     if (selectedMemberFor360) {
+      setUserEditForm({
+        fullName: selectedMemberFor360.fullName || '',
+        mobile: selectedMemberFor360.mobile || '',
+        email: selectedMemberFor360.email || '',
+        password: selectedMemberFor360.password || '',
+        qualification: selectedMemberFor360.qualification || '',
+        city: selectedMemberFor360.city || '',
+        state: selectedMemberFor360.state || '',
+        pincode: selectedMemberFor360.pincode || '',
+        address: selectedMemberFor360.address || '',
+        upiId: selectedMemberFor360.payoutDetails?.upiId || '',
+        avatarFrame: selectedMemberFor360.avatarFrame || 'none',
+      });
+      setIsEditingUser360(false);
+      setShowUserPasswordIn360(false);
+      setUserEditStatus({ isSaving: false, msg: '', error: '' });
+
       const resetScroll = () => {
         if (modal360BodyRef.current) {
           modal360BodyRef.current.scrollTo({ top: 0, behavior: 'instant' });
@@ -357,6 +436,45 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
       return () => clearTimeout(timer);
     }
   }, [selectedMemberFor360, member360ActiveTab]);
+
+  const handleSaveUserEditFrom360 = async () => {
+    if (!selectedMemberFor360) return;
+    setUserEditStatus({ isSaving: true, msg: '', error: '' });
+    try {
+      const updates: Partial<Member> = {
+        fullName: userEditForm.fullName.trim(),
+        mobile: userEditForm.mobile.trim(),
+        email: userEditForm.email.trim(),
+        password: userEditForm.password.trim(),
+        qualification: userEditForm.qualification.trim(),
+        city: userEditForm.city.trim(),
+        state: userEditForm.state.trim(),
+        pincode: userEditForm.pincode.trim(),
+        address: userEditForm.address.trim(),
+        avatarFrame: userEditForm.avatarFrame,
+        payoutDetails: {
+          holderRelation: 'Self',
+          holderName: userEditForm.fullName.trim(),
+          payoutMethod: 'UPI',
+          upiId: userEditForm.upiId.trim(),
+        },
+      };
+
+      const updated = StorageService.updateMemberWithAudit(selectedMemberFor360.accId, updates, 'ADMIN');
+      await FirestoreService.updateMember(selectedMemberFor360.accId, updates);
+
+      if (updated) {
+        setSelectedMemberFor360(updated);
+        setMembers((prev) => prev.map((m) => (m.accId === updated.accId ? updated : m)));
+        setAuditLogs(StorageService.getAuditLogs());
+      }
+      setUserEditStatus({ isSaving: false, msg: '✓ प्रोफाइल व पासवर्ड सफलतापूर्वक अपडेट हो गया!', error: '' });
+      setIsEditingUser360(false);
+      setTimeout(() => setUserEditStatus({ isSaving: false, msg: '', error: '' }), 4000);
+    } catch (err: any) {
+      setUserEditStatus({ isSaving: false, msg: '', error: err?.message || 'अपडेट करने में त्रुटि हुई।' });
+    }
+  };
 
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -471,10 +589,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
 
   // Direct 1-Click Approve Member
   const handleApproveMember = (member: Member) => {
-    const defaultLink = 'https://achieversclub.in/download/acc-official-v2.apk';
+    const defaultLink = siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk';
+    const autoGrant = siteConfig.autoGrantAppLinkOnVerification !== false;
+    
     StorageService.approveMember(member.accId, defaultLink);
+    if (!autoGrant) {
+      StorageService.revokeAppLink(member.accId);
+    }
     refreshData();
-    setActionSuccess(`सदस्य ${member.fullName} (${member.accId}) का ₹249 भुगतान स्वीकृत व 🆔 सत्यापित हो गई!`);
+    setActionSuccess(`सदस्य ${member.fullName} (${member.accId}) का ₹249 भुगतान स्वीकृत व 🆔 सत्यापित हो गई! ${autoGrant ? '📱 Real App Link भी स्वतः स्वीकृत हो गया।' : ''}`);
     
     // Update active modal member if open
     if (screenshotModalMember && screenshotModalMember.accId === member.accId) {
@@ -482,7 +605,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
         ...screenshotModalMember,
         status: 'verified',
         verifiedAt: new Date().toISOString(),
-        realAppLinkApproved: true,
+        realAppLinkApproved: autoGrant,
         realAppLink: defaultLink,
       });
     }
@@ -750,6 +873,67 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
     setSiteConfig(updated);
     setActionSuccess('वेबसाइट स्क्रॉलिंग नोटिस सफलतापूर्वक अपडेट हो गया!');
     setTimeout(() => setActionSuccess(''), 3000);
+  };
+
+  const handleSaveAppDownloadSettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    const updated = StorageService.updateSiteConfig({
+      appDownloadUrl: appDownloadUrlInput.trim(),
+      showAppDownload: showAppDownloadToggle,
+      appName: appNameInput.trim(),
+      appVersion: appVersionInput.trim(),
+      appFileSize: appFileSizeInput.trim(),
+      autoGrantAppLinkOnVerification: autoGrantAppLinkToggle,
+      appDownloadNotice: appDownloadNoticeInput.trim(),
+    });
+    setSiteConfig(updated);
+    setCustomAppLink(appDownloadUrlInput.trim());
+    setActionSuccess('📱 आधिकारिक Real App APK लिंक व डिलीवरी सेटिंग्स सफलतापूर्वक सहेजी गईं!');
+    setTimeout(() => setActionSuccess(''), 3500);
+  };
+
+  const handleBulkGrantAppLink = () => {
+    const verifiedMembers = members.filter((m) => m.status === 'verified');
+    if (verifiedMembers.length === 0) {
+      alert('कोई सत्यापित (Verified) सदस्य उपलब्ध नहीं है।');
+      return;
+    }
+    const targetLink = appDownloadUrlInput.trim() || siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk';
+    const confirmed = window.confirm(
+      `क्या आप सभी ${verifiedMembers.length} सत्यापित सदस्यों को आधिकारिक Real App APK लिंक (${targetLink}) जारी/स्वीकृत करना चाहते हैं?`
+    );
+    if (!confirmed) return;
+    const count = StorageService.bulkGrantAppLinkToVerified(targetLink);
+    refreshData();
+    setBulkGrantSuccessMsg(`🎉 सभी ${count} सत्यापित सदस्यों के खाते में Real App APK लिंक सफलतापूर्वक सक्रिय हो गया!`);
+    setActionSuccess(`सभी ${count} सत्यापित सदस्यों को ऐप लिंक दिया गया!`);
+    setTimeout(() => {
+      setBulkGrantSuccessMsg('');
+      setActionSuccess('');
+    }, 4500);
+  };
+
+  const handleGrantMemberAppLink = (accId: string, customLink?: string) => {
+    const link = customLink || appDownloadUrlInput.trim() || siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk';
+    const updated = StorageService.grantAppLink(accId, link);
+    refreshData();
+    if (updated) {
+      setSelectedMember(updated);
+    }
+    setActionSuccess(`सदस्य ${accId} को Real App Link सफलतापूर्वक प्रदान किया गया!`);
+    setTimeout(() => setActionSuccess(''), 3500);
+  };
+
+  const handleRevokeMemberAppLink = (accId: string) => {
+    const confirmed = window.confirm(`क्या आप सदस्य ${accId} का Real App Link एक्सेस निष्क्रिय (Revoke) करना चाहते हैं?`);
+    if (!confirmed) return;
+    const updated = StorageService.revokeAppLink(accId);
+    refreshData();
+    if (updated) {
+      setSelectedMember(updated);
+    }
+    setActionSuccess(`सदस्य ${accId} का App Link एक्सेस रिवोक कर दिया गया।`);
+    setTimeout(() => setActionSuccess(''), 3500);
   };
 
   const handleOpenAddServiceModal = () => {
@@ -1158,51 +1342,142 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
         {adminTab === 'members' && (
         <div className="space-y-6 animate-fadeIn">
           {/* 4 Stats Cards */}
+      {/* 4 Interactive Stats Action Buttons (Click opens filtered popup list sorted by newest joining date) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-xs">
-          <span className="text-[11px] text-slate-500 block font-medium">कुल पंजीकृत सदस्य</span>
-          <span className="font-mono-acc font-black text-2xl text-slate-900">
+        {/* Card 1: Total Registered Members */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            setStatsPopupFilter('ALL');
+            setStatsPopupSearch('');
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              setStatsPopupFilter('ALL');
+              setStatsPopupSearch('');
+            }
+          }}
+          className="group text-left bg-gradient-to-b from-white via-slate-50 to-slate-100 border border-slate-300 hover:border-[#2874f0] hover:shadow-lg rounded-xl p-3.5 shadow-xs transition-all duration-200 cursor-pointer active:translate-y-0.5 relative overflow-hidden select-none"
+          title="क्लिक करें: सभी पंजीकृत सदस्यों की नवीनतम सूची देखें"
+        >
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] text-slate-600 block font-bold">कुल पंजीकृत सदस्य</span>
+            <span className="text-[10px] text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full font-bold group-hover:bg-[#2874f0] group-hover:text-white transition">
+              लिस्ट खोलें ↗
+            </span>
+          </div>
+          <span className="font-mono-acc font-black text-2xl sm:text-3xl text-slate-900 block leading-tight">
             {members.length}
           </span>
-          <span className="text-[10px] text-slate-500 block mt-0.5">
-            {members.filter((m) => m.plan === 'SWIS').length} SWIS •{' '}
-            {members.filter((m) => m.plan === 'TWIS').length} TWIS
-          </span>
+          <div className="flex items-center justify-between text-[10px] text-slate-500 mt-1">
+            <span>{members.filter((m) => m.plan === 'SWIS').length} SWIS • {members.filter((m) => m.plan === 'TWIS').length} TWIS</span>
+            <span className="text-[#2874f0] font-bold underline">सूची देखें</span>
+          </div>
         </div>
 
-        <div className="bg-white border border-amber-300 rounded-xl p-3.5 shadow-xs bg-amber-50/30">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-amber-800 font-bold block">लंबित रसीद सत्यापन</span>
-            {pendingMembers.length > 0 && (
-              <span className="animate-pulse w-2.5 h-2.5 rounded-full bg-amber-500" />
-            )}
+        {/* Card 2: Pending Receipt Verification */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            setStatsPopupFilter('pending');
+            setStatsPopupSearch('');
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              setStatsPopupFilter('pending');
+              setStatsPopupSearch('');
+            }
+          }}
+          className="group text-left bg-gradient-to-b from-amber-50 via-amber-100/60 to-yellow-100/40 border-2 border-amber-400 hover:border-amber-500 hover:shadow-lg rounded-xl p-3.5 shadow-xs transition-all duration-200 cursor-pointer active:translate-y-0.5 relative overflow-hidden select-none"
+          title="क्लिक करें: लंबित रसीद सत्यापन सदस्यों की नवीनतम सूची देखें"
+        >
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] text-amber-950 font-black flex items-center gap-1.5">
+              <span>लंबित रसीद सत्यापन</span>
+              {pendingMembers.length > 0 && (
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-600"></span>
+                </span>
+              )}
+            </span>
+            <span className="text-[10px] text-amber-950 bg-amber-200 border border-amber-400 px-2 py-0.5 rounded-full font-black group-hover:bg-amber-600 group-hover:text-white transition">
+              सत्यापित करें ↗
+            </span>
           </div>
-          <span className="font-mono-acc font-black text-2xl text-amber-700">
+          <span className="font-mono-acc font-black text-2xl sm:text-3xl text-amber-700 block leading-tight">
             {pendingMembers.length}
           </span>
-          <span className="text-[10px] text-amber-700 block mt-0.5 font-medium">
-            सत्यापन व स्क्रीनशॉट जांच की प्रतीक्षा में
-          </span>
+          <div className="flex items-center justify-between text-[10px] text-amber-800 mt-1 font-medium">
+            <span>जांच व UTR सत्यापन की प्रतीक्षा</span>
+            <span className="text-amber-900 font-black underline">तुरंत जांचें</span>
+          </div>
         </div>
 
-        <div className="bg-white border border-emerald-200 rounded-xl p-3.5 shadow-xs bg-green-50/20">
-          <span className="text-[11px] text-emerald-800 font-bold block">सत्यापित सदस्य (₹249 Paid)</span>
-          <span className="font-mono-acc font-black text-2xl text-emerald-600">
+        {/* Card 3: Verified Paid Members */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            setStatsPopupFilter('verified');
+            setStatsPopupSearch('');
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              setStatsPopupFilter('verified');
+              setStatsPopupSearch('');
+            }
+          }}
+          className="group text-left bg-gradient-to-b from-emerald-50 via-teal-50 to-green-100/40 border border-emerald-400 hover:border-emerald-600 hover:shadow-lg rounded-xl p-3.5 shadow-xs transition-all duration-200 cursor-pointer active:translate-y-0.5 relative overflow-hidden select-none"
+          title="क्लिक करें: सत्यापित (₹249 Paid) सदस्यों की नवीनतम सूची देखें"
+        >
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] text-emerald-950 font-black block">सत्यापित सदस्य (₹249 Paid)</span>
+            <span className="text-[10px] text-emerald-900 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full font-bold group-hover:bg-emerald-600 group-hover:text-white transition">
+              लिस्ट खोलें ↗
+            </span>
+          </div>
+          <span className="font-mono-acc font-black text-2xl sm:text-3xl text-emerald-600 block leading-tight">
             {verifiedMembers.length}
           </span>
-          <span className="text-[10px] text-emerald-600 block mt-0.5">
-            कुल राजस्व: ₹{totalRevenue.toLocaleString()}
-          </span>
+          <div className="flex items-center justify-between text-[10px] text-emerald-700 mt-1 font-medium">
+            <span>कुल राजस्व: ₹{totalRevenue.toLocaleString()}</span>
+            <span className="text-emerald-800 font-bold underline">सूची देखें</span>
+          </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-xs">
-          <span className="text-[11px] text-slate-500 block font-medium">अस्वीकृत आवेदन (Rejected)</span>
-          <span className="font-mono-acc font-black text-2xl text-red-600">
+        {/* Card 4: Rejected Members */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            setStatsPopupFilter('rejected');
+            setStatsPopupSearch('');
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              setStatsPopupFilter('rejected');
+              setStatsPopupSearch('');
+            }
+          }}
+          className="group text-left bg-gradient-to-b from-rose-50 via-red-50 to-pink-100/40 border border-rose-300 hover:border-red-500 hover:shadow-lg rounded-xl p-3.5 shadow-xs transition-all duration-200 cursor-pointer active:translate-y-0.5 relative overflow-hidden select-none"
+          title="क्लिक करें: अस्वीकृत (Rejected) आवेदनों की नवीनतम सूची देखें"
+        >
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] text-rose-950 font-bold block">अस्वीकृत आवेदन (Rejected)</span>
+            <span className="text-[10px] text-rose-900 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded-full font-bold group-hover:bg-rose-600 group-hover:text-white transition">
+              लिस्ट खोलें ↗
+            </span>
+          </div>
+          <span className="font-mono-acc font-black text-2xl sm:text-3xl text-red-600 block leading-tight">
             {rejectedMembers.length}
           </span>
-          <span className="text-[10px] text-slate-500 block mt-0.5">
-            गलत UTR या अधूरी रसीद
-          </span>
+          <div className="flex items-center justify-between text-[10px] text-rose-700 mt-1 font-medium">
+            <span>गलत UTR या अधूरी रसीद</span>
+            <span className="text-rose-800 font-bold underline">सूची देखें</span>
+          </div>
         </div>
       </div>
 
@@ -3366,7 +3641,203 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
         </div>
       </div>
 
-      {/* SECTION 3: ANNOUNCEMENT MARQUEE TICKER */}
+      {/* SECTION: REAL APP APK DOWNLOAD & DELIVERY SETTINGS */}
+      <div className="bg-white border-2 border-blue-200 rounded-xl p-5 sm:p-6 space-y-4 shadow-sm relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2874f0] to-[#1258c7] text-white flex items-center justify-center shadow-md shrink-0">
+              <Smartphone className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h4 className="text-sm sm:text-base font-black text-slate-900 flex items-center gap-2 flex-wrap">
+                <span>📱 आधिकारिक Real App APK लिंक व डिलीवरी सेटिंग्स</span>
+                <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                  showAppDownloadToggle ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-rose-100 text-rose-800 border border-rose-300'
+                }`}>
+                  {showAppDownloadToggle ? '● सक्रिय (Active)' : '○ निष्क्रिय (Disabled)'}
+                </span>
+              </h4>
+              <p className="text-xs text-slate-500">
+                सत्यापित सदस्यों को Real App APK लिंक जारी करने, डाउनलोड पोर्टल नियंत्रित करने और बल्क डिलीवरी की व्यवस्था
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Bulk Grant CTA */}
+          <button
+            type="button"
+            onClick={handleBulkGrantAppLink}
+            className="px-3.5 py-2 bg-gradient-to-b from-emerald-600 via-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-800 text-white font-black text-xs rounded-xl shadow-[0_3px_0_#065f46,0_6px_12px_rgba(16,185,129,0.3)] active:translate-y-0.5 active:shadow-[0_1px_0_#065f46] flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap shrink-0"
+            title="सभी वेरिफाइड यूजर्स को एक साथ ऐप लिंक असाइन करें"
+          >
+            <Send className="w-3.5 h-3.5 text-white" />
+            <span>🚀 सभी वेरिफाइड सदस्यों को लिंक दें ({members.filter(m => m.status === 'verified').length})</span>
+          </button>
+        </div>
+
+        {bulkGrantSuccessMsg && (
+          <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-900 text-xs font-bold flex items-center gap-2 shadow-xs animate-fadeIn">
+            <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{bulkGrantSuccessMsg}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSaveAppDownloadSettings} className="space-y-4">
+          {/* Primary APK Download Link URL */}
+          <div>
+            <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center justify-between">
+              <span>ऑफिशियल Real App डाउनलोड लिंक (Primary APK Download URL):</span>
+              <span className="text-[10px] text-[#2874f0] font-semibold">उपयोगकर्ता को यही लिंक मिलता है</span>
+            </label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Download className="w-3.5 h-3.5 absolute left-3 top-3 text-[#2874f0]" />
+                <input
+                  type="url"
+                  value={appDownloadUrlInput}
+                  onChange={(e) => setAppDownloadUrlInput(e.target.value)}
+                  placeholder="https://achieversclub.in/download/acc-official-v2.apk"
+                  className="w-full bg-white border border-gray-300 rounded-xl pl-8 pr-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0] font-mono-acc font-bold"
+                  required
+                />
+              </div>
+              <a
+                href={appDownloadUrlInput}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-gray-300 flex items-center gap-1 cursor-pointer shrink-0"
+                title="लिंक टेस्ट करें"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>टेस्ट करें</span>
+              </a>
+            </div>
+          </div>
+
+          {/* App Meta Details Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-800 mb-1">
+                एप्लिकेशन नाम (App Name):
+              </label>
+              <input
+                type="text"
+                value={appNameInput}
+                onChange={(e) => setAppNameInput(e.target.value)}
+                placeholder="ACC Official Android APK"
+                className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-800 mb-1">
+                वर्ज़न नंबर (Version):
+              </label>
+              <input
+                type="text"
+                value={appVersionInput}
+                onChange={(e) => setAppVersionInput(e.target.value)}
+                placeholder="v2.4.0 (Latest)"
+                className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono-acc font-bold"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-800 mb-1">
+                फ़ाइल साइज़ (File Size):
+              </label>
+              <input
+                type="text"
+                value={appFileSizeInput}
+                onChange={(e) => setAppFileSizeInput(e.target.value)}
+                placeholder="18.5 MB"
+                className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono-acc font-bold"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Feature Toggles Box */}
+          <div className="bg-[#f1f2f4] p-3.5 rounded-xl border border-gray-200 space-y-2.5 text-xs">
+            <span className="font-black text-slate-900 block text-[11px] uppercase tracking-wider">
+              ऐप लिंक ऑटोमेशन व एक्सेस कंट्रोल:
+            </span>
+
+            {/* TOGGLE 1: Show/Hide App Download System */}
+            <label className="flex items-center justify-between cursor-pointer p-2.5 rounded-lg bg-white border border-blue-200 hover:bg-blue-50/50 transition">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-md bg-[#2874f0] text-white flex items-center justify-center shrink-0">
+                  <Download className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <span className="font-bold text-slate-900 block leading-tight">
+                    ऐप डाउनलोड पोर्टल ऑन रखें (Enable App Download Portal)
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    छात्रों को डैशबोर्ड में Real App डाउनलोड का विकल्प व लिंक कार्ड दिखाई देगा
+                  </span>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={showAppDownloadToggle}
+                onChange={(e) => setShowAppDownloadToggle(e.target.checked)}
+                className="w-4 h-4 text-[#2874f0] rounded"
+              />
+            </label>
+
+            {/* TOGGLE 2: Auto Grant App Link upon Verification */}
+            <label className="flex items-center justify-between cursor-pointer p-2.5 rounded-lg bg-white border border-emerald-200 hover:bg-emerald-50/50 transition">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-md bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <span className="font-bold text-slate-900 block leading-tight">
+                    सत्यापन पर स्वतः ऐप लिंक स्वीकृत करें (Auto-grant on Verification)
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    जैसे ही आप किसी नए सदस्य का ₹249 UTR स्वीकृत करेंगे, उसे तुरंत ऐप लिंक स्वीकृत हो जाएगा
+                  </span>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={autoGrantAppLinkToggle}
+                onChange={(e) => setAutoGrantAppLinkToggle(e.target.checked)}
+                className="w-4 h-4 text-emerald-600 rounded"
+              />
+            </label>
+          </div>
+
+          {/* User Guidance / Installation Notice */}
+          <div>
+            <label className="block text-xs font-bold text-slate-800 mb-1">
+              उपयोगकर्ता के लिए ऐप डाउनलोड व इंस्टालेशन दिशानिर्देश (User Notes):
+            </label>
+            <textarea
+              rows={2}
+              value={appDownloadNoticeInput}
+              onChange={(e) => setAppDownloadNoticeInput(e.target.value)}
+              placeholder="केवल अधिकृत ACC वेबसाइट से ही APK डाउनलोड करें। इंस्टालेशन के समय 'Install from Unknown Sources' को अनुमति दें।"
+              className="w-full bg-white border border-gray-300 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0]"
+            />
+          </div>
+
+          {/* 3D Tactile Save Button */}
+          <button
+            type="submit"
+            className="w-full py-3 bg-gradient-to-b from-[#2874f0] via-[#1a65dc] to-[#0f4eb8] hover:from-[#367ff5] hover:to-[#1258c7] text-white font-black text-xs sm:text-sm rounded-xl shadow-[0_4px_0_#0a3782,0_8px_16px_rgba(40,116,240,0.35)] active:translate-y-0.5 active:shadow-[0_1px_0_#0a3782] flex items-center justify-center gap-2 transition cursor-pointer"
+          >
+            <CheckCircle2 className="w-4 h-4 text-white" />
+            <span>📱 ऐप लिंक सेटिंग्स सुरक्षित करें (Save App Link Settings)</span>
+          </button>
+        </form>
+      </div>
+
+      {/* SECTION 4: ANNOUNCEMENT MARQUEE TICKER */}
       <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3 shadow-sm">
         <div className="flex items-center justify-between border-b border-gray-100 pb-2">
           <div>
@@ -3633,6 +4104,495 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
     </div>
   )}
       </div>
+
+      {/* ========================================================================= */}
+      {/* FILTERED MEMBERS DETAILS POPUP MODAL (SORTED BY NEWEST JOINING DATE FIRST) */}
+      {/* ========================================================================= */}
+      {statsPopupFilter !== null && typeof document !== 'undefined' && createPortal(
+        (() => {
+          // 1. Filter by status (or ALL)
+          const baseList = statsPopupFilter === 'ALL'
+            ? members
+            : members.filter((m) => m.status === statsPopupFilter);
+
+          // 2. Search query within popup
+          const searchLower = statsPopupSearch.trim().toLowerCase();
+          const searchedList = searchLower
+            ? baseList.filter((m) => {
+                return (
+                  m.fullName.toLowerCase().includes(searchLower) ||
+                  m.accId.toLowerCase().includes(searchLower) ||
+                  m.mobile.includes(searchLower) ||
+                  (m.whatsapp && m.whatsapp.includes(searchLower)) ||
+                  (m.utrNumber && m.utrNumber.toLowerCase().includes(searchLower)) ||
+                  (m.sponsorId && m.sponsorId.toLowerCase().includes(searchLower)) ||
+                  (m.sponsorName && m.sponsorName.toLowerCase().includes(searchLower)) ||
+                  (m.city && m.city.toLowerCase().includes(searchLower)) ||
+                  (m.state && m.state.toLowerCase().includes(searchLower))
+                );
+              })
+            : baseList;
+
+          // 3. STRICT SORT: Newest Joining Date / Timestamp on top (Descending)
+          const sortedList = [...searchedList].sort((a, b) => {
+            const getTimestamp = (m: Member): number => {
+              if (m.createdAt) {
+                const t = new Date(m.createdAt).getTime();
+                if (!isNaN(t) && t > 0) return t;
+              }
+              if (m.paymentDate) {
+                const parts = m.paymentDate.split('-');
+                if (parts.length === 3) {
+                  // DD-MM-YYYY format
+                  const parsed = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`).getTime();
+                  if (!isNaN(parsed) && parsed > 0) return parsed;
+                }
+              }
+              return 0;
+            };
+            return getTimestamp(b) - getTimestamp(a);
+          });
+
+          // Meta config based on filter
+          const filterConfig = {
+            ALL: {
+              title: 'कुल पंजीकृत सदस्य (All Registered Members)',
+              subtitle: 'सभी पंजीकृत छात्र व सदस्य — नवीनतम जॉइनिंग क्रम में सबसे ऊपर',
+              badgeColor: 'bg-blue-600 text-white',
+              headerBg: 'from-blue-900 via-indigo-900 to-slate-900',
+              borderColor: 'border-blue-500/30',
+              accentColor: 'text-blue-400',
+            },
+            pending: {
+              title: 'लंबित रसीद सत्यापन (Pending Verification)',
+              subtitle: 'रसीद व ₹249 UTR सत्यापन की प्रतीक्षा कर रहे सदस्य — तुरंत सत्यापित करें',
+              badgeColor: 'bg-amber-500 text-slate-950 font-black',
+              headerBg: 'from-amber-950 via-yellow-950 to-slate-900',
+              borderColor: 'border-amber-500/40',
+              accentColor: 'text-amber-400',
+            },
+            verified: {
+              title: 'सत्यापित सदस्य (Verified Members - ₹249 Paid)',
+              subtitle: 'सत्यापित डिजिटल आईडी कार्ड धारक सदस्य — नवीनतम जॉइनिंग क्रम',
+              badgeColor: 'bg-emerald-600 text-white',
+              headerBg: 'from-emerald-950 via-teal-950 to-slate-900',
+              borderColor: 'border-emerald-500/30',
+              accentColor: 'text-emerald-400',
+            },
+            rejected: {
+              title: 'अस्वीकृत आवेदन (Rejected Applications)',
+              subtitle: 'अमान्य UTR या फर्जी स्क्रीनशॉट के कारण निरस्त किए गए आवेदन',
+              badgeColor: 'bg-rose-600 text-white',
+              headerBg: 'from-rose-950 via-red-950 to-slate-900',
+              borderColor: 'border-rose-500/30',
+              accentColor: 'text-rose-400',
+            },
+          }[statsPopupFilter];
+
+          const formatJoiningDate = (m: Member) => {
+            if (m.createdAt) {
+              try {
+                const d = new Date(m.createdAt);
+                if (!isNaN(d.getTime())) {
+                  return d.toLocaleString('hi-IN', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true,
+                  });
+                }
+              } catch (_) {}
+            }
+            return m.paymentDate || 'N/A';
+          };
+
+          return (
+            <div className="fixed inset-0 z-[99999] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-fadeIn">
+              <div className="bg-white border border-slate-300 rounded-2xl max-w-5xl w-full max-h-[94vh] flex flex-col shadow-2xl overflow-hidden animate-scaleUp">
+                {/* Header */}
+                <div className={`p-4 sm:p-5 bg-gradient-to-r ${filterConfig.headerBg} text-white border-b ${filterConfig.borderColor} shrink-0`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold shadow-xs ${filterConfig.badgeColor}`}>
+                          {filterConfig.title}
+                        </span>
+                        <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded font-mono-acc font-bold">
+                          {sortedList.length} सदस्य
+                        </span>
+                        <span className="text-[11px] bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                          <Flame className="w-3 h-3 text-yellow-400" />
+                          <span>नए सदस्य सबसे ऊपर (Latest First)</span>
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 max-w-2xl">{filterConfig.subtitle}</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStatsPopupFilter(null);
+                        setStatsPopupSearch('');
+                      }}
+                      className="text-slate-300 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-lg transition cursor-pointer shrink-0"
+                      title="बंद करें"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* Filter Switch Tabs & Quick Search */}
+                  <div className="mt-3.5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-3 border-t border-white/10">
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                      <button
+                        type="button"
+                        onClick={() => setStatsPopupFilter('ALL')}
+                        className={`text-xs px-3 py-1.5 rounded-lg font-bold transition whitespace-nowrap cursor-pointer ${
+                          statsPopupFilter === 'ALL'
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'bg-white/10 text-slate-200 hover:bg-white/20'
+                        }`}
+                      >
+                        सभी ({members.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStatsPopupFilter('pending')}
+                        className={`text-xs px-3 py-1.5 rounded-lg font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                          statsPopupFilter === 'pending'
+                            ? 'bg-amber-500 text-slate-950 shadow-sm'
+                            : 'bg-white/10 text-slate-200 hover:bg-white/20'
+                        }`}
+                      >
+                        लंबित ({pendingMembers.length})
+                        {pendingMembers.length > 0 && (
+                          <span className="w-2 h-2 rounded-full bg-amber-300 animate-ping"></span>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStatsPopupFilter('verified')}
+                        className={`text-xs px-3 py-1.5 rounded-lg font-bold transition whitespace-nowrap cursor-pointer ${
+                          statsPopupFilter === 'verified'
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : 'bg-white/10 text-slate-200 hover:bg-white/20'
+                        }`}
+                      >
+                        सत्यापित ({verifiedMembers.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStatsPopupFilter('rejected')}
+                        className={`text-xs px-3 py-1.5 rounded-lg font-bold transition whitespace-nowrap cursor-pointer ${
+                          statsPopupFilter === 'rejected'
+                            ? 'bg-rose-600 text-white shadow-sm'
+                            : 'bg-white/10 text-slate-200 hover:bg-white/20'
+                        }`}
+                      >
+                        अस्वीकृत ({members.filter((m) => m.status === 'rejected').length})
+                      </button>
+                    </div>
+
+                    {/* Search inside popup */}
+                    <div className="relative min-w-[200px] sm:min-w-[280px]">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={statsPopupSearch}
+                        onChange={(e) => setStatsPopupSearch(e.target.value)}
+                        placeholder="नाम, ACC ID, मोबाइल, UTR, प्रायोजक..."
+                        className="w-full pl-8 pr-7 py-1.5 bg-black/40 border border-white/20 rounded-lg text-xs text-white placeholder-slate-400 focus:outline-hidden focus:border-white focus:bg-black/60 transition"
+                      />
+                      {statsPopupSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setStatsPopupSearch('')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Member Cards List - Scrollable */}
+                <div className="flex-1 overflow-y-auto p-3 sm:p-4 bg-slate-50 space-y-3">
+                  {sortedList.length === 0 ? (
+                    <div className="text-center py-12 bg-white rounded-xl border border-dashed border-slate-300 p-8 space-y-3">
+                      <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 mx-auto flex items-center justify-center">
+                        <Users className="w-6 h-6" />
+                      </div>
+                      <h4 className="text-sm font-bold text-slate-800">कोई सदस्य नहीं मिला</h4>
+                      <p className="text-xs text-slate-500 max-w-md mx-auto">
+                        {statsPopupSearch
+                          ? `खोज "${statsPopupSearch}" के अनुसार कोई परिणाम उपलब्ध नहीं है।`
+                          : 'इस श्रेणी में वर्तमान में कोई सदस्य रिकॉर्ड मौजूद नहीं है।'}
+                      </p>
+                      {statsPopupSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setStatsPopupSearch('')}
+                          className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-1.5 rounded-lg transition cursor-pointer"
+                        >
+                          खोज फ़िल्टर साफ़ करें
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    sortedList.map((m, index) => {
+                      const isFirst = index === 0;
+                      return (
+                        <div
+                          key={m.accId}
+                          className={`bg-white rounded-xl border p-3.5 sm:p-4 shadow-xs transition-all duration-200 hover:shadow-md ${
+                            isFirst
+                              ? 'border-yellow-400 ring-2 ring-yellow-400/30 bg-gradient-to-r from-amber-50/40 via-white to-white'
+                              : m.status === 'pending'
+                              ? 'border-amber-300 hover:border-amber-400'
+                              : m.status === 'verified'
+                              ? 'border-slate-200 hover:border-emerald-300'
+                              : 'border-rose-200 hover:border-rose-300'
+                          }`}
+                        >
+                          {/* Top Row: Rank & Newest Badge, Status, Joining Time */}
+                          <div className="flex items-center justify-between gap-2 flex-wrap border-b border-slate-100 pb-2.5 mb-3">
+                            <div className="flex items-center gap-2">
+                              {/* Serial / Rank Tag */}
+                              <span
+                                className={`text-[11px] font-mono-acc font-black px-2 py-0.5 rounded ${
+                                  isFirst
+                                    ? 'bg-yellow-400 text-slate-950 shadow-xs ring-1 ring-yellow-500'
+                                    : 'bg-slate-100 text-slate-700'
+                                }`}
+                              >
+                                #{index + 1}
+                              </span>
+
+                              {isFirst && (
+                                <span className="text-[10px] bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black px-2 py-0.5 rounded-full flex items-center gap-1 shadow-xs animate-pulse">
+                                  <Sparkles className="w-3 h-3" />
+                                  <span>सबसे नया सदस्य (NEWEST JOINING)</span>
+                                </span>
+                              )}
+
+                              {/* Status Badge */}
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                                  m.status === 'verified'
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    : m.status === 'pending'
+                                    ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                    : 'bg-rose-100 text-rose-800 border border-rose-300'
+                                }`}
+                              >
+                                {m.status === 'verified' && <CheckCircle2 className="w-3 h-3 text-emerald-600" />}
+                                {m.status === 'pending' && <Clock className="w-3 h-3 text-amber-600 animate-spin" />}
+                                {m.status === 'rejected' && <XCircle className="w-3 h-3 text-rose-600" />}
+                                <span>
+                                  {m.status === 'verified'
+                                    ? 'सत्यापित (Paid)'
+                                    : m.status === 'pending'
+                                    ? 'सत्यापन लंबित'
+                                    : 'अस्वीकृत'}
+                                </span>
+                              </span>
+
+                              {/* Plan Badge */}
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                  m.plan === 'SWIS'
+                                    ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                    : 'bg-purple-100 text-purple-800 border border-purple-200'
+                                }`}
+                              >
+                                {m.plan} Plan (₹249)
+                              </span>
+                            </div>
+
+                            {/* Joining Date & Time Badge */}
+                            <div className="flex items-center gap-1.5 text-xs text-slate-600 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
+                              <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                              <span className="text-[11px] font-medium">जॉइनिंग:</span>
+                              <strong className="font-mono-acc text-[11px] text-slate-900">
+                                {formatJoiningDate(m)}
+                              </strong>
+                            </div>
+                          </div>
+
+                          {/* Member Main Row: Avatar + Info + Action Buttons */}
+                          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+                            {/* Member Profile Info */}
+                            <div className="flex items-center gap-3">
+                              <div className="shrink-0">
+                                <AvatarWith3DFrame
+                                  avatarUrl={m.avatarUrl}
+                                  name={m.fullName}
+                                  frame={m.avatarFrame || 'none'}
+                                  size="md"
+                                />
+                              </div>
+
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <strong className="text-slate-900 text-sm sm:text-base font-bold">
+                                    {m.fullName}
+                                  </strong>
+                                  <div className="flex items-center gap-1 bg-yellow-100 border border-yellow-300 text-slate-950 px-2 py-0.5 rounded text-xs font-mono-acc font-black">
+                                    <span>{m.accId}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(m.accId);
+                                        setActionSuccess(`ACC ID ${m.accId} कॉपी किया गया!`);
+                                        setTimeout(() => setActionSuccess(''), 3000);
+                                      }}
+                                      className="hover:text-blue-700 transition"
+                                      title="ACC ID कॉपी करें"
+                                    >
+                                      <Copy className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Contact & Location */}
+                                <div className="flex items-center gap-3 flex-wrap text-xs text-slate-600">
+                                  <span className="flex items-center gap-1">
+                                    <Phone className="w-3 h-3 text-slate-400" />
+                                    <span className="font-mono-acc font-bold text-slate-900">{m.mobile}</span>
+                                  </span>
+                                  {m.whatsapp && (
+                                    <a
+                                      href={`https://wa.me/91${m.whatsapp.replace(/\D/g, '')}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="flex items-center gap-1 text-emerald-700 hover:text-emerald-800 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200"
+                                      title="WhatsApp पर संदेश भेजें"
+                                    >
+                                      <MessageCircle className="w-3 h-3" />
+                                      <span>WA: {m.whatsapp}</span>
+                                    </a>
+                                  )}
+                                  <span>
+                                    📍 {m.city}, {m.state}
+                                  </span>
+                                </div>
+
+                                {/* Sponsor & UTR Details */}
+                                <div className="flex items-center gap-3 flex-wrap text-xs text-slate-600 pt-0.5">
+                                  <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
+                                    प्रायोजक:{' '}
+                                    <strong className="text-slate-900 font-bold">
+                                      {m.sponsorName ? `${m.sponsorName} (${m.sponsorId})` : 'Direct (No Sponsor)'}
+                                    </strong>
+                                  </span>
+                                  <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
+                                    UTR:{' '}
+                                    <strong className="font-mono-acc font-bold text-slate-900">
+                                      {m.utrNumber || 'N/A'}
+                                    </strong>
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-2 flex-wrap w-full md:w-auto justify-end pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
+                              {/* If Pending: Quick Approve & Reject Buttons */}
+                              {m.status === 'pending' && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleApproveMember(m)}
+                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+                                    title="रसीद स्वीकृत करें व आईडी कार्ड जारी करें"
+                                  >
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    <span>स्वीकृत करें</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenRejectModal(m)}
+                                    className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-lg text-xs font-bold flex items-center gap-1 transition cursor-pointer"
+                                    title="आवेदन अस्वीकृत करें"
+                                  >
+                                    <XCircle className="w-3.5 h-3.5" />
+                                    <span>अस्वीकृत</span>
+                                  </button>
+                                </>
+                              )}
+
+                              {/* View Receipt Screenshot */}
+                              {m.paymentScreenshotUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() => setScreenshotModalMember(m)}
+                                  className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold flex items-center gap-1 transition cursor-pointer"
+                                  title="₹249 भुगतान रसीद स्क्रीनशॉट देखें"
+                                >
+                                  <ImageIcon className="w-3.5 h-3.5" />
+                                  <span>रसीद</span>
+                                </button>
+                              )}
+
+                              {/* 360 Full Profile View */}
+                              <button
+                                type="button"
+                                onClick={() => setSelectedMemberFor360(m)}
+                                className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-300 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                                title="सदस्य का संपूर्ण 360° विवरण देखें"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>360° विवरण</span>
+                              </button>
+
+                              {/* Digital ID Card */}
+                              {m.status === 'verified' && (
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedMember(m)}
+                                  className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-xs font-bold flex items-center gap-1 transition cursor-pointer"
+                                  title="डिजिटल आईडी कार्ड देखें"
+                                >
+                                  <Award className="w-3.5 h-3.5" />
+                                  <span>ID कार्ड</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="p-3 sm:p-4 bg-slate-100 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <span>दिखाए गए सदस्य:</span>
+                    <strong className="text-slate-900 font-mono-acc font-bold">{sortedList.length}</strong>
+                    <span>/ कुल:</span>
+                    <strong className="text-slate-900 font-mono-acc font-bold">{members.length}</strong>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStatsPopupFilter(null);
+                      setStatsPopupSearch('');
+                    }}
+                    className="px-4 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-bold transition cursor-pointer"
+                  >
+                    बंद करें
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })(),
+        document.body
+      )}
 
       {/* ========================================================================= */}
       {/* SCREENSHOT PREVIEW & VERIFICATION MODAL (HIGH RESOLUTION & APPROVE/REJECT) */}
@@ -4291,27 +5251,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
               />
             </div>
 
-            <div className="text-[11px] text-slate-600 bg-slate-50 p-3 rounded-lg border border-gray-200">
-              <p className="font-semibold text-slate-800 mb-1">प्रत्यक्ष शेयर विकल्प (Direct Delivery):</p>
-              <div className="flex flex-col gap-1.5">
+            <div className="text-[11px] text-slate-600 bg-slate-50 p-3.5 rounded-xl border border-gray-200 space-y-2">
+              <p className="font-bold text-slate-800">प्रत्यक्ष शेयर विकल्प (Direct Delivery Options):</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {/* Telegram Delivery */}
                 <button
                   type="button"
                   onClick={() => {
-                    const msg = encodeURIComponent(
-                      `Namaste ${linkModalMember.fullName} ji,\n` +
-                      `Aapka Achievers Club Community (ACC) ID: ${linkModalMember.accId} verify ho chuka hai!\n` +
-                      `Aapka official Real Application Download Link ye hai:\n` +
-                      `${customAppLink}\n\n` +
-                      `Shubhkaamnaayein, Start Young Retire Young!`
+                    const text = encodeURIComponent(
+                      `नमस्ते ${linkModalMember.fullName} जी,\n` +
+                      `Achievers Club Community (ACC) में आपका 🆔 ${linkModalMember.accId} verify ho chuka hai!\n\n` +
+                      `📱 आपकी ऑफिशियल Real App डाउनलोड लिंक:\n${customAppLink}\n\n` +
+                      `Start Young, Retire Young!`
                     );
-                    window.open(`https://api.whatsapp.com/send?phone=91${linkModalMember.mobile}&text=${msg}`, '_blank');
+                    window.open(`https://t.me/share/url?url=${encodeURIComponent(customAppLink)}&text=${text}`, '_blank');
                   }}
-                  className="flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-sm font-bold text-xs transition shadow-xs"
+                  className="p-2.5 bg-gradient-to-b from-[#229ed9] to-[#0088cc] hover:from-[#2eb0ee] hover:to-[#0077b3] text-white font-black text-xs rounded-xl shadow-[0_2px_0_#005580] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer"
                 >
-                  <MessageCircle className="w-4 h-4" />
-                  <span>WhatsApp पर सीधे लिंक भेजें</span>
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Telegram पर भेजें</span>
                 </button>
 
+                {/* Email Delivery */}
                 <button
                   type="button"
                   onClick={() => {
@@ -4324,10 +5285,52 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                     );
                     window.open(`mailto:${linkModalMember.email}?subject=${subject}&body=${body}`, '_blank');
                   }}
-                  className="flex items-center gap-2 px-3 py-2 bg-[#2874f0] hover:bg-[#1258c7] text-white rounded-sm font-bold text-xs transition shadow-xs"
+                  className="p-2.5 bg-gradient-to-b from-[#2874f0] to-[#1258c7] hover:from-[#367ff5] hover:to-[#0f4eb8] text-white font-black text-xs rounded-xl shadow-[0_2px_0_#0a3782] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer"
                 >
-                  <Mail className="w-4 h-4" />
-                  <span>Email पर लिंक प्रेषित करें</span>
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>Email पर प्रेषित करें</span>
+                </button>
+
+                {/* WhatsApp Delivery (if active) */}
+                {siteConfig.showWhatsAppSupport === true && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const msg = encodeURIComponent(
+                        `Namaste ${linkModalMember.fullName} ji,\n` +
+                        `Aapka Achievers Club Community (ACC) ID: ${linkModalMember.accId} verify ho chuka hai!\n` +
+                        `Aapka official Real Application Download Link ye hai:\n` +
+                        `${customAppLink}\n\n` +
+                        `Shubhkaamnaayein, Start Young Retire Young!`
+                      );
+                      window.open(`https://api.whatsapp.com/send?phone=91${linkModalMember.whatsapp || linkModalMember.mobile}&text=${msg}`, '_blank');
+                    }}
+                    className="p-2.5 bg-gradient-to-b from-[#25D366] to-[#128C7E] hover:from-[#2be66f] hover:to-[#0f7267] text-white font-black text-xs rounded-xl shadow-[0_2px_0_#075E54] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span>WhatsApp पर भेजें</span>
+                  </button>
+                )}
+
+                {/* Copy Complete Welcome & Link Message */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const fullMsg = 
+                      `🎉 बधाई हो! Achievers Club Community (ACC) में आपका स्वागत है।\n\n` +
+                      `👤 सदस्य का नाम: ${linkModalMember.fullName}\n` +
+                      `🆔 Member ID: ${linkModalMember.accId}\n` +
+                      `📱 मोबाइल: ${linkModalMember.mobile}\n` +
+                      `💼 प्लान: ${linkModalMember.plan} System (सत्यापित)\n\n` +
+                      `📲 ऑफिशियल Real App APK डाउनलोड लिंक:\n${customAppLink}\n\n` +
+                      `Start Young, Retire Young!`;
+                    navigator.clipboard.writeText(fullMsg);
+                    alert('✅ क्रेडेंशियल्स व Real App लिंक संदेश क्लिपबोर्ड में कॉपी हो गया!');
+                  }}
+                  className="p-2.5 bg-gradient-to-b from-slate-800 to-slate-900 hover:from-slate-700 hover:to-black text-white font-black text-xs rounded-xl shadow-[0_2px_0_#0f172a] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>संदेश कॉपी करें</span>
                 </button>
               </div>
             </div>
@@ -4336,16 +5339,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
               <button
                 type="button"
                 onClick={() => setLinkModalMember(null)}
-                className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-sm border border-gray-200"
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-gray-200 transition"
               >
                 रद्द करें
               </button>
               <button
                 type="button"
                 onClick={() => handleApproveAndSendAppLink(linkModalMember)}
-                className="flex-1 py-2 bg-[#fb641b] hover:bg-[#e85a14] text-white text-xs font-bold rounded-sm shadow-sm"
+                className="flex-1 py-2.5 bg-gradient-to-b from-[#fb641b] via-[#ea580c] to-[#c2410c] hover:from-[#ff752b] hover:to-[#b03608] text-white text-xs font-black rounded-xl shadow-[0_3px_0_#7c2d12] active:translate-y-0.5 active:shadow-none transition flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                पोर्टल में लिंक सुरक्षित करें
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>पोर्टल में लिंक स्वीकृत करें</span>
               </button>
             </div>
           </div>
@@ -5934,6 +6938,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                     {withdrawals.filter((w) => (w.accId || '').toUpperCase() === (activeM?.accId || '').toUpperCase()).length}
                   </span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSelect360SubTab('original_form')}
+                  className={`shrink-0 flex items-center justify-center text-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+                    member360ActiveTab === 'original_form'
+                      ? 'bg-rose-50 text-rose-800 shadow-xs border border-rose-200 ring-1 ring-rose-300'
+                      : 'text-slate-600 hover:bg-slate-200 border border-transparent'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                  <span>7. ओरिजिनल फॉर्म</span>
+                  <span className="bg-rose-100 text-rose-800 text-[10px] px-1.5 py-0.2 rounded-full font-mono shrink-0 font-bold">
+                    पंजीकरण
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSelect360SubTab('private_chat')}
+                  className={`shrink-0 flex items-center justify-center text-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+                    member360ActiveTab === 'private_chat'
+                      ? 'bg-sky-50 text-sky-800 shadow-xs border border-sky-200 ring-1 ring-sky-300'
+                      : 'text-slate-600 hover:bg-slate-200 border border-transparent'
+                  }`}
+                >
+                  <MessageCircle className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                  <span>8. 💬 प्राइवेट चैट (Admin-User)</span>
+                  <span className="bg-sky-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-mono shrink-0 font-black animate-pulse">
+                    Live
+                  </span>
+                </button>
               </div>
 
               {/* Modal Body / Tab Content (Resets to top:0 automatically via ref) */}
@@ -5945,8 +6981,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                   <div className="bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 text-white rounded-xl p-3.5 sm:p-4 shadow-sm border border-purple-400/40 space-y-3">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-xl bg-[#ffe500] text-[#2874f0] font-black flex items-center justify-center text-sm shrink-0 shadow-sm border border-yellow-300">
-                          ACC
+                        <div className="shrink-0 p-1">
+                          <AvatarWith3DFrame
+                            avatarUrl={activeM.avatarUrl}
+                            name={activeM.fullName}
+                            frame={activeM.avatarFrame || 'none'}
+                            size="md"
+                          />
                         </div>
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
@@ -6026,6 +7067,282 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                         </strong>
                       </div>
                     </div>
+                  </div>
+
+                  {/* USER ID, PASSWORD & PROFILE MANAGEMENT (ADMIN MASTER CONTROL) */}
+                  <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-xl p-4 sm:p-5 border-2 border-indigo-500/50 shadow-md space-y-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-indigo-800/60 pb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold shadow-xs">
+                          <Key className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-black text-white flex items-center gap-2">
+                            <span>🔑 {activeM.fullName} का ID, पासवर्ड व प्रोफाइल एडिटर</span>
+                            <span className="text-[10px] bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 px-2 py-0.5 rounded-full font-bold">
+                              एडमिन मास्टर कंट्रोल
+                            </span>
+                          </h4>
+                          <p className="text-[11px] text-indigo-200">
+                            यूजर का पासवर्ड देखें, बदलें एवं प्रोफाइल की सभी जानकारियों को सीधे एडिट करें (ऑडिट हिस्ट्री में रिकॉर्ड होगा)
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingUser360(!isEditingUser360)}
+                          className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black rounded-lg text-xs shadow-sm flex items-center gap-1.5 transition cursor-pointer"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>{isEditingUser360 ? 'रद्द करें (Cancel)' : '✏️ प्रोफाइल व पासवर्ड एडिट करें'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {userEditStatus.msg && (
+                      <div className="p-3 bg-emerald-500/20 border border-emerald-400 text-emerald-200 text-xs font-bold rounded-lg flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-300 shrink-0" />
+                        <span>{userEditStatus.msg}</span>
+                      </div>
+                    )}
+
+                    {userEditStatus.error && (
+                      <div className="p-3 bg-rose-500/20 border border-rose-400 text-rose-200 text-xs font-bold rounded-lg flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-rose-300 shrink-0" />
+                        <span>{userEditStatus.error}</span>
+                      </div>
+                    )}
+
+                    {!isEditingUser360 ? (
+                      /* Readonly Credential Display with Show/Hide Password */
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                        <div className="bg-white/5 rounded-xl p-3 border border-white/10">
+                          <span className="text-[10px] text-indigo-300 block font-bold uppercase">Member ID (यूनिक 🆔)</span>
+                          <div className="flex items-center justify-between mt-1">
+                            <strong className="text-yellow-300 font-mono-acc text-sm">{activeM.accId}</strong>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(activeM.accId);
+                                alert('ID कॉपी हो गई: ' + activeM.accId);
+                              }}
+                              className="text-indigo-200 hover:text-white p-1"
+                              title="ID कॉपी करें"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="bg-white/5 rounded-xl p-3 border border-white/10">
+                          <span className="text-[10px] text-indigo-300 block font-bold uppercase">लॉगिन पासवर्ड (Password)</span>
+                          <div className="flex items-center justify-between mt-1">
+                            <strong className="text-emerald-300 font-mono-acc text-sm">
+                              {showUserPasswordIn360 ? (activeM.password || 'ACC@123') : '••••••••'}
+                            </strong>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setShowUserPasswordIn360(!showUserPasswordIn360)}
+                                className="text-indigo-200 hover:text-white p-1 cursor-pointer"
+                                title={showUserPasswordIn360 ? 'पासवर्ड छुपाएं' : 'पासवर्ड देखें'}
+                              >
+                                {showUserPasswordIn360 ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(activeM.password || 'ACC@123');
+                                  alert('पासवर्ड कॉपी हो गया!');
+                                }}
+                                className="text-indigo-200 hover:text-white p-1 cursor-pointer"
+                                title="पासवर्ड कॉपी करें"
+                              >
+                                <Copy className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="bg-white/5 rounded-xl p-3 border border-white/10">
+                          <span className="text-[10px] text-indigo-300 block font-bold uppercase">3D लाइव अवतार फ्रेम</span>
+                          <div className="flex items-center justify-between mt-1">
+                            <strong className="text-sky-300 text-xs flex items-center gap-1.5">
+                              {activeM.avatarFrame === 'fire' ? '🔥 Fire Flame' :
+                               activeM.avatarFrame === 'water' ? '💧 Water Ocean' :
+                               activeM.avatarFrame === 'work_hard' ? '⚡ Work Hard Neon' :
+                               activeM.avatarFrame === 'royal_gold' ? '👑 Royal Gold VIP' :
+                               activeM.avatarFrame === 'neon_cyber' ? '💎 Cosmic Diamond' : '⚪ Classic Clean'}
+                            </strong>
+                            <button
+                              type="button"
+                              onClick={() => setIsEditingUser360(true)}
+                              className="text-xs text-amber-300 hover:underline font-bold cursor-pointer"
+                            >
+                              बदलें
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Full Editable Form */
+                      <div className="bg-slate-950/80 rounded-xl p-4 border border-indigo-400/40 space-y-4 animate-fadeIn">
+                        <div className="border-b border-indigo-900 pb-2">
+                          <h5 className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                            <Sliders className="w-3.5 h-3.5" />
+                            <span>एडमिन त्वरित संपादन फॉर्म (Direct User Detail Editor)</span>
+                          </h5>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                          <div>
+                            <label className="text-[10px] text-slate-300 block mb-1 font-bold">पूरा नाम (Full Name):</label>
+                            <input
+                              type="text"
+                              value={userEditForm.fullName}
+                              onChange={(e) => setUserEditForm((p) => ({ ...p, fullName: e.target.value }))}
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400 font-semibold"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] text-slate-300 block mb-1 font-bold">मोबाइल नंबर (Mobile):</label>
+                            <input
+                              type="text"
+                              value={userEditForm.mobile}
+                              onChange={(e) => setUserEditForm((p) => ({ ...p, mobile: e.target.value }))}
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400 font-mono-acc font-bold"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] text-slate-300 block mb-1 font-bold">ईमेल आईडी (Email):</label>
+                            <input
+                              type="email"
+                              value={userEditForm.email}
+                              onChange={(e) => setUserEditForm((p) => ({ ...p, email: e.target.value }))}
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400 font-mono-acc"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] text-amber-300 block mb-1 font-bold flex items-center gap-1">
+                              <Key className="w-3 h-3 text-amber-400" />
+                              <span>लॉगिन पासवर्ड (Password):</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={userEditForm.password}
+                              onChange={(e) => setUserEditForm((p) => ({ ...p, password: e.target.value }))}
+                              placeholder="नया पासवर्ड दर्ज करें"
+                              className="w-full bg-slate-900 border border-amber-500/60 rounded-lg px-2.5 py-1.5 text-xs text-emerald-300 focus:outline-none focus:border-amber-400 font-mono-acc font-bold"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] text-slate-300 block mb-1 font-bold">शिक्षा / योग्यता (Qualification):</label>
+                            <input
+                              type="text"
+                              value={userEditForm.qualification}
+                              onChange={(e) => setUserEditForm((p) => ({ ...p, qualification: e.target.value }))}
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] text-slate-300 block mb-1 font-bold">पेआउट UPI ID:</label>
+                            <input
+                              type="text"
+                              value={userEditForm.upiId}
+                              onChange={(e) => setUserEditForm((p) => ({ ...p, upiId: e.target.value }))}
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-emerald-300 focus:outline-none focus:border-amber-400 font-mono-acc"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] text-slate-300 block mb-1 font-bold">शहर (City):</label>
+                            <input
+                              type="text"
+                              value={userEditForm.city}
+                              onChange={(e) => setUserEditForm((p) => ({ ...p, city: e.target.value }))}
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] text-slate-300 block mb-1 font-bold">राज्य (State):</label>
+                            <input
+                              type="text"
+                              value={userEditForm.state}
+                              onChange={(e) => setUserEditForm((p) => ({ ...p, state: e.target.value }))}
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] text-slate-300 block mb-1 font-bold">पिनकोड (Pincode):</label>
+                            <input
+                              type="text"
+                              value={userEditForm.pincode}
+                              onChange={(e) => setUserEditForm((p) => ({ ...p, pincode: e.target.value }))}
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400 font-mono-acc"
+                            />
+                          </div>
+
+                          <div className="sm:col-span-2">
+                            <label className="text-[10px] text-slate-300 block mb-1 font-bold">पूरा पता (Address):</label>
+                            <input
+                              type="text"
+                              value={userEditForm.address}
+                              onChange={(e) => setUserEditForm((p) => ({ ...p, address: e.target.value }))}
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] text-slate-300 block mb-1 font-bold">3D अवतार फ्रेम:</label>
+                            <select
+                              value={userEditForm.avatarFrame}
+                              onChange={(e) => setUserEditForm((p) => ({ ...p, avatarFrame: e.target.value as AvatarFrameType }))}
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-amber-300 focus:outline-none focus:border-amber-400 font-bold"
+                            >
+                              {AVATAR_FRAMES.map((f) => (
+                                <option key={f.id} value={f.id} className="bg-slate-900 text-white">
+                                  {f.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-indigo-900">
+                          <button
+                            type="button"
+                            onClick={() => setIsEditingUser360(false)}
+                            className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold transition cursor-pointer"
+                          >
+                            रद्द करें
+                          </button>
+                          <button
+                            type="button"
+                            disabled={userEditStatus.isSaving}
+                            onClick={handleSaveUserEditFrom360}
+                            className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-lg text-xs font-black shadow-md flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+                          >
+                            {userEditStatus.isSaving ? (
+                              <span>सहेज रहे हैं...</span>
+                            ) : (
+                              <>
+                                <Save className="w-3.5 h-3.5" />
+                                <span>💾 सभी बदलाव सुरक्षित करें (ऑडिट लॉग के साथ)</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* PLAN CHANGE & UPGRADE HUB - DEDICATED SECTION */}
@@ -6147,6 +7464,184 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                             <span>💾 {activeM.fullName} का प्लान अपडेट करें</span>
                           </>
                         )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* REAL APP LINK DELIVERY & STATUS HUB FOR THIS MEMBER */}
+                  <div className="bg-gradient-to-r from-blue-50 via-sky-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-4 sm:p-5 shadow-xs space-y-3">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-blue-200 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-[#2874f0] text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+                          <Smartphone className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs sm:text-sm font-black text-slate-900 flex items-center gap-2 flex-wrap">
+                            <span>📱 {activeM.fullName} का Real App APK लिंक व डिलीवरी हब</span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              activeM.realAppLinkApproved
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                : 'bg-amber-100 text-amber-800 border border-amber-300'
+                            }`}>
+                              {activeM.realAppLinkApproved ? '✓ लिंक सक्रिय व स्वीकृत' : '○ अप्रूव नहीं है'}
+                            </span>
+                          </h4>
+                          <p className="text-[11px] text-slate-600">
+                            इस सदस्य को आधिकारिक Real App लिंक प्रदान करें, व्यक्तिगत डिलीवरी करें या लिंक की स्थिति बदलें
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Status Badges & Quick Action */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {activeM.realAppLinkApproved ? (
+                          <button
+                            type="button"
+                            onClick={() => handleRevokeMemberAppLink(activeM.accId)}
+                            className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition cursor-pointer"
+                            title="ऐप लिंक रिवोक करें"
+                          >
+                            ❌ लिंक रिवोक करें
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleGrantMemberAppLink(activeM.accId, siteConfig.appDownloadUrl)}
+                            className="px-3.5 py-1.5 bg-gradient-to-b from-emerald-600 via-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-800 text-white rounded-lg text-xs font-black shadow-[0_2px_0_#065f46] active:translate-y-0.5 active:shadow-none transition cursor-pointer flex items-center gap-1.5"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>✓ ऐप लिंक स्वीकृत करें</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Assigned App Link Display */}
+                    <div className="bg-white p-3 rounded-lg border border-blue-200 space-y-2">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                          <Download className="w-3.5 h-3.5 text-[#2874f0]" />
+                          <span>सदस्य का अधिकृत Real App APK लिंक:</span>
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const link = activeM.realAppLink || siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk';
+                              navigator.clipboard.writeText(link);
+                              alert('Real App Link क्लिपबोर्ड में कॉपी हो गया!');
+                            }}
+                            className="text-[#2874f0] hover:underline text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <Copy className="w-3 h-3" />
+                            <span>कॉपी लिंक</span>
+                          </button>
+                          <a
+                            href={activeM.realAppLink || siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-slate-600 hover:text-slate-900 text-[11px] font-bold flex items-center gap-1"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            <span>ओपन</span>
+                          </a>
+                        </div>
+                      </div>
+                      <div className="p-2 bg-slate-50 rounded border border-gray-200 font-mono-acc text-xs text-[#2874f0] break-all font-semibold select-all">
+                        {activeM.realAppLink || siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk'}
+                      </div>
+                    </div>
+
+                    {/* Delivery Options Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 pt-1 text-xs">
+                      {/* Telegram Share */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const link = activeM.realAppLink || siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk';
+                          const text = encodeURIComponent(
+                            `नमस्ते ${activeM.fullName} जी,\n` +
+                            `Achievers Club Community (ACC) में आपका 🆔 ${activeM.accId} वेरीफाई हो गया है!\n\n` +
+                            `📱 आपकी ऑफिशियल Real App डाउनलोड लिंक:\n${link}\n\n` +
+                            `Start Young, Retire Young!`
+                          );
+                          window.open(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${text}`, '_blank');
+                        }}
+                        className="p-2.5 bg-gradient-to-b from-[#229ed9] to-[#0088cc] hover:from-[#2eb0ee] hover:to-[#0077b3] text-white font-bold rounded-xl shadow-[0_2px_0_#005580] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Telegram पर लिंक भेजें</span>
+                      </button>
+
+                      {/* Email Send */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const link = activeM.realAppLink || siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk';
+                          const subject = encodeURIComponent(`Achievers Club Community - Official Real App Download Link (${activeM.accId})`);
+                          const body = encodeURIComponent(
+                            `नमस्ते ${activeM.fullName},\n\n` +
+                            `बधाई हो! आपका Achievers Club Community (ACC) खाता सत्यापित हो गया है।\n\n` +
+                            `🆔 आपकी Member ID: ${activeM.accId}\n` +
+                            `🔑 पासवर्ड: ${activeM.password || 'आपकी गुप्त कुंजी'}\n` +
+                            `💼 प्लान: ${activeM.plan} System\n` +
+                            `📱 ऑफिशियल Real App APK डाउनलोड लिंक:\n${link}\n\n` +
+                            `किसी भी सहायता के लिए: ${siteConfig.officialEmail || 'newuserhelpline@gmail.com'}\n\n` +
+                            `शुभकामनाएँ,\nAchievers Club Community टीम`
+                          );
+                          window.open(`mailto:${activeM.email}?subject=${subject}&body=${body}`, '_blank');
+                        }}
+                        className="p-2.5 bg-gradient-to-b from-[#2874f0] to-[#1258c7] hover:from-[#367ff5] hover:to-[#0f4eb8] text-white font-bold rounded-xl shadow-[0_2px_0_#0a3782] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap"
+                      >
+                        <Mail className="w-3.5 h-3.5" />
+                        <span>ईमेल पर लिंक भेजें</span>
+                      </button>
+
+                      {/* WhatsApp (if active) */}
+                      {siteConfig.showWhatsAppSupport === true && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const link = activeM.realAppLink || siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk';
+                            const msg = encodeURIComponent(
+                              `नमस्ते ${activeM.fullName} जी,\n` +
+                              `Aapka Achievers Club Community (ACC) ID: ${activeM.accId} verify ho chuka hai!\n` +
+                              `Aapka official Real Application Download Link ye hai:\n` +
+                              `${link}\n\n` +
+                              `Shubhkaamnaayein, Start Young Retire Young!`
+                            );
+                            window.open(`https://api.whatsapp.com/send?phone=91${activeM.whatsapp || activeM.mobile}&text=${msg}`, '_blank');
+                          }}
+                          className="p-2.5 bg-gradient-to-b from-[#25D366] to-[#128C7E] hover:from-[#2be66f] hover:to-[#0f7267] text-white font-bold rounded-xl shadow-[0_2px_0_#075E54] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                          <span>WhatsApp पर भेजें</span>
+                        </button>
+                      )}
+
+                      {/* Copy Complete Welcome & App Delivery Text */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const link = activeM.realAppLink || siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk';
+                          const fullMsg = 
+                            `🎉 बधाई हो! Achievers Club Community (ACC) में आपका स्वागत है।\n\n` +
+                            `👤 सदस्य का नाम: ${activeM.fullName}\n` +
+                            `🆔 Member ID: ${activeM.accId}\n` +
+                            `📱 मोबाइल: ${activeM.mobile}\n` +
+                            `💼 प्लान: ${activeM.plan} System (सत्यापित)\n` +
+                            `🤝 स्पॉन्सर: ${activeM.sponsorName || 'कंपनी डायरेक्ट'} (${activeM.sponsorId || 'DIRECT'})\n\n` +
+                            `📲 ऑफिशियल Real App APK डाउनलोड लिंक:\n${link}\n\n` +
+                            `📧 सहायता केंद्र: ${siteConfig.officialEmail || 'newuserhelpline@gmail.com'}\n` +
+                            `✈️ टेलीग्राम हेल्प: ${siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE'}\n\n` +
+                            `Start Young, Retire Young!`;
+                          navigator.clipboard.writeText(fullMsg);
+                          alert('✅ पूर्ण वेलकम व Real App डिलीवरी संदेश क्लिपबोर्ड में कॉपी हो गया!');
+                        }}
+                        className="p-2.5 bg-gradient-to-b from-slate-800 to-slate-900 hover:from-slate-700 hover:to-black text-white font-bold rounded-xl shadow-[0_2px_0_#0f172a] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>क्रेडेंशियल्स + लिंक कॉपी</span>
                       </button>
                     </div>
                   </div>
@@ -6837,6 +8332,309 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                       </>
                     );
                   })()}
+                </div>
+              )}
+
+              {/* SUBTAB 7: ORIGINAL REGISTRATION FORM & IMMUTABLE SUBMISSION DATA */}
+              {member360ActiveTab === 'original_form' && (
+                <div className="space-y-4">
+                  {/* Header Banner */}
+                  <div className="bg-gradient-to-r from-rose-900 via-rose-950 to-slate-900 text-white rounded-xl p-4 sm:p-5 border border-rose-400/40 shadow-xs space-y-2">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-rose-800 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-rose-500 text-white flex items-center justify-center font-bold shadow-xs">
+                          <FileText className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs sm:text-sm font-black text-white flex items-center gap-2">
+                            <span>📋 {activeM.fullName} का ओरिजिनल रजिस्ट्रेशन फॉर्म रिकॉर्ड</span>
+                            <span className="text-[10px] bg-rose-500/30 text-rose-200 border border-rose-400/30 px-2 py-0.5 rounded-full font-bold">
+                              Pristine Snapshot
+                            </span>
+                          </h4>
+                          <p className="text-[11px] text-rose-200">
+                            यूजर द्वारा रजिस्ट्रेशन के समय फॉर्म में दर्ज की गई मूल प्रविष्टियां एवं भुगतान रसीद का अप्रभावित रिकॉर्ड
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[11px] font-mono-acc text-rose-200 bg-rose-950/60 px-2.5 py-1 rounded border border-rose-800">
+                        सबमिशन तारीख: {activeM.originalFormData?.registeredAt || activeM.paymentDate || activeM.createdAt?.split('T')[0] || '2026-10-08'}
+                      </span>
+                    </div>
+
+                    <div className="text-xs text-rose-200/90 leading-relaxed">
+                      💡 <strong>एडमिन नोट:</strong> यदि सदस्य ने बाद में अपना मोबाइल, पता या अन्य विवरण बदला है, तो मूल फॉर्म डेटा यहाँ कभी नहीं बदलता। इससे आप हमेशा जान सकते हैं कि उसने शुरुआती फॉर्म में क्या भरा था।
+                    </div>
+                  </div>
+
+                  {/* Original Form Data Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Original Personal & Contact Information */}
+                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs space-y-3">
+                      <h5 className="text-xs font-bold text-slate-900 flex items-center gap-1.5 border-b border-gray-200 pb-2">
+                        <Users className="w-4 h-4 text-rose-600" />
+                        <span>ओरिजिनल व्यक्तिगत व संपर्क प्रविष्टियां (Original Profile Inputs)</span>
+                      </h5>
+
+                      <div className="space-y-2 text-xs">
+                        <div className="flex justify-between items-center py-1 border-b border-gray-50">
+                          <span className="text-slate-500">1. ओरिजिनल नाम:</span>
+                          <span className="font-bold text-slate-900">
+                            {activeM.originalFormData?.fullName || activeM.fullName}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between items-center py-1 border-b border-gray-50">
+                          <span className="text-slate-500">2. ओरिजिनल मोबाइल नंबर:</span>
+                          <span className="font-mono-acc font-bold text-slate-900">
+                            {activeM.originalFormData?.mobile || activeM.mobile}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between items-center py-1 border-b border-gray-50">
+                          <span className="text-slate-500">3. ओरिजिनल ईमेल:</span>
+                          <span className="font-mono-acc text-slate-800">
+                            {activeM.originalFormData?.email || activeM.email}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between items-center py-1 border-b border-gray-50">
+                          <span className="text-slate-500">4. ओरिजिनल पासवर्ड:</span>
+                          <span className="font-mono-acc text-emerald-700 font-bold">
+                            {activeM.originalFormData?.password || activeM.password || 'ACC@123'}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between items-center py-1 border-b border-gray-50">
+                          <span className="text-slate-500">5. शिक्षा / योग्यता:</span>
+                          <span className="font-semibold text-slate-800">
+                            {activeM.originalFormData?.qualification || activeM.qualification || 'Graduate'}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between items-center py-1 border-b border-gray-50">
+                          <span className="text-slate-500">6. ओरिजिनल शहर व राज्य:</span>
+                          <span className="font-semibold text-slate-800">
+                            {activeM.originalFormData?.city || activeM.city || 'शहर'}, {activeM.originalFormData?.state || activeM.state || 'राज्य'}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between items-center py-1 border-b border-gray-50">
+                          <span className="text-slate-500">7. पिनकोड:</span>
+                          <span className="font-mono-acc text-slate-800">
+                            {activeM.originalFormData?.pincode || activeM.pincode || '452001'}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between items-start py-1">
+                          <span className="text-slate-500">8. पूरा पता:</span>
+                          <span className="font-semibold text-slate-800 text-right max-w-[220px]">
+                            {activeM.originalFormData?.address || activeM.address || 'उपलब्ध नहीं'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Original Payment, Plan & Sponsor Submission */}
+                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs space-y-3">
+                      <h5 className="text-xs font-bold text-slate-900 flex items-center gap-1.5 border-b border-gray-200 pb-2">
+                        <CreditCard className="w-4 h-4 text-emerald-600" />
+                        <span>ओरिजिनल प्लान, स्पॉन्सर व UTR प्रविष्टियां (Financial Inputs)</span>
+                      </h5>
+
+                      <div className="space-y-2 text-xs">
+                        <div className="flex justify-between items-center py-1 border-b border-gray-50">
+                          <span className="text-slate-500">9. चयनित सिस्टम प्लान:</span>
+                          <span className="font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                            {activeM.originalFormData?.plan || activeM.plan} PLAN (₹249)
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between items-center py-1 border-b border-gray-50">
+                          <span className="text-slate-500">10. दर्ज स्पॉन्सर आईडी:</span>
+                          <span className="font-mono-acc font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                            {activeM.originalFormData?.sponsorId || activeM.sponsorId || 'DIRECT'}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between items-center py-1 border-b border-gray-50">
+                          <span className="text-slate-500">11. दर्ज UTR / ट्रांजैक्शन नंबर:</span>
+                          <div className="flex items-center gap-1">
+                            <span className="font-mono-acc font-black text-slate-900 bg-yellow-50 px-2 py-0.5 rounded border border-yellow-300">
+                              {activeM.originalFormData?.utrNumber || activeM.utrNumber || 'N/A'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const utr = activeM.originalFormData?.utrNumber || activeM.utrNumber;
+                                if (utr) {
+                                  navigator.clipboard.writeText(utr);
+                                  alert('UTR कॉपी हो गया: ' + utr);
+                                }
+                              }}
+                              className="text-slate-500 hover:text-slate-900 p-0.5 cursor-pointer"
+                              title="UTR कॉपी करें"
+                            >
+                              <Copy className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Payment Screenshot Box */}
+                        <div className="pt-2">
+                          <span className="text-slate-500 block text-[11px] font-bold mb-1.5">
+                            12. ओरिजिनल पेमेंट स्क्रीनशॉट रसीद (Submitted Screenshot):
+                          </span>
+                          {(activeM.originalFormData?.screenshotUrl || activeM.screenshotUrl) ? (
+                            <div className="relative border-2 border-dashed border-gray-300 rounded-xl p-2 bg-slate-50 flex items-center justify-between gap-3">
+                              <img
+                                src={activeM.originalFormData?.screenshotUrl || activeM.screenshotUrl}
+                                alt="Payment Receipt"
+                                className="w-20 h-20 object-contain rounded-lg border border-gray-200 bg-white"
+                              />
+                              <div className="flex-1 space-y-1.5">
+                                <span className="text-[11px] font-bold text-slate-800 block">
+                                  ₹249 एक्टिवेशन रसीद
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setScreenshotModalMember(activeM);
+                                      setZoomLevel(1);
+                                    }}
+                                    className="px-2.5 py-1.5 bg-[#2874f0] hover:bg-blue-700 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-xs cursor-pointer"
+                                  >
+                                    <ZoomIn className="w-3.5 h-3.5" />
+                                    <span>ज़ूम करके देखें</span>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="p-3 bg-amber-50 text-amber-800 rounded-lg text-xs border border-amber-200">
+                              रसीद स्क्रीनशॉट उपलब्ध नहीं है (ऑफलाइन या डायरेक्ट एक्टिवेशन)।
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* COMPARATIVE AUDIT SNAPSHOT: ORIGINAL SUBMISSION VS CURRENT PROFILE */}
+                  <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs space-y-3">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-gray-200 pb-2">
+                      <h5 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                        <History className="w-4 h-4 text-purple-600" />
+                        <span>तुलनात्मक विश्लेषण: ओरिजिनल फॉर्म vs वर्तमान प्रोफाइल (What Changed Since Registration?)</span>
+                      </h5>
+                      <button
+                        type="button"
+                        onClick={() => handleSelect360SubTab('audit_history')}
+                        className="text-xs text-purple-700 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>सबटैब 2: पूर्ण टाइमस्टैम्प ऑडिट लॉग खोलें</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border border-gray-200 rounded-lg overflow-hidden">
+                        <thead className="bg-slate-50 border-b border-gray-200 text-slate-600 font-bold">
+                          <tr>
+                            <th className="py-2 px-3">फील्ड का नाम</th>
+                            <th className="py-2 px-3">ओरिजिनल फॉर्म डेटा (Registration)</th>
+                            <th className="py-2 px-3">वर्तमान प्रोफाइल डेटा (Current Profile)</th>
+                            <th className="py-2 px-3 text-center">स्थिति</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {[
+                            {
+                              label: 'पूरा नाम',
+                              orig: activeM.originalFormData?.fullName || activeM.fullName,
+                              curr: activeM.fullName,
+                            },
+                            {
+                              label: 'मोबाइल नंबर',
+                              orig: activeM.originalFormData?.mobile || activeM.mobile,
+                              curr: activeM.mobile,
+                            },
+                            {
+                              label: 'ईमेल',
+                              orig: activeM.originalFormData?.email || activeM.email,
+                              curr: activeM.email,
+                            },
+                            {
+                              label: 'सिस्टम प्लान',
+                              orig: activeM.originalFormData?.plan || activeM.plan,
+                              curr: activeM.plan,
+                            },
+                            {
+                              label: 'शहर व राज्य',
+                              orig: `${activeM.originalFormData?.city || activeM.city || ''}, ${activeM.originalFormData?.state || activeM.state || ''}`,
+                              curr: `${activeM.city || ''}, ${activeM.state || ''}`,
+                            },
+                            {
+                              label: 'पता (Address)',
+                              orig: activeM.originalFormData?.address || activeM.address || 'उपलब्ध नहीं',
+                              curr: activeM.address || 'उपलब्ध नहीं',
+                            },
+                          ].map((row, idx) => {
+                            const isDifferent = (row.orig || '').trim().toLowerCase() !== (row.curr || '').trim().toLowerCase();
+                            return (
+                              <tr key={idx} className={isDifferent ? 'bg-amber-50/50' : 'bg-white'}>
+                                <td className="py-2 px-3 font-semibold text-slate-700">{row.label}</td>
+                                <td className="py-2 px-3 font-mono-acc text-slate-600">{row.orig}</td>
+                                <td className="py-2 px-3 font-mono-acc font-bold text-slate-900">{row.curr}</td>
+                                <td className="py-2 px-3 text-center">
+                                  {isDifferent ? (
+                                    <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-300">
+                                      बदला गया (Edited)
+                                    </span>
+                                  ) : (
+                                    <span className="bg-emerald-50 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-200">
+                                      ✓ मूल समान
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* SUBTAB 8: PRIVATE 1-ON-1 CHAT WITH USER (TEXT, PHOTOS, VIDEOS, LINKS) */}
+              {member360ActiveTab === 'private_chat' && (
+                <div className="bg-white rounded-xl border border-gray-200 p-2 sm:p-4 shadow-sm space-y-3">
+                  <div className="px-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-gray-200 pb-2.5">
+                    <div>
+                      <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                        <MessageCircle className="w-4 h-4 text-[#2874f0]" />
+                        <span>💬 {activeM.fullName} ({activeM.accId}) के साथ प्राइवेट सपोर्ट चैट</span>
+                      </h4>
+                      <p className="text-xs text-slate-500">
+                        यहाँ से आप छात्र को व्यक्तिगत संदेश, वेब लिंक, फोटो और वीडियो भेज सकते हैं। यह चैट पूरी तरह निजी व सुरक्षित है।
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="font-mono-acc font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-gray-200">
+                        📱 {activeM.mobile}
+                      </span>
+                    </div>
+                  </div>
+
+                  <PrivateChatBox
+                    userAccId={activeM.accId}
+                    currentUserRole="admin"
+                    currentUserName="ACC एडमिन"
+                    currentUserAccId="ADMIN"
+                    targetMember={activeM}
+                  />
                 </div>
               )}
             </div>

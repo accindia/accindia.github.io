@@ -1,4 +1,4 @@
-import { Member, PlanType, RechargeTransaction, ReferralRecord, WithdrawalRequest, AppServiceItem, PromotionalPoster, SiteConfig, ProfileEditAuditLog } from '../types';
+import { Member, PlanType, RechargeTransaction, ReferralRecord, WithdrawalRequest, AppServiceItem, PromotionalPoster, SiteConfig, ProfileEditAuditLog, PrivateMessage, ProfileFieldChange, AvatarFrameType } from '../types';
 import { FirestoreService } from './firestore';
 
 const MEMBERS_KEY = 'acc_members_data_v2';
@@ -8,6 +8,7 @@ const WITHDRAWALS_KEY = 'acc_withdrawals_data_v2';
 const CURRENT_USER_KEY = 'acc_current_user_v2';
 const SITE_CONFIG_KEY = 'acc_site_config_v2';
 const PROFILE_AUDIT_KEY = 'acc_profile_audit_logs_v1';
+const PRIVATE_MESSAGES_KEY = 'acc_private_messages_v1';
 
 export const DEFAULT_SERVICES: AppServiceItem[] = [
   {
@@ -121,6 +122,13 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
   showTelegramSupport: true,
   showEmailSupport: true,
   showCallSupport: false,
+  appDownloadUrl: 'https://achieversclub.in/download/acc-official-v2.apk',
+  showAppDownload: true,
+  appName: 'ACC Official Android APK',
+  appVersion: 'v2.4.0 (Latest)',
+  appFileSize: '18.5 MB',
+  autoGrantAppLinkOnVerification: true,
+  appDownloadNotice: 'केवल अधिकृत ACC वेबसाइट से ही APK डाउनलोड करें। इंस्टालेशन के समय "Install from Unknown Sources" को अनुमति दें।',
   services: DEFAULT_SERVICES,
   promotionalPosters: DEFAULT_PROMOTIONAL_POSTERS,
 };
@@ -574,6 +582,76 @@ export const StorageService = {
     return members[idx];
   },
 
+  updateMemberWithAudit(accId: string, updates: Partial<Member>, editedBy: string = 'User'): Member | null {
+    const members = this.getMembers();
+    const idx = members.findIndex((m) => m.accId.toUpperCase() === accId.toUpperCase());
+    if (idx === -1) return null;
+
+    const oldMember = members[idx];
+    const changes: ProfileFieldChange[] = [];
+
+    const fieldLabels: Record<string, string> = {
+      fullName: 'पूरा नाम (Full Name)',
+      mobile: 'मोबाइल नंबर (Mobile)',
+      password: 'गोपनीय पासवर्ड (Password)',
+      email: 'ईमेल आईडी (Email)',
+      qualification: 'शिक्षा / कॉलेज (Qualification)',
+      address: 'पूरा पता (Address)',
+      city: 'शहर (City)',
+      state: 'राज्य (State)',
+      pincode: 'पिनकोड (Pincode)',
+      plan: 'प्लान सिस्टम (Plan)',
+      walletBalance: 'वॉलेट बैलेंस (Wallet Balance)',
+      totalEarnings: 'कुल आय (Total Earnings)',
+      sponsorId: 'स्पॉन्सर 🆔 (Sponsor ID)',
+      status: 'सत्यापन स्थिति (Status)',
+      avatarUrl: 'प्रोफाइल फोटो (Profile Picture)',
+      avatarFrame: '3D लाइव फ्रेम (Avatar Frame)',
+      payoutDetails: 'पेआउट UPI / बैंक (Payout Details)',
+      telegram: 'टेलीग्राम (Telegram)',
+      whatsapp: 'व्हाट्सएप (WhatsApp)',
+    };
+
+    Object.keys(updates).forEach((key) => {
+      const k = key as keyof Member;
+      if (k === 'editHistory' || k === 'lastEditedAt') return;
+
+      const oldVal = oldMember[k];
+      const newVal = updates[k];
+
+      const oldStr = typeof oldVal === 'object' ? JSON.stringify(oldVal || {}) : String(oldVal ?? '');
+      const newStr = typeof newVal === 'object' ? JSON.stringify(newVal || {}) : String(newVal ?? '');
+
+      if (oldStr !== newStr) {
+        changes.push({
+          field: String(key),
+          fieldLabel: fieldLabels[key] || String(key),
+          oldValue: oldStr.length > 120 ? oldStr.substring(0, 117) + '...' : oldStr,
+          newValue: newStr.length > 120 ? newStr.substring(0, 117) + '...' : newStr,
+        });
+      }
+    });
+
+    const now = new Date().toISOString();
+    const finalUpdates: Partial<Member> = {
+      ...updates,
+      lastEditedAt: now,
+    };
+
+    if (changes.length > 0) {
+      const logEntry: ProfileEditAuditLog = {
+        id: `audit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        accId: oldMember.accId,
+        memberName: `${oldMember.fullName} (द्वारा: ${editedBy})`,
+        timestamp: now,
+        changes,
+      };
+      this.saveAuditLog(logEntry);
+    }
+
+    return this.updateMember(accId, finalUpdates);
+  },
+
   getAuditLogs(): ProfileEditAuditLog[] {
     try {
       const data = localStorage.getItem(PROFILE_AUDIT_KEY);
@@ -587,12 +665,68 @@ export const StorageService = {
     const current = this.getAuditLogs();
     const updated = [log, ...current];
     try {
-      localStorage.setItem(PROFILE_AUDIT_KEY, JSON.stringify(updated.slice(0, 500)));
+      localStorage.setItem(PROFILE_AUDIT_KEY, JSON.stringify(updated.slice(0, 1000)));
     } catch (e) {
       console.warn('Storage audit log error:', e);
     }
     FirestoreService.saveAuditLog(log).catch((e) => console.warn('Firestore audit log error:', e));
     notifySync();
+  },
+
+  getPrivateMessages(userAccId?: string): PrivateMessage[] {
+    try {
+      const data = localStorage.getItem(PRIVATE_MESSAGES_KEY);
+      const msgs: PrivateMessage[] = data ? JSON.parse(data) : [];
+      if (userAccId) {
+        return msgs.filter((m) => (m.userAccId || '').toUpperCase() === userAccId.toUpperCase());
+      }
+      return msgs;
+    } catch {
+      return [];
+    }
+  },
+
+  sendPrivateMessage(msg: Omit<PrivateMessage, 'id' | 'timestamp'>): PrivateMessage {
+    const newMsg: PrivateMessage = {
+      ...msg,
+      id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: new Date().toISOString(),
+      isRead: false,
+    };
+    const current = this.getPrivateMessages();
+    const updated = [...current, newMsg];
+    try {
+      localStorage.setItem(PRIVATE_MESSAGES_KEY, JSON.stringify(updated.slice(-2000)));
+    } catch (e) {
+      console.warn('Storage sendPrivateMessage error:', e);
+    }
+    FirestoreService.savePrivateMessage(newMsg).catch((e) => console.warn('Firestore private msg err:', e));
+    notifySync();
+    return newMsg;
+  },
+
+  markMessagesAsRead(userAccId: string, readerRole: 'admin' | 'user'): void {
+    const current = this.getPrivateMessages();
+    let hasChanges = false;
+    const updated = current.map((m) => {
+      if (
+        (m.userAccId || '').toUpperCase() === userAccId.toUpperCase() &&
+        m.senderRole !== readerRole &&
+        !m.isRead
+      ) {
+        hasChanges = true;
+        return { ...m, isRead: true };
+      }
+      return m;
+    });
+    if (hasChanges) {
+      try {
+        localStorage.setItem(PRIVATE_MESSAGES_KEY, JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Storage markMessagesAsRead error:', e);
+      }
+      notifySync();
+    }
   },
 
   getTransactions(): RechargeTransaction[] {
@@ -881,12 +1015,54 @@ export const StorageService = {
         showTelegramSupport: parsed.showTelegramSupport !== false,
         showEmailSupport: parsed.showEmailSupport !== false,
         showCallSupport: Boolean(parsed.showCallSupport || parsed.showHelplineCallButton),
+        appDownloadUrl: parsed.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk',
+        showAppDownload: parsed.showAppDownload !== false,
+        appName: parsed.appName || 'ACC Official Android APK',
+        appVersion: parsed.appVersion || 'v2.4.0 (Latest)',
+        appFileSize: parsed.appFileSize || '18.5 MB',
+        autoGrantAppLinkOnVerification: parsed.autoGrantAppLinkOnVerification !== false,
+        appDownloadNotice: parsed.appDownloadNotice || 'केवल अधिकृत ACC वेबसाइट से ही APK डाउनलोड करें। इंस्टालेशन के समय "Install from Unknown Sources" को अनुमति दें।',
         services: Array.isArray(parsed.services) ? parsed.services : DEFAULT_SERVICES,
         promotionalPosters: Array.isArray(parsed.promotionalPosters) ? parsed.promotionalPosters : DEFAULT_PROMOTIONAL_POSTERS,
       };
     } catch {
       return DEFAULT_SITE_CONFIG;
     }
+  },
+
+  grantAppLink(accId: string, customAppLink?: string): Member | null {
+    const defaultLink = customAppLink || this.getSiteConfig().appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk';
+    const updated = this.updateMember(accId, {
+      realAppLink: defaultLink,
+      realAppLinkApproved: true,
+    });
+    return updated;
+  },
+
+  revokeAppLink(accId: string): Member | null {
+    const updated = this.updateMember(accId, {
+      realAppLinkApproved: false,
+    });
+    return updated;
+  },
+
+  bulkGrantAppLinkToVerified(appLink?: string): number {
+    const defaultLink = appLink || this.getSiteConfig().appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk';
+    const members = this.getMembers();
+    let count = 0;
+    const updated = members.map((m) => {
+      if (m.status === 'verified') {
+        count++;
+        return {
+          ...m,
+          realAppLink: m.realAppLink || defaultLink,
+          realAppLinkApproved: true,
+        };
+      }
+      return m;
+    });
+    this.saveMembers(updated);
+    return count;
   },
 
   saveSiteConfig(config: SiteConfig): void {
