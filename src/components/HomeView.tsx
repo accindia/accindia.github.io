@@ -250,6 +250,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   // 7-Slide Festive & Earning Carousel Auto-Slider State
   const [currentSlideIndex, setCurrentSlideIndex] = useState<number>(0);
   const [isSlidePaused, setIsSlidePaused] = useState<boolean>(false);
+  const [previewBannerImage, setPreviewBannerImage] = useState<string | null>(null);
 
   useEffect(() => {
     if (isSlidePaused) return;
@@ -588,22 +589,46 @@ export const HomeView: React.FC<HomeViewProps> = ({
               className={`relative z-10 bg-gradient-to-r ${slide.gradient} rounded-xl p-5 sm:p-7 md:p-8 border-2 ${slide.borderColor} shadow-2xl animate-fadeIn space-y-4`}
             >
               <div className="flex flex-col lg:flex-row items-center lg:items-start justify-between gap-5">
-                {/* Real 8K Festival Banner Image */}
+                {/* Real 8K Festival Banner Image - 100% Full Uncropped View on all screens */}
                 {slide.imageUrl && (
-                  <div className="w-full lg:w-72 xl:w-80 h-44 sm:h-48 lg:h-52 shrink-0 rounded-xl overflow-hidden border-2 border-amber-300/60 shadow-2xl relative group bg-black/40">
-                    <img
-                      src={slide.imageUrl}
-                      alt={slide.festivalName}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end justify-between p-2.5">
-                      <span className="text-[10px] font-black text-amber-300 bg-black/70 px-2 py-0.5 rounded backdrop-blur-xs flex items-center gap-1">
-                        <span>{slide.iconEmoji}</span>
-                        <span>{slide.festivalName}</span>
-                      </span>
-                      <span className="text-[9px] font-bold text-white bg-emerald-600/90 px-1.5 py-0.5 rounded">
-                        HD पोस्टर ✓
-                      </span>
+                  <div className="w-full lg:w-[380px] xl:w-[440px] shrink-0 flex flex-col gap-1.5">
+                    <div 
+                      onClick={() => setPreviewBannerImage(slide.imageUrl || null)}
+                      className="w-full aspect-[16/9] rounded-xl overflow-hidden border-2 border-amber-300/80 shadow-[0_8px_25px_rgba(0,0,0,0.5)] relative group bg-slate-950 flex items-center justify-center cursor-pointer select-none"
+                      title="क्लिक करके पूरा HD फेस्टिवल पोस्टर 100% फुल स्क्रीन में देखें"
+                    >
+                      {/* Ambient background blur to smoothly blend poster on widescreen/tall mobile */}
+                      <img
+                        src={slide.imageUrl}
+                        alt=""
+                        aria-hidden="true"
+                        className="absolute inset-0 w-full h-full object-cover blur-md opacity-35 scale-105 pointer-events-none"
+                      />
+                      {/* Crisp Foreground Poster: Complete & Uncropped View */}
+                      <img
+                        src={slide.imageUrl}
+                        alt={slide.festivalName}
+                        className="relative z-10 w-full h-full object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)] group-hover:scale-[1.02] transition-transform duration-300"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent flex items-end justify-between p-2.5 z-20 pointer-events-none">
+                        <span className="text-[10px] font-black text-amber-300 bg-black/80 px-2 py-0.5 rounded backdrop-blur-xs flex items-center gap-1 border border-amber-400/30">
+                          <span>{slide.iconEmoji}</span>
+                          <span>{slide.festivalName}</span>
+                        </span>
+                        <span className="text-[9px] font-bold text-white bg-emerald-600 px-2 py-0.5 rounded shadow-sm flex items-center gap-1">
+                          <span>🔍 100% पूरा पोस्टर</span>
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-amber-200/90 px-1 font-semibold">
+                      <span>✨ 8K HD रियल फेस्टिवल पोस्टर</span>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewBannerImage(slide.imageUrl || null)}
+                        className="text-amber-300 hover:text-white underline cursor-pointer"
+                      >
+                        फुल स्क्रीन में देखें ↗
+                      </button>
                     </div>
                   </div>
                 )}
@@ -1376,6 +1401,43 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <span className="text-slate-400">Zero Investment Work · One-Time ₹{siteConfig.activationFee || 249} Joining</span>
         </div>
       </footer>
+
+      {/* 100% Full View 8K Festival Poster Modal */}
+      {previewBannerImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/90 backdrop-blur-md animate-fadeIn"
+          onClick={() => setPreviewBannerImage(null)}
+        >
+          <div 
+            className="relative max-w-4xl w-full max-h-[92vh] flex flex-col items-center bg-slate-950 border-2 border-amber-400/90 rounded-2xl overflow-hidden shadow-2xl p-3 sm:p-5 ring-4 ring-amber-400/20"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-full flex items-center justify-between pb-3 mb-2 border-b border-white/20">
+              <span className="text-sm sm:text-base font-bold text-amber-300 flex items-center gap-2">
+                <span>🌟</span> ACC 8K HD रियल फेस्टिवल पोस्टर (100% पूरा व स्पष्ट दृश्य)
+              </span>
+              <button
+                type="button"
+                onClick={() => setPreviewBannerImage(null)}
+                className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black transition cursor-pointer shadow-md active:translate-y-0.5"
+              >
+                बंद करें [X]
+              </button>
+            </div>
+            <div className="flex-1 w-full flex items-center justify-center overflow-hidden bg-black/60 rounded-xl p-2 border border-white/10">
+              <img
+                src={previewBannerImage}
+                alt="ACC Festival Poster 100% Full View"
+                className="max-w-full max-h-[75vh] object-contain rounded-lg shadow-2xl"
+              />
+            </div>
+            <div className="w-full pt-2 flex items-center justify-between text-xs text-amber-200">
+              <span>🇮🇳 Achievers Club Community (ACC) Festival Special</span>
+              <span className="text-[11px] text-slate-400">सभी स्क्रीन पर 100% पूरा दृश्य</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

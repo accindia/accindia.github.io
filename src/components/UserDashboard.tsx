@@ -92,6 +92,7 @@ interface UserDashboardProps {
 
 export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpdateUser, onNavigateToPromotions }) => {
   const [activeTab, setActiveTab] = useState<'applink' | 'twis' | 'swis' | 'idcard' | 'kit' | 'courses' | 'profile' | 'support_chat'>('applink');
+  const [popupTabModal, setPopupTabModal] = useState<'applink' | 'twis' | 'swis' | 'idcard' | 'kit' | 'courses' | 'profile' | 'support_chat' | null>(null);
   const tabContentRef = useRef<HTMLDivElement>(null);
 
   // 3D Avatar Frame Selection Modal State
@@ -126,9 +127,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
     }
   };
 
-  // Directly navigate & smoothly scroll user straight to the target section/tab
-  const handleSelectTab = (tab: 'applink' | 'twis' | 'swis' | 'idcard' | 'kit' | 'courses' | 'profile' | 'support_chat') => {
+  // Directly navigate, pop open modal window & smoothly scroll user straight to target section/tab
+  const handleSelectTab = (tab: 'applink' | 'twis' | 'swis' | 'idcard' | 'kit' | 'courses' | 'profile' | 'support_chat', openAsPopup: boolean = true) => {
     setActiveTab(tab);
+    if (openAsPopup) {
+      setPopupTabModal(tab);
+    }
     setTimeout(() => {
       if (tabContentRef.current) {
         tabContentRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1296,29 +1300,29 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
               <button
                 type="button"
                 onClick={() => handleSelectTab('applink')}
-                className="px-2.5 py-1 bg-[#2481cc] hover:bg-[#1d6fae] text-white rounded text-[11px] font-bold border border-white/20 transition cursor-pointer shrink-0 shadow-[0_2px_0_#0f4c75] active:translate-y-0.5 active:shadow-none"
+                className="px-3 py-1 bg-[#2481cc] hover:bg-[#1d6fae] text-white rounded-lg text-[11px] font-bold border border-white/20 transition cursor-pointer shrink-0 shadow-[0_2px_0_#0f4c75] active:translate-y-0.5 active:shadow-none"
               >
-                ऐप लिंक
+                App Link
               </button>
             </div>
 
-            {/* Quick 3D Action Buttons Bar */}
+            {/* Quick 3D Action Buttons Bar with English Labels & Live Count */}
             <div className="flex items-center gap-1.5 flex-wrap">
               {/* 3D Notification Alert Button with Exact Message Count */}
               <button
                 type="button"
                 onClick={() => setShowNotificationModal(true)}
                 className="relative flex-1 sm:flex-none px-3.5 py-1.5 bg-gradient-to-b from-[#e11d48] via-[#be123c] to-[#9f1239] hover:from-[#f43f5e] hover:to-[#be123c] text-white rounded-lg text-[11px] font-black shadow-[0_2.5px_0_#4c0519] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap border border-white/20"
-                title="एडमिन संदेश व लाइव सूचनाएं"
+                title="Admin Messages & Live Notifications"
               >
                 <Bell className={`w-3.5 h-3.5 ${unreadAdminCount > 0 ? 'animate-bounce text-amber-300' : 'text-white'}`} />
-                <span>सूचनाएं</span>
+                <span>Notifications</span>
                 <span className={`font-black text-[10px] px-2 py-0.2 rounded-full shadow-xs ${
                   unreadAdminCount > 0
                     ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-300 animate-pulse'
                     : 'bg-emerald-950/80 text-emerald-300 border border-emerald-400/50'
                 }`}>
-                  {unreadAdminCount > 0 ? `${unreadAdminCount} नए सन्देश` : '0 नए'}
+                  {unreadAdminCount > 0 ? `${unreadAdminCount} New` : '0 New'}
                 </span>
               </button>
 
@@ -1329,27 +1333,37 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                   setShowFrameModal(true);
                 }}
                 className="flex-1 sm:flex-none px-3 py-1.5 bg-gradient-to-b from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-lg text-[11px] font-black shadow-[0_2.5px_0_#9a3412] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1 transition cursor-pointer whitespace-nowrap border border-white/20"
+                title="Customize 3D Live Profile Frame"
               >
                 <Sparkles className="w-3.5 h-3.5 text-slate-950" />
-                <span>3D फ्रेम</span>
+                <span>3D Frames</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleSelectTab('support_chat')}
-                className="flex-1 sm:flex-none px-3 py-1.5 bg-gradient-to-b from-[#229ed9] to-[#0088cc] hover:from-[#2eb0ee] hover:to-[#0077b3] text-white rounded-lg text-[11px] font-black shadow-[0_2.5px_0_#005580] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1 transition cursor-pointer whitespace-nowrap border border-white/20"
+                className="flex-1 sm:flex-none px-3 py-1.5 bg-gradient-to-b from-[#229ed9] to-[#0088cc] hover:from-[#2eb0ee] hover:to-[#0077b3] text-white rounded-lg text-[11px] font-black shadow-[0_2.5px_0_#005580] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap border border-white/20"
+                title="Admin Support Chat Desk"
               >
                 <MessageCircle className="w-3.5 h-3.5" />
-                <span>💬 चैट</span>
+                <span>Support Chat</span>
+                <span className={`font-black text-[10px] px-1.5 py-0.2 rounded-full shadow-xs ${
+                  unreadAdminCount > 0
+                    ? 'bg-amber-300 text-slate-950 ring-2 ring-amber-400 animate-pulse'
+                    : 'bg-sky-950/80 text-sky-200 border border-sky-400/50'
+                }`}>
+                  {unreadAdminCount}
+                </span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleSelectTab('idcard')}
                 className="flex-1 sm:flex-none px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-[11px] font-bold border border-white/20 shadow-[0_2px_0_#1e293b] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1 transition cursor-pointer whitespace-nowrap"
+                title="View & Download Digital ID Card"
               >
                 <CreditCard className="w-3.5 h-3.5 text-amber-400" />
-                <span>🪪 ID</span>
+                <span>Digital ID</span>
               </button>
             </div>
           </div>
@@ -1490,20 +1504,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
             </span>
           </div>
           <span className="text-[10px] sm:text-[11px] text-[#2874f0] font-bold bg-blue-50 px-2 sm:px-2.5 py-0.5 rounded-full border border-blue-200">
-            {activeTab === 'applink' && '📱 Real App APK'}
-            {activeTab === 'kit' && '📚 किट व ट्रेनिंग'}
-            {activeTab === 'twis' && '👥 TWIS रेफरल (₹150)'}
-            {activeTab === 'swis' && '⚡ SWIS रिचार्ज (3.30%)'}
-            {activeTab === 'idcard' && '🪪 डिजिटल ID कार्ड'}
-            {activeTab === 'profile' && '✏️ प्रोफाइल एडिट'}
-            {activeTab === 'support_chat' && '💬 एडमिन हेल्पडेस्क चैट'}
-            {activeTab === 'courses' && '🎓 स्टूडेंट अकेडमी'}
+            {activeTab === 'applink' && '📱 Official App (APK)'}
+            {activeTab === 'kit' && '📚 Training Kit'}
+            {activeTab === 'twis' && '👥 TWIS Referral (₹150)'}
+            {activeTab === 'swis' && '⚡ SWIS Recharge (3.3%)'}
+            {activeTab === 'idcard' && '🪪 Digital ID Card'}
+            {activeTab === 'profile' && '✏️ Edit Profile'}
+            {activeTab === 'support_chat' && '💬 Support Chat Desk'}
+            {activeTab === 'courses' && '🎓 Student Academy'}
           </span>
         </div>
 
-        {/* 8 Complete 3D Tactile Buttons Grid: Symmetrical on Mobile (4x2 on tablet, 8x1 on desktop) */}
+        {/* 8 Complete 3D Tactile Buttons Grid with English Names & Live Message Count */}
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 bg-slate-100/80 p-2 rounded-xl w-full max-w-full">
-          {/* Button 1: Real App */}
+          {/* Button 1: Official App */}
           <button
             type="button"
             onClick={() => handleSelectTab('applink')}
@@ -1512,9 +1526,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                 ? 'bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white shadow-[0_3px_0_#093b8f] ring-2 ring-[#2874f0]/50 translate-y-0.5'
                 : 'bg-white text-slate-800 hover:text-[#2874f0] hover:bg-blue-50 border border-blue-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
+            title="Official App Delivery Portal (Pop-up Window)"
           >
             <Smartphone className={`w-4 h-4 shrink-0 ${activeTab === 'applink' ? 'text-white' : 'text-[#2874f0]'}`} />
-            <span className="truncate">Real App</span>
+            <span className="truncate">Official App</span>
           </button>
 
           {/* Button 2: TWIS */}
@@ -1526,6 +1541,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                 ? 'bg-gradient-to-b from-indigo-600 to-indigo-800 text-white shadow-[0_3px_0_#312e81] ring-2 ring-indigo-500/50 translate-y-0.5'
                 : 'bg-white text-slate-800 hover:text-indigo-600 hover:bg-indigo-50 border border-indigo-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
+            title="TWIS Referral System ₹150 (Pop-up Window)"
           >
             <Users className={`w-4 h-4 shrink-0 ${activeTab === 'twis' ? 'text-white' : 'text-indigo-600'}`} />
             <span className="truncate">TWIS (₹150)</span>
@@ -1540,6 +1556,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                 ? 'bg-gradient-to-b from-emerald-600 to-emerald-800 text-white shadow-[0_3px_0_#064e3b] ring-2 ring-emerald-500/50 translate-y-0.5'
                 : 'bg-white text-slate-800 hover:text-emerald-700 hover:bg-emerald-50 border border-emerald-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
+            title="SWIS Recharge Cashback 3.3% (Pop-up Window)"
           >
             <Zap className={`w-4 h-4 shrink-0 ${activeTab === 'swis' ? 'text-white' : 'text-emerald-600'}`} />
             <span className="truncate">SWIS (3.3%)</span>
@@ -1554,12 +1571,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                 ? 'bg-gradient-to-b from-amber-500 to-amber-700 text-slate-950 shadow-[0_3px_0_#78350f] ring-2 ring-amber-400/50 translate-y-0.5'
                 : 'bg-white text-slate-800 hover:text-amber-800 hover:bg-amber-50 border border-amber-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
+            title="Digital ID Card (Pop-up Window)"
           >
             <CreditCard className={`w-4 h-4 shrink-0 ${activeTab === 'idcard' ? 'text-slate-950' : 'text-amber-600'}`} />
-            <span className="truncate">डिजिटल ID</span>
+            <span className="truncate">Digital ID</span>
           </button>
 
-          {/* Button 5: Profile */}
+          {/* Button 5: Edit Profile */}
           <button
             type="button"
             onClick={() => handleSelectTab('profile')}
@@ -1568,12 +1586,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                 ? 'bg-gradient-to-b from-[#fb641b] to-[#c2410c] text-white shadow-[0_3px_0_#7c2d12] ring-2 ring-[#fb641b]/50 translate-y-0.5'
                 : 'bg-white text-slate-800 hover:text-[#fb641b] hover:bg-orange-50 border border-orange-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
+            title="Edit Profile & Account Settings (Pop-up Window)"
           >
             <Edit3 className={`w-4 h-4 shrink-0 ${activeTab === 'profile' ? 'text-white' : 'text-[#fb641b]'}`} />
-            <span className="truncate">✏️ प्रोफाइल</span>
+            <span className="truncate">Edit Profile</span>
           </button>
 
-          {/* Button 6: Admin Chat */}
+          {/* Button 6: Support Chat with Live Message Count */}
           <button
             type="button"
             onClick={() => handleSelectTab('support_chat')}
@@ -1582,12 +1601,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                 ? 'bg-gradient-to-b from-[#229ed9] to-[#0077b3] text-white shadow-[0_3px_0_#004d73] ring-2 ring-[#229ed9]/50 translate-y-0.5'
                 : 'bg-white text-slate-800 hover:text-[#229ed9] hover:bg-sky-50 border border-sky-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
+            title="Admin Support Chat Desk (Pop-up Window)"
           >
             <MessageCircle className={`w-4 h-4 shrink-0 ${activeTab === 'support_chat' ? 'text-white' : 'text-[#229ed9]'}`} />
-            <span className="truncate">💬 एडमिन चैट</span>
+            <span className="truncate">Support Chat</span>
+            <span className={`ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-black shadow-xs ${
+              unreadAdminCount > 0
+                ? 'bg-rose-500 text-white ring-1 ring-white/50 animate-pulse'
+                : 'bg-slate-200 text-slate-700'
+            }`}>
+              {unreadAdminCount}
+            </span>
           </button>
 
-          {/* Button 7: Kit */}
+          {/* Button 7: Training Kit */}
           <button
             type="button"
             onClick={() => handleSelectTab('kit')}
@@ -1596,12 +1623,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                 ? 'bg-gradient-to-b from-teal-600 to-teal-800 text-white shadow-[0_3px_0_#134e4a] ring-2 ring-teal-500/50 translate-y-0.5'
                 : 'bg-white text-slate-800 hover:text-teal-700 hover:bg-teal-50 border border-teal-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
+            title="Training Kit & Materials (Pop-up Window)"
           >
             <BookOpen className={`w-4 h-4 shrink-0 ${activeTab === 'kit' ? 'text-white' : 'text-teal-600'}`} />
-            <span className="truncate">📚 किट</span>
+            <span className="truncate">Training Kit</span>
           </button>
 
-          {/* Button 8: Academy */}
+          {/* Button 8: Student Academy */}
           <button
             type="button"
             onClick={() => handleSelectTab('courses')}
@@ -1610,9 +1638,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                 ? 'bg-gradient-to-b from-purple-600 to-purple-800 text-white shadow-[0_3px_0_#581c87] ring-2 ring-purple-500/50 translate-y-0.5'
                 : 'bg-white text-slate-800 hover:text-purple-700 hover:bg-purple-50 border border-purple-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
+            title="Student Academy & Certification (Pop-up Window)"
           >
             <GraduationCap className={`w-4 h-4 shrink-0 ${activeTab === 'courses' ? 'text-white' : 'text-purple-600'}`} />
-            <span className="truncate">🎓 अकेडमी</span>
+            <span className="truncate">Student Academy</span>
           </button>
         </div>
       </div>

@@ -430,6 +430,21 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
 
+            {/* 3D Control Panel Login Button for Admin */}
+            <button
+              type="button"
+              onClick={() => setActiveWindow('admin')}
+              className="group relative flex items-center gap-1 sm:gap-1.5 bg-gradient-to-b from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 px-2 sm:px-2.5 md:px-3 py-1 sm:py-1.5 rounded-xl font-black text-[10px] sm:text-xs shadow-[0_3px_8px_rgba(217,119,6,0.4),inset_0_1.5px_1px_rgba(255,255,255,0.9)] border border-amber-200 active:translate-y-0.5 transition cursor-pointer shrink-0 select-none"
+              title="Admin Control Panel Login"
+            >
+              <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-lg bg-slate-950 text-amber-300 flex items-center justify-center shadow-inner shrink-0 border border-amber-300/60">
+                <ShieldCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-300" />
+              </div>
+              <span className="whitespace-nowrap leading-none font-display font-black tracking-tight">
+                Control Panel Login
+              </span>
+            </button>
+
             {/* 3D Mobile Menu Toggle Button */}
             <button
               type="button"
@@ -653,6 +668,29 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <span className="text-slate-500 text-[11px] font-semibold">{currentDate}</span>
           </div>
+
+          {/* 3D Control Panel Login for Admin on Mobile */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveWindow('admin');
+              setMobileMenuOpen(false);
+            }}
+            className="w-full p-2.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs shadow-[0_3px_8px_rgba(217,119,6,0.4),inset_0_1.5px_1px_rgba(255,255,255,0.9)] border border-amber-200 active:translate-y-0.5 transition cursor-pointer flex items-center justify-between"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-slate-950 text-amber-300 flex items-center justify-center shadow-inner border border-amber-300/60 shrink-0">
+                <ShieldCheck className="w-4 h-4 text-amber-300" />
+              </div>
+              <div className="text-left">
+                <span className="block font-display font-black text-xs tracking-tight">Control Panel Login</span>
+                <span className="block text-[10px] text-slate-800 font-semibold">एडमिनिस्ट्रेटर डैशबोर्ड व नियंत्रण</span>
+              </div>
+            </div>
+            <span className="text-[10px] font-black bg-slate-950 text-amber-300 px-2 py-0.5 rounded-md border border-amber-300/40">
+              Admin ↗
+            </span>
+          </button>
 
           {/* Navigation Items 2-Column Grid with 3D Icons & Multi-Line Text Boxes */}
           <div className="grid grid-cols-2 gap-2 pt-1">
