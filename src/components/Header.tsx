@@ -318,11 +318,16 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Official 3D ACC Emblem Logo (Frameless, Complete & No Side Cut) */}
             <AccLogo size="custom" className="w-8 h-8 sm:w-10 sm:h-10 group-hover:scale-105 active:translate-y-0.5" />
             <div className="flex flex-col min-w-0 justify-center">
-              <span className="font-display font-black text-xs sm:text-base md:text-lg tracking-tight text-white leading-tight truncate drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]">
-                Achievers Club
-              </span>
+              <div className="flex items-center gap-1 sm:gap-1.5">
+                <span className="font-display font-black text-xs sm:text-base md:text-lg tracking-tight text-white leading-tight truncate drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]">
+                  Achievers Club
+                </span>
+                <span className="bg-gradient-to-r from-orange-500 via-white to-emerald-500 text-slate-950 font-black text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-0.5 border border-white/60">
+                  <span className="text-[9px]">🇮🇳</span> INDIA
+                </span>
+              </div>
               <span className="text-[9.5px] sm:text-[11px] text-[#ffe500] italic font-bold flex items-center gap-1 leading-none mt-0.5 truncate">
-                <span>Community</span>
+                <span>Community (ACC)</span>
                 <span className="hidden sm:inline text-[9px] text-blue-100 font-normal not-italic">· Start Young</span>
               </span>
             </div>
@@ -397,30 +402,30 @@ export const Header: React.FC<HeaderProps> = ({
             ) : (
               /* LOGGED OUT ACTIONS: 3D LOGIN & 3D REGISTER (ZERO TEXT CUTOFF) */
               <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                {/* 3D Login Button */}
+                {/* 3D Premium Login Button */}
                 <button
                   type="button"
                   onClick={() => setActiveWindow('login')}
-                  className="group relative flex items-center gap-1 sm:gap-1.5 bg-gradient-to-b from-white via-slate-50 to-slate-100 text-[#2874f0] hover:text-[#1258c7] px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl font-black text-[11px] sm:text-xs shadow-[0_3px_8px_rgba(0,0,0,0.2),inset_0_1.5px_1px_rgba(255,255,255,1)] border border-slate-200 active:translate-y-0.5 transition cursor-pointer shrink-0"
+                  className="group relative flex items-center gap-1 sm:gap-1.5 btn-premium-login text-white px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl font-black text-[11px] sm:text-xs shadow-[0_3px_12px_rgba(37,99,235,0.4),0_1px_3px_rgba(0,0,0,0.2)] active:translate-y-0.5 transition cursor-pointer shrink-0 border-t border-white/40 select-none"
                   title="विद्यार्थी लॉगिन करें"
                 >
-                  <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-lg bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white flex items-center justify-center shadow-[0_2px_4px_rgba(40,116,240,0.35),inset_0_1px_0.5px_rgba(255,255,255,0.6)] shrink-0">
+                  <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-lg bg-white/20 border border-white/30 text-cyan-200 flex items-center justify-center shadow-inner shrink-0">
                     <LogIn className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   </div>
-                  <span className="whitespace-nowrap leading-none">लॉगिन</span>
+                  <span className="whitespace-nowrap leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">लॉगिन</span>
                 </button>
 
-                {/* 3D Register Button */}
+                {/* 3D Register Button with Rainbow Theme */}
                 <button
                   type="button"
                   onClick={() => setActiveWindow('register')}
-                  className="group relative flex items-center gap-1 sm:gap-1.5 bg-gradient-to-b from-[#fb641b] via-[#ea580c] to-[#c2410c] text-white hover:from-[#ea580c] hover:to-[#9a3412] px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl font-black text-[11px] sm:text-xs shadow-[0_3px_10px_rgba(251,100,27,0.4),inset_0_1.5px_1px_rgba(255,255,255,0.5)] border border-amber-300/40 active:translate-y-0.5 transition cursor-pointer shrink-0"
+                  className="group relative flex items-center gap-1 sm:gap-1.5 btn-rainbow-theme btn-rainbow-sheen text-white px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl font-black text-[11px] sm:text-xs shadow-[0_3px_12px_rgba(255,0,122,0.35)] active:translate-y-0.5 transition cursor-pointer shrink-0 border-t border-white/50 select-none"
                   title="कंपनी डायरेक्ट ₹249 में रजिस्ट्रेशन करें"
                 >
-                  <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-lg bg-gradient-to-b from-yellow-300 to-amber-400 text-slate-950 flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.25),inset_0_1px_0.5px_rgba(255,255,255,0.8)] shrink-0">
+                  <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-lg bg-white/25 border border-white/40 text-yellow-300 flex items-center justify-center shadow-inner shrink-0">
                     <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-pulse" />
                   </div>
-                  <span className="whitespace-nowrap leading-none">रजिस्टर ₹249</span>
+                  <span className="whitespace-nowrap leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">रजिस्टर ₹249</span>
                 </button>
               </div>
             )}
@@ -606,34 +611,34 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-2 pb-2 border-b border-gray-100">
-              {/* 3D Mobile Login */}
+              {/* 3D Mobile Premium Login */}
               <button
                 type="button"
                 onClick={() => {
                   setActiveWindow('login');
                   setMobileMenuOpen(false);
                 }}
-                className="group py-2.5 px-3 bg-gradient-to-b from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-[#2874f0] font-black text-xs rounded-xl border border-blue-300 shadow-[0_3px_6px_rgba(40,116,240,0.15),inset_0_1px_0_rgba(255,255,255,0.8)] active:translate-y-0.5 flex items-center justify-center gap-2 cursor-pointer"
+                className="group py-2.5 px-3 btn-premium-login text-white font-black text-xs rounded-xl shadow-[0_4px_14px_rgba(37,99,235,0.35)] active:translate-y-0.5 flex items-center justify-center gap-2 cursor-pointer border-t border-white/40 select-none"
               >
-                <div className="w-6 h-6 rounded-lg bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white flex items-center justify-center shadow-[0_2px_4px_rgba(40,116,240,0.35),inset_0_1px_0.5px_rgba(255,255,255,0.5)] shrink-0">
+                <div className="w-6 h-6 rounded-lg bg-white/20 border border-white/30 text-cyan-200 flex items-center justify-center shadow-inner shrink-0">
                   <LogIn className="w-3.5 h-3.5" />
                 </div>
-                <span className="leading-none">विद्यार्थी लॉगिन</span>
+                <span className="leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">विद्यार्थी लॉगिन</span>
               </button>
 
-              {/* 3D Mobile Register */}
+              {/* 3D Mobile Register with Rainbow Theme */}
               <button
                 type="button"
                 onClick={() => {
                   setActiveWindow('register');
                   setMobileMenuOpen(false);
                 }}
-                className="group py-2.5 px-3 bg-gradient-to-b from-[#fb641b] via-[#ea580c] to-[#c2410c] hover:from-[#ea580c] hover:to-[#9a3412] text-white font-black text-xs rounded-xl shadow-[0_3px_10px_rgba(251,100,27,0.35),inset_0_1.5px_1px_rgba(255,255,255,0.5)] active:translate-y-0.5 flex items-center justify-center gap-2 cursor-pointer"
+                className="group py-2.5 px-3 btn-rainbow-theme btn-rainbow-sheen text-white font-black text-xs rounded-xl shadow-[0_4px_14px_rgba(255,0,122,0.35)] active:translate-y-0.5 flex items-center justify-center gap-2 cursor-pointer border-t border-white/40 select-none"
               >
-                <div className="w-6 h-6 rounded-lg bg-gradient-to-b from-yellow-300 to-amber-400 text-slate-950 flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.25),inset_0_1px_0.5px_rgba(255,255,255,0.8)] shrink-0">
+                <div className="w-6 h-6 rounded-lg bg-white/25 border border-white/40 text-yellow-300 flex items-center justify-center shadow-inner shrink-0">
                   <Sparkles className="w-3.5 h-3.5 animate-pulse" />
                 </div>
-                <span className="leading-none">रजिस्टर ₹249</span>
+                <span className="leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">रजिस्टर ₹249</span>
               </button>
             </div>
           )}

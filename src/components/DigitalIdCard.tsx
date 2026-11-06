@@ -334,7 +334,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
               <AvatarWith3DFrame
                 avatarUrl={member.avatarUrl}
                 name={member.fullName}
-                frame={member.avatarFrame || 'royal_gold'}
+                frame={member.avatarFrame || 'acc_medallion'}
                 size="md"
               />
               <div className="absolute -bottom-1 -right-1 bg-amber-500 text-slate-950 p-1 rounded-full shadow z-20">

@@ -62,6 +62,7 @@ import {
   Droplets,
   Crown,
   Gem,
+  Bell,
 } from 'lucide-react';
 import {
   Member,
@@ -71,8 +72,9 @@ import {
   ProfileFieldChange,
   ProfileEditAuditLog,
   AvatarFrameType,
+  PrivateMessage,
 } from '../types';
-import { StorageService } from '../services/storage';
+import { StorageService, subscribeToSync } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
 import { compressImage } from '../utils/imageCompressor';
 import { DigitalIdCard } from './DigitalIdCard';
@@ -94,7 +96,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
 
   // 3D Avatar Frame Selection Modal State
   const [showFrameModal, setShowFrameModal] = useState<boolean>(false);
-  const [framePreview, setFramePreview] = useState<AvatarFrameType>(currentUser.avatarFrame || 'fire');
+  const [framePreview, setFramePreview] = useState<AvatarFrameType>(currentUser.avatarFrame || 'acc_medallion');
+  const [frameCategory, setFrameCategory] = useState<'all' | 'acc' | 'elements' | 'vip'>('all');
   const [isSavingFrame, setIsSavingFrame] = useState<boolean>(false);
   const [frameSuccessMsg, setFrameSuccessMsg] = useState<string>('');
 
@@ -138,6 +141,46 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [statusCheckMsg, setStatusCheckMsg] = useState('');
   const siteConfig = StorageService.getSiteConfig();
+
+  // User Private Messages & 3D Live Notifications System (Admin Message Alerts)
+  const [userMessages, setUserMessages] = useState<PrivateMessage[]>(() =>
+    StorageService.getPrivateMessages(currentUser.accId)
+  );
+  const [showNotificationModal, setShowNotificationModal] = useState<boolean>(false);
+
+  useEffect(() => {
+    setUserMessages(StorageService.getPrivateMessages(currentUser.accId));
+    const unsubscribeMessages = FirestoreService.subscribeToPrivateMessages(currentUser.accId, (cloudMsgs) => {
+      if (cloudMsgs && cloudMsgs.length > 0) {
+        setUserMessages(cloudMsgs);
+      }
+    });
+    const unsubscribeSync = subscribeToSync(() => {
+      setUserMessages(StorageService.getPrivateMessages(currentUser.accId));
+    });
+    return () => {
+      unsubscribeMessages();
+      unsubscribeSync();
+    };
+  }, [currentUser.accId]);
+
+  const adminIncomingMessages = userMessages
+    .filter((m) => m.senderRole === 'admin')
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  const unreadAdminCount = adminIncomingMessages.filter((m) => !m.isRead).length;
+
+  const handleOpenChatFromNotification = () => {
+    StorageService.markMessagesAsRead(currentUser.accId, 'user');
+    setUserMessages(StorageService.getPrivateMessages(currentUser.accId));
+    setShowNotificationModal(false);
+    handleSelectTab('support_chat');
+  };
+
+  const handleMarkAllUserNotificationsRead = () => {
+    StorageService.markMessagesAsRead(currentUser.accId, 'user');
+    setUserMessages(StorageService.getPrivateMessages(currentUser.accId));
+  };
 
   // 3.30% Recharge Commission Guide Modal State
   const [showRechargeGuideModal, setShowRechargeGuideModal] = useState(false);
@@ -1141,27 +1184,31 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
   // =========================================================================
   return (
     <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6 animate-fadeIn pb-24 sm:pb-32">
-      {/* Top Welcome Bar - Telegram App Style Ultra-Premium Hub (100% Responsive for All Devices) */}
-      <div className="bg-gradient-to-r from-[#17212b] via-[#202b36] to-[#0e1621] text-white rounded-2xl p-4 sm:p-5 md:p-6 shadow-xl border-2 border-[#2481cc]/50 relative overflow-hidden space-y-4">
-        {/* Subtle Telegram Ambient Glow */}
-        <div className="absolute -top-12 -right-12 w-48 h-48 bg-[#2481cc]/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+      {/* Top Welcome Bar - Radiant Rainbow Theme Banner (100% Crisp Font, Golden Glow & Zero Blur) */}
+      <div className="profile-rainbow-banner text-white rounded-2xl p-4 sm:p-5 md:p-6 shadow-2xl relative overflow-hidden space-y-4 subpixel-antialiased">
+        {/* Crisp Gradient Highlight (No GPU blur overlays) */}
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 via-rose-500 to-[#2481cc]" />
 
         {/* Official ACC Background Watermark */}
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 w-48 h-48 pointer-events-none select-none z-0">
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 w-48 h-48 pointer-events-none select-none z-0 opacity-15">
           <AccLogo watermark size="custom" className="w-full h-full" />
         </div>
 
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          {/* Left: 3D Avatar + Telegram User Details */}
+          {/* Left: 3D Avatar + User Details with Rainbow Glow */}
           <div className="flex items-center gap-4 min-w-0 w-full md:w-auto">
             {/* 3D Animated Live Avatar Frame Container */}
             <div className="relative shrink-0 flex flex-col items-center">
               <AvatarWith3DFrame
                 avatarUrl={currentUser.avatarUrl}
                 name={currentUser.fullName}
-                frame={currentUser.avatarFrame || 'fire'}
+                frame={currentUser.avatarFrame || 'acc_dancing_circle'}
                 size="lg"
+                onClick={() => {
+                  setFramePreview(currentUser.avatarFrame || 'acc_dancing_circle');
+                  setShowFrameModal(true);
+                }}
+                className="cursor-pointer hover:scale-105 transition-transform"
               />
 
               {/* Action Buttons Below / On Avatar */}
@@ -1169,11 +1216,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                 <button
                   type="button"
                   onClick={() => {
-                    setFramePreview(currentUser.avatarFrame || 'fire');
+                    setFramePreview(currentUser.avatarFrame || 'acc_dancing_circle');
                     setShowFrameModal(true);
                   }}
-                  className="px-2 py-0.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-[10px] rounded-full shadow-[0_2px_0_#9a3412] active:translate-y-0.5 active:shadow-none flex items-center gap-1 transition cursor-pointer"
-                  title="3D लाइव फ्रेम बदलें (Fire, Water, Work Hard, etc.)"
+                  className="px-2.5 py-0.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-[10px] rounded-full shadow-[0_2px_0_#9a3412] active:translate-y-0.5 active:shadow-none flex items-center gap-1 transition cursor-pointer"
+                  title="3D लाइव फ्रेम बदलें (ACC 3D नाचता हुआ रिंग, Medallion, Fire, etc.)"
                 >
                   <Sparkles className="w-2.5 h-2.5 text-slate-950" />
                   <span>3D फ्रेम</span>
@@ -1189,12 +1236,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
               </div>
             </div>
 
-            {/* User Telegram Meta & Badges */}
+            {/* User Meta & Rainbow Glowing Details */}
             <div className="min-w-0 flex-1 space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/70 border border-emerald-500/40 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/50 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span>ऑनलाइन • Telegram ACC Profile</span>
+                  <span>ऑनलाइन • ACC INDIA Profile</span>
                 </span>
                 <span className="text-[10px] font-mono-acc text-sky-200 bg-[#2481cc]/30 border border-[#2481cc]/40 px-2 py-0.5 rounded-full">
                   @{currentUser.telegram ? currentUser.telegram.replace('@', '') : currentUser.fullName.toLowerCase().replace(/\s+/g, '_')}
@@ -1202,39 +1249,39 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-lg sm:text-2xl font-black text-white tracking-wide truncate drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-black tracking-wide truncate text-gold-solid drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
                   {currentUser.fullName}
                 </h2>
-                <span className="text-[10px] sm:text-xs text-sky-200 bg-[#2481cc]/25 px-2 py-0.5 rounded font-medium border border-[#2481cc]/40 truncate">
+                <span className="text-[10px] sm:text-xs text-sky-200 bg-[#2481cc]/25 px-2 py-0.5 rounded font-bold border border-[#2481cc]/40 truncate">
                   {currentUser.qualification || 'छात्र सदस्य'}
                 </span>
               </div>
 
               <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs pt-0.5">
-                <span className="text-slate-400 text-[11px] font-bold">यूनिक 🆔:</span>
-                <span className="font-mono-acc font-black text-amber-300 text-xs sm:text-sm bg-black/50 px-2 py-0.5 rounded border border-amber-400/40">
+                <span className="text-slate-200 text-[11px] font-bold">यूनिक 🆔:</span>
+                <span className="font-mono-acc font-black text-xs sm:text-sm px-3 py-0.5 rounded-md id-badge-rainbow text-gold-solid tracking-wider select-all shadow-md">
                   {currentUser.accId}
                 </span>
                 <button
                   type="button"
                   onClick={handleCopyId}
-                  className="text-sky-300 hover:text-white p-1 rounded hover:bg-white/10 transition cursor-pointer"
+                  className="text-amber-300 hover:text-white p-1 rounded hover:bg-white/10 transition cursor-pointer"
                   title="Copy ID"
                 >
                   {copiedId ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
-                <span className="text-slate-600">|</span>
-                <span className="text-[10px] sm:text-[11px] font-black text-emerald-300 bg-emerald-950/70 px-2 py-0.5 rounded border border-emerald-400/40 flex items-center gap-1">
+                <span className="text-white/40">|</span>
+                <span className="text-[10px] sm:text-[11px] font-black text-emerald-300 bg-emerald-950/90 px-2 py-0.5 rounded border border-emerald-400/50 flex items-center gap-1 shadow-xs">
                   <CheckCircle2 className="w-3 h-3 shrink-0" /> {currentUser.plan} Plan (सत्यापित ✓)
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Right: Real App APK Status & Telegram Quick Actions */}
+          {/* Right: 3D Notification System & Quick Action Buttons */}
           <div className="flex flex-col sm:flex-row md:flex-col gap-2 w-full md:w-auto shrink-0">
             {/* Real App Status */}
-            <div className="bg-[#17212b]/90 border border-[#2481cc]/40 rounded-xl p-2.5 sm:p-3 flex items-center justify-between gap-3">
+            <div className="bg-black/40 backdrop-blur-xs border border-white/20 rounded-xl p-2.5 sm:p-3 flex items-center justify-between gap-3 shadow-md">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-emerald-500 text-white shadow-xs">
                   <CheckCircle2 className="w-4 h-4" />
@@ -1249,21 +1296,39 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
               <button
                 type="button"
                 onClick={() => handleSelectTab('applink')}
-                className="px-2.5 py-1 bg-[#2481cc] hover:bg-[#1d6fae] text-white rounded text-[11px] font-bold border border-white/20 transition cursor-pointer shrink-0"
+                className="px-2.5 py-1 bg-[#2481cc] hover:bg-[#1d6fae] text-white rounded text-[11px] font-bold border border-white/20 transition cursor-pointer shrink-0 shadow-[0_2px_0_#0f4c75] active:translate-y-0.5 active:shadow-none"
               >
                 ऐप लिंक
               </button>
             </div>
 
-            {/* Quick 3D Action Buttons */}
+            {/* Quick 3D Action Buttons Bar */}
             <div className="flex items-center gap-1.5 flex-wrap">
+              {/* 3D Notification Alert Button with Exact Message Count */}
+              <button
+                type="button"
+                onClick={() => setShowNotificationModal(true)}
+                className="relative flex-1 sm:flex-none px-3.5 py-1.5 bg-gradient-to-b from-[#e11d48] via-[#be123c] to-[#9f1239] hover:from-[#f43f5e] hover:to-[#be123c] text-white rounded-lg text-[11px] font-black shadow-[0_2.5px_0_#4c0519] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap border border-white/20"
+                title="एडमिन संदेश व लाइव सूचनाएं"
+              >
+                <Bell className={`w-3.5 h-3.5 ${unreadAdminCount > 0 ? 'animate-bounce text-amber-300' : 'text-white'}`} />
+                <span>सूचनाएं</span>
+                <span className={`font-black text-[10px] px-2 py-0.2 rounded-full shadow-xs ${
+                  unreadAdminCount > 0
+                    ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-300 animate-pulse'
+                    : 'bg-emerald-950/80 text-emerald-300 border border-emerald-400/50'
+                }`}>
+                  {unreadAdminCount > 0 ? `${unreadAdminCount} नए सन्देश` : '0 नए'}
+                </span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => {
-                  setFramePreview(currentUser.avatarFrame || 'fire');
+                  setFramePreview(currentUser.avatarFrame || 'acc_dancing_circle');
                   setShowFrameModal(true);
                 }}
-                className="flex-1 sm:flex-none px-3 py-1.5 bg-gradient-to-b from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-lg text-[11px] font-black shadow-[0_2px_0_#9a3412] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1 transition cursor-pointer whitespace-nowrap"
+                className="flex-1 sm:flex-none px-3 py-1.5 bg-gradient-to-b from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-lg text-[11px] font-black shadow-[0_2.5px_0_#9a3412] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1 transition cursor-pointer whitespace-nowrap border border-white/20"
               >
                 <Sparkles className="w-3.5 h-3.5 text-slate-950" />
                 <span>3D फ्रेम</span>
@@ -1272,19 +1337,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
               <button
                 type="button"
                 onClick={() => handleSelectTab('support_chat')}
-                className="flex-1 sm:flex-none px-3 py-1.5 bg-gradient-to-b from-[#229ed9] to-[#0088cc] hover:from-[#2eb0ee] hover:to-[#0077b3] text-white rounded-lg text-[11px] font-black shadow-[0_2px_0_#005580] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1 transition cursor-pointer whitespace-nowrap"
+                className="flex-1 sm:flex-none px-3 py-1.5 bg-gradient-to-b from-[#229ed9] to-[#0088cc] hover:from-[#2eb0ee] hover:to-[#0077b3] text-white rounded-lg text-[11px] font-black shadow-[0_2.5px_0_#005580] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1 transition cursor-pointer whitespace-nowrap border border-white/20"
               >
                 <MessageCircle className="w-3.5 h-3.5" />
-                <span>💬 एडमिन चैट</span>
+                <span>💬 चैट</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleSelectTab('idcard')}
-                className="flex-1 sm:flex-none px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-[11px] font-bold border border-white/20 flex items-center justify-center gap-1 transition cursor-pointer whitespace-nowrap"
+                className="flex-1 sm:flex-none px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-[11px] font-bold border border-white/20 shadow-[0_2px_0_#1e293b] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1 transition cursor-pointer whitespace-nowrap"
               >
                 <CreditCard className="w-3.5 h-3.5 text-amber-400" />
-                <span>🪪 ID कार्ड</span>
+                <span>🪪 ID</span>
               </button>
             </div>
           </div>
@@ -1392,22 +1457,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
           </div>
         </div>
 
-        {/* Card 4: Sponsor Info */}
-        <div className="bg-white border border-gray-200 rounded-xl p-3.5 sm:p-4 shadow-xs flex flex-col justify-between">
+        {/* Card 4: Sponsor Info with Rainbow Glow */}
+        <div className="bg-white border-2 border-amber-200/80 rounded-xl p-3.5 sm:p-4 shadow-sm flex flex-col justify-between">
           <div>
-            <span className="text-[11px] text-slate-500 block font-bold uppercase tracking-wider">🤝 Sponsor विवरण</span>
-            <span className="font-bold text-sm text-slate-900 block mt-1 truncate">
+            <span className="text-[11px] text-slate-600 block font-bold uppercase tracking-wider">🤝 Sponsor विवरण</span>
+            <span className="font-black text-sm block mt-1 truncate text-slate-900 font-display">
               {currentUser.sponsorName || 'ACC Core Team'}
             </span>
           </div>
           <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between text-[10px]">
-            <span className="font-mono-acc text-[#2874f0] font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 truncate">
+            <span className="font-mono-acc font-black text-xs px-2.5 py-0.5 rounded id-badge-rainbow text-gold-solid tracking-wider truncate">
               {currentUser.sponsorId || 'ACC-ADMIN'}
             </span>
             <button
               type="button"
               onClick={() => handleSelectTab('twis')}
-              className="text-slate-500 hover:text-slate-900 font-medium hover:underline"
+              className="text-[#2874f0] hover:text-[#1258c7] font-bold hover:underline"
             >
               नेटवर्क देखें →
             </button>
@@ -1415,13 +1480,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
         </div>
       </div>
 
-      {/* Redesigned Clean Dashboard Menu System (Flawless on Mobile, Tablet & Desktop) */}
-      <div className="bg-white border border-gray-200 rounded-xl p-2.5 sm:p-3 shadow-xs space-y-2">
+      {/* Redesigned 3D Dashboard Menu System (Flawless on Mobile, Tablet & Desktop) */}
+      <div className="bg-white border border-gray-200 rounded-xl p-2.5 sm:p-3 shadow-md space-y-2.5">
         <div className="flex items-center justify-between px-1.5 pt-0.5 border-b border-gray-100 pb-2">
           <div className="flex items-center gap-2">
             <div className="w-2.5 h-2.5 rounded-full bg-[#2874f0] animate-pulse"></div>
             <span className="text-xs font-black uppercase tracking-wider text-slate-900">
-              डैशबोर्ड मुख्य सेवाएं (Services & Tools)
+              डैशबोर्ड मुख्य 3D सेवाएं (Services & Tools)
             </span>
           </div>
           <span className="text-[10px] sm:text-[11px] text-[#2874f0] font-bold bg-blue-50 px-2 sm:px-2.5 py-0.5 rounded-full border border-blue-200">
@@ -1436,106 +1501,114 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
           </span>
         </div>
 
-        {/* 8 Clean Touch-Friendly Buttons Grid: Perfectly Symmetrical on Mobile (4x2 on tablet, 8x1 on desktop) */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 sm:gap-2 bg-slate-50/90 p-1.5 rounded-lg w-full max-w-full">
+        {/* 8 Complete 3D Tactile Buttons Grid: Symmetrical on Mobile (4x2 on tablet, 8x1 on desktop) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 bg-slate-100/80 p-2 rounded-xl w-full max-w-full">
+          {/* Button 1: Real App */}
           <button
             type="button"
             onClick={() => handleSelectTab('applink')}
-            className={`min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+            className={`min-h-[46px] flex items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'applink'
-                ? 'bg-[#2874f0] text-white shadow-xs ring-2 ring-[#2874f0]'
-                : 'bg-white text-slate-700 hover:text-[#2874f0] hover:bg-blue-50/50 border border-gray-200'
+                ? 'bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white shadow-[0_3px_0_#093b8f] ring-2 ring-[#2874f0]/50 translate-y-0.5'
+                : 'bg-white text-slate-800 hover:text-[#2874f0] hover:bg-blue-50 border border-blue-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
           >
-            <Smartphone className="w-4 h-4 shrink-0" />
+            <Smartphone className={`w-4 h-4 shrink-0 ${activeTab === 'applink' ? 'text-white' : 'text-[#2874f0]'}`} />
             <span className="truncate">Real App</span>
           </button>
 
+          {/* Button 2: TWIS */}
           <button
             type="button"
             onClick={() => handleSelectTab('twis')}
-            className={`min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+            className={`min-h-[46px] flex items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'twis'
-                ? 'bg-[#2874f0] text-white shadow-xs ring-2 ring-[#2874f0]'
-                : 'bg-white text-slate-700 hover:text-[#2874f0] hover:bg-blue-50/50 border border-gray-200'
+                ? 'bg-gradient-to-b from-indigo-600 to-indigo-800 text-white shadow-[0_3px_0_#312e81] ring-2 ring-indigo-500/50 translate-y-0.5'
+                : 'bg-white text-slate-800 hover:text-indigo-600 hover:bg-indigo-50 border border-indigo-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
           >
-            <Users className="w-4 h-4 shrink-0" />
+            <Users className={`w-4 h-4 shrink-0 ${activeTab === 'twis' ? 'text-white' : 'text-indigo-600'}`} />
             <span className="truncate">TWIS (₹150)</span>
           </button>
 
+          {/* Button 3: SWIS */}
           <button
             type="button"
             onClick={() => handleSelectTab('swis')}
-            className={`min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+            className={`min-h-[46px] flex items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'swis'
-                ? 'bg-emerald-600 text-white shadow-xs ring-2 ring-emerald-600'
-                : 'bg-white text-slate-700 hover:text-emerald-700 hover:bg-emerald-50/50 border border-gray-200'
+                ? 'bg-gradient-to-b from-emerald-600 to-emerald-800 text-white shadow-[0_3px_0_#064e3b] ring-2 ring-emerald-500/50 translate-y-0.5'
+                : 'bg-white text-slate-800 hover:text-emerald-700 hover:bg-emerald-50 border border-emerald-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
           >
             <Zap className={`w-4 h-4 shrink-0 ${activeTab === 'swis' ? 'text-white' : 'text-emerald-600'}`} />
-            <span className="truncate">SWIS (3.30%)</span>
+            <span className="truncate">SWIS (3.3%)</span>
           </button>
 
+          {/* Button 4: Digital ID */}
           <button
             type="button"
             onClick={() => handleSelectTab('idcard')}
-            className={`min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+            className={`min-h-[46px] flex items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'idcard'
-                ? 'bg-amber-600 text-white shadow-xs ring-2 ring-amber-600'
-                : 'bg-white text-slate-700 hover:text-amber-800 hover:bg-amber-50/50 border border-gray-200'
+                ? 'bg-gradient-to-b from-amber-500 to-amber-700 text-slate-950 shadow-[0_3px_0_#78350f] ring-2 ring-amber-400/50 translate-y-0.5'
+                : 'bg-white text-slate-800 hover:text-amber-800 hover:bg-amber-50 border border-amber-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
           >
-            <CreditCard className={`w-4 h-4 shrink-0 ${activeTab === 'idcard' ? 'text-white' : 'text-amber-600'}`} />
+            <CreditCard className={`w-4 h-4 shrink-0 ${activeTab === 'idcard' ? 'text-slate-950' : 'text-amber-600'}`} />
             <span className="truncate">डिजिटल ID</span>
           </button>
 
+          {/* Button 5: Profile */}
           <button
             type="button"
             onClick={() => handleSelectTab('profile')}
-            className={`min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+            className={`min-h-[46px] flex items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'profile'
-                ? 'bg-[#fb641b] text-white shadow-xs ring-2 ring-[#fb641b]'
-                : 'bg-amber-50 text-amber-950 hover:bg-amber-100 border border-amber-300 font-extrabold shadow-xs'
+                ? 'bg-gradient-to-b from-[#fb641b] to-[#c2410c] text-white shadow-[0_3px_0_#7c2d12] ring-2 ring-[#fb641b]/50 translate-y-0.5'
+                : 'bg-white text-slate-800 hover:text-[#fb641b] hover:bg-orange-50 border border-orange-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
           >
             <Edit3 className={`w-4 h-4 shrink-0 ${activeTab === 'profile' ? 'text-white' : 'text-[#fb641b]'}`} />
             <span className="truncate">✏️ प्रोफाइल</span>
           </button>
 
+          {/* Button 6: Admin Chat */}
           <button
             type="button"
             onClick={() => handleSelectTab('support_chat')}
-            className={`min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+            className={`min-h-[46px] flex items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'support_chat'
-                ? 'bg-[#229ed9] text-white shadow-xs ring-2 ring-[#229ed9]'
-                : 'bg-sky-50 text-sky-900 hover:bg-sky-100 border border-sky-300 font-extrabold shadow-xs'
+                ? 'bg-gradient-to-b from-[#229ed9] to-[#0077b3] text-white shadow-[0_3px_0_#004d73] ring-2 ring-[#229ed9]/50 translate-y-0.5'
+                : 'bg-white text-slate-800 hover:text-[#229ed9] hover:bg-sky-50 border border-sky-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
           >
             <MessageCircle className={`w-4 h-4 shrink-0 ${activeTab === 'support_chat' ? 'text-white' : 'text-[#229ed9]'}`} />
             <span className="truncate">💬 एडमिन चैट</span>
           </button>
 
+          {/* Button 7: Kit */}
           <button
             type="button"
             onClick={() => handleSelectTab('kit')}
-            className={`min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+            className={`min-h-[46px] flex items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'kit'
-                ? 'bg-indigo-600 text-white shadow-xs ring-2 ring-indigo-600'
-                : 'bg-white text-slate-700 hover:text-indigo-700 hover:bg-indigo-50/50 border border-gray-200'
+                ? 'bg-gradient-to-b from-teal-600 to-teal-800 text-white shadow-[0_3px_0_#134e4a] ring-2 ring-teal-500/50 translate-y-0.5'
+                : 'bg-white text-slate-800 hover:text-teal-700 hover:bg-teal-50 border border-teal-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
           >
-            <BookOpen className={`w-4 h-4 shrink-0 ${activeTab === 'kit' ? 'text-white' : 'text-indigo-600'}`} />
+            <BookOpen className={`w-4 h-4 shrink-0 ${activeTab === 'kit' ? 'text-white' : 'text-teal-600'}`} />
             <span className="truncate">📚 किट</span>
           </button>
 
+          {/* Button 8: Academy */}
           <button
             type="button"
             onClick={() => handleSelectTab('courses')}
-            className={`min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 sm:py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer text-center ${
+            className={`min-h-[46px] flex items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'courses'
-                ? 'bg-purple-600 text-white shadow-xs ring-2 ring-purple-600'
-                : 'bg-white text-slate-700 hover:text-purple-700 hover:bg-purple-50/50 border border-gray-200'
+                ? 'bg-gradient-to-b from-purple-600 to-purple-800 text-white shadow-[0_3px_0_#581c87] ring-2 ring-purple-500/50 translate-y-0.5'
+                : 'bg-white text-slate-800 hover:text-purple-700 hover:bg-purple-50 border border-purple-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
           >
             <GraduationCap className={`w-4 h-4 shrink-0 ${activeTab === 'courses' ? 'text-white' : 'text-purple-600'}`} />
@@ -1578,11 +1651,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                       <Users className="w-3.5 h-3.5 text-[#2874f0]" />
                       <span>आपकी स्पॉन्सर 🆔 (Sponsor ID):</span>
                     </span>
-                    <span className="font-mono-acc font-black text-xs text-[#2874f0] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                    <span className="font-mono-acc font-black text-xs id-badge-rainbow text-gold-solid px-2.5 py-0.5 rounded shadow-xs">
                       {currentUser.sponsorId || 'ACC249SWISRK01'}
                     </span>
                     {currentUser.sponsorName && (
-                      <span className="text-slate-700 font-semibold text-[11px]">
+                      <span className="text-slate-900 font-bold text-xs">
                         ({currentUser.sponsorName})
                       </span>
                     )}
@@ -4424,7 +4497,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
       {/* ========================================================================= */}
       {showFrameModal && (
         <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 pt-3 pb-28 bg-black/85 backdrop-blur-md animate-fadeIn overflow-y-auto">
-          <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto bg-gradient-to-b from-slate-900 via-slate-950 to-black border-2 border-amber-500/60 rounded-3xl p-5 sm:p-6 pb-8 shadow-[0_0_50px_rgba(245,158,11,0.3)] space-y-5 text-white animate-scaleUp my-auto">
+          <div className="w-full max-w-2xl max-h-[92vh] overflow-y-auto bg-gradient-to-b from-slate-900 via-slate-950 to-black border-2 border-amber-500/60 rounded-3xl p-4 sm:p-6 pb-8 shadow-[0_0_50px_rgba(245,158,11,0.3)] space-y-4 text-white animate-scaleUp my-auto">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div className="flex items-center gap-2.5">
@@ -4433,13 +4506,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                 </div>
                 <div>
                   <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
-                    <span>🎨 3D लाइव अवतार फ्रेम सेलेक्टर</span>
-                    <span className="text-[10px] bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full font-black">
-                      PREMIUM
+                    <span>🎨 3D लाइव अवतार फ्रेम सिस्टम</span>
+                    <span className="text-[10px] bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 px-2 py-0.5 rounded-full font-black">
+                      ACC VIP
                     </span>
                   </h3>
                   <p className="text-xs text-amber-200/80">
-                    अपनी प्रोफाइल फोटो व डिजिटल ID कार्ड के लिए 3D एनिमेटेड लाइव फ्रेम चुनें
+                    ACC 3D गोल्ड कॉइन मेडैलियन, 360° लाइव रोटेटिंग टेक्स्ट एवं अग्नि चक्र फ्रेम्स
                   </p>
                 </div>
               </div>
@@ -4460,12 +4533,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
               </div>
             )}
 
-            {/* Live Center Preview with Circular Flaming Ring */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-5 sm:p-6 flex flex-col items-center justify-center gap-3 text-center overflow-visible">
-              <span className="text-[11px] text-slate-400 uppercase tracking-widest font-bold">
-                लाइव 3D अग्नि चक्र प्रीव्यू (Live 360° Ring Preview)
+            {/* Live Center Preview Box */}
+            <div className="bg-gradient-to-b from-white/10 to-white/5 border border-amber-400/30 rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center gap-2 text-center overflow-visible shadow-inner relative">
+              <span className="text-[10.5px] text-amber-300/90 uppercase tracking-widest font-black flex items-center gap-1.5">
+                <Sparkles className="w-3 h-3 text-amber-400" />
+                लाइव 3D फ्रेम प्रीव्यू (Real-time Live Preview)
               </span>
-              <div className="py-4 my-1 overflow-visible flex items-center justify-center">
+
+              <div className="py-6 my-2 overflow-visible flex items-center justify-center">
                 <AvatarWith3DFrame
                   avatarUrl={currentUser.avatarUrl}
                   name={currentUser.fullName}
@@ -4473,17 +4548,46 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                   size="xl"
                 />
               </div>
-              <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                <span>चयनित:</span>
-                <span className="text-white bg-white/10 px-2.5 py-0.5 rounded-full border border-white/15">
-                  {AVATAR_FRAMES.find((f) => f.id === framePreview)?.name}
-                </span>
+
+              <div className="flex flex-col items-center gap-1">
+                <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                  <span className="text-slate-400">सक्रिय प्रीव्यू:</span>
+                  <span className="text-white bg-amber-500/20 border border-amber-400/40 px-3 py-0.5 rounded-full font-black">
+                    {AVATAR_FRAMES.find((f) => f.id === framePreview)?.name}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300 max-w-md">
+                  {AVATAR_FRAMES.find((f) => f.id === framePreview)?.description}
+                </p>
               </div>
             </div>
 
+            {/* Frame Category Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+              {[
+                { id: 'all', label: 'सभी फ्रेम (All)' },
+                { id: 'acc', label: '🎖️ ACC ऑफिशियल (Coin & Text)' },
+                { id: 'elements', label: '🔥 3D लाइव एलिमेंट्स' },
+                { id: 'vip', label: '👑 रॉयल वीआईपी' },
+              ].map((cat) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setFrameCategory(cat.id as any)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                    frameCategory === cat.id
+                      ? 'bg-amber-400 text-slate-950 font-black shadow-md'
+                      : 'bg-white/10 hover:bg-white/15 text-slate-300'
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+
             {/* Frame Options Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-              {AVATAR_FRAMES.map((f) => {
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+              {AVATAR_FRAMES.filter((f) => frameCategory === 'all' || f.category === frameCategory).map((f) => {
                 const isSelected = framePreview === f.id;
                 return (
                   <button
@@ -4492,26 +4596,30 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                     onClick={() => setFramePreview(f.id)}
                     className={`p-3 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
                       isSelected
-                        ? 'border-amber-400 bg-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.4)] ring-2 ring-amber-400/50'
+                        ? 'border-amber-400 bg-amber-500/20 shadow-[0_0_20px_rgba(245,158,11,0.45)] ring-2 ring-amber-400/60'
                         : 'border-white/10 bg-white/5 hover:bg-white/10'
                     }`}
                   >
                     <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-lg">{f.icon}</span>
-                        {currentUser.avatarFrame === f.id && (
-                          <span className="text-[9px] bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 px-1.5 py-0.2 rounded font-bold">
-                            सक्रिय
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xl">{f.icon}</span>
+                        {currentUser.avatarFrame === f.id ? (
+                          <span className="text-[9px] bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 px-2 py-0.5 rounded-full font-bold">
+                            ✓ वर्तमान सक्रिय
+                          </span>
+                        ) : (
+                          <span className="text-[9px] bg-white/10 text-slate-300 px-1.5 py-0.5 rounded font-mono">
+                            {f.category.toUpperCase()}
                           </span>
                         )}
                       </div>
                       <strong className="text-xs font-black text-white block">{f.name}</strong>
-                      <p className="text-[10px] text-slate-300 mt-0.5 leading-snug">{f.desc}</p>
+                      <p className="text-[10px] text-slate-300 mt-1 leading-snug line-clamp-2">{f.desc}</p>
                     </div>
 
-                    <div className="mt-2 pt-1 border-t border-white/10 text-[10px] flex items-center justify-between">
+                    <div className="mt-2.5 pt-1.5 border-t border-white/10 text-[10px] flex items-center justify-between">
                       <span className="text-amber-300 font-bold">{f.badge}</span>
-                      <span className={isSelected ? 'text-amber-400 font-bold' : 'text-slate-500'}>
+                      <span className={isSelected ? 'text-amber-400 font-black' : 'text-slate-400'}>
                         {isSelected ? '✓ चयनित' : 'देखें'}
                       </span>
                     </div>
@@ -4521,7 +4629,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-white/10">
               <button
                 type="button"
                 onClick={() => setShowFrameModal(false)}
@@ -4534,16 +4642,151 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                 type="button"
                 disabled={isSavingFrame}
                 onClick={() => handleSelectAndSaveFrame(framePreview)}
-                className="px-6 py-2.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black text-xs rounded-xl shadow-lg flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+                className="px-7 py-2.5 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-[0_4px_16px_rgba(245,158,11,0.5)] flex items-center gap-2 transition cursor-pointer disabled:opacity-50 border-t border-white/50"
               >
                 {isSavingFrame ? (
-                  <span>सहेज रहे हैं...</span>
+                  <span className="flex items-center gap-1.5">
+                    <div className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                    <span>सहेज रहे हैं...</span>
+                  </span>
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4 text-slate-950" />
                     <span>✓ यह 3D फ्रेम प्रोफाइल में सेव करें</span>
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3D User Notifications & Admin Alerts Modal */}
+      {showNotificationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-[#17212b] text-white border-2 border-[#2481cc]/60 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-[#17212b] via-[#202b36] to-[#0e1621] p-4 sm:p-5 border-b border-[#2481cc]/40 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-600 to-amber-500 flex items-center justify-center shadow-md">
+                  <Bell className="w-5 h-5 text-white animate-bounce" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                    <span>एडमिन संदेश व सूचनाएं</span>
+                    {unreadAdminCount > 0 && (
+                      <span className="text-[10px] bg-rose-500 text-white px-2 py-0.5 rounded-full font-black animate-pulse">
+                        {unreadAdminCount} नया
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-xs text-sky-200">ACC केंद्रीय सहायता कक्ष से सीधे प्राप्त संदेश</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNotificationModal(false)}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Notification Items List */}
+            <div className="p-4 overflow-y-auto space-y-3 flex-1 min-h-[200px]">
+              {adminIncomingMessages.length === 0 ? (
+                <div className="text-center py-10 px-4 space-y-3">
+                  <div className="w-14 h-14 mx-auto rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-400">
+                    <Bell className="w-7 h-7 text-slate-400" />
+                  </div>
+                  <h4 className="text-sm font-bold text-white">फिलहाल कोई नया एडमिन संदेश नहीं है</h4>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                    यदि आपको किसी भी सेवा या एक्टिवेशन से संबंधित कोई प्रश्न है, तो सीधे एडमिन से चैट करें।
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleOpenChatFromNotification}
+                    className="mt-2 px-4 py-2 bg-gradient-to-b from-[#229ed9] to-[#0088cc] hover:from-[#2eb0ee] hover:to-[#0077b3] text-white text-xs font-black rounded-lg shadow-[0_3px_0_#005580] active:translate-y-0.5 active:shadow-none inline-flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    <span>💬 एडमिन को नया मैसेज भेजें</span>
+                  </button>
+                </div>
+              ) : (
+                adminIncomingMessages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`p-3.5 rounded-xl border transition-all ${
+                      !msg.isRead
+                        ? 'bg-[#2481cc]/15 border-[#2481cc] shadow-md ring-1 ring-[#2481cc]/40'
+                        : 'bg-white/5 border-white/10 hover:bg-white/10'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        <span className="text-xs font-bold text-sky-200">केंद्रीय एडमिन (ACC Support)</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {!msg.isRead && (
+                          <span className="text-[9px] bg-rose-500 text-white font-black px-1.5 py-0.5 rounded-full">
+                            नया सन्देश
+                          </span>
+                        )}
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    </div>
+
+                    <p className="text-xs sm:text-sm text-slate-100 font-medium whitespace-pre-wrap leading-relaxed">
+                      {msg.text}
+                    </p>
+
+                    <div className="mt-3 pt-2 border-t border-white/10 flex items-center justify-between">
+                      <span className="text-[10px] text-slate-400">
+                        {new Date(msg.timestamp).toLocaleDateString('hi-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={handleOpenChatFromNotification}
+                        className="px-3 py-1 bg-gradient-to-b from-[#229ed9] to-[#0088cc] hover:from-[#2eb0ee] hover:to-[#0077b3] text-white text-[11px] font-black rounded-lg shadow-[0_2px_0_#005580] active:translate-y-0.5 active:shadow-none inline-flex items-center gap-1 transition cursor-pointer"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        <span>💬 चैट खोलें व उत्तर दें</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3 bg-[#111922] border-t border-white/10 flex items-center justify-between gap-2">
+              {unreadAdminCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={handleMarkAllUserNotificationsRead}
+                  className="text-xs text-sky-300 hover:text-white font-bold transition cursor-pointer"
+                >
+                  ✓ सभी को पढ़ा हुआ मार्क करें
+                </button>
+              ) : (
+                <span className="text-xs text-slate-400">सभी सूचनाएं अप-टू-डेट हैं</span>
+              )}
+
+              <button
+                type="button"
+                onClick={handleOpenChatFromNotification}
+                className="px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-black rounded-xl shadow-md transition cursor-pointer flex items-center gap-1.5"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>लाइव चैट बॉक्स खोलें</span>
               </button>
             </div>
           </div>

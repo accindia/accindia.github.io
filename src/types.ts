@@ -43,7 +43,19 @@ export interface ProfileEditAuditLog {
   changes: ProfileFieldChange[];
 }
 
-export type AvatarFrameType = 'none' | 'fire' | 'water' | 'work_hard' | 'royal_gold' | 'neon_cyber';
+export type AvatarFrameType =
+  | 'acc_medallion'
+  | 'acc_dancing_circle'
+  | 'acc_spinning_text'
+  | 'acc_diwali_deepak'
+  | 'acc_royal_chakra'
+  | 'tiranga_chakra'
+  | 'fire'
+  | 'royal_gold'
+  | 'neon_cyber'
+  | 'water'
+  | 'work_hard'
+  | 'none';
 
 export interface OriginalRegistrationData {
   submittedAt: string;

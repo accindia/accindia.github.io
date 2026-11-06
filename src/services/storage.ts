@@ -80,24 +80,59 @@ export const DEFAULT_SERVICES: AppServiceItem[] = [
 
 export const DEFAULT_PROMOTIONAL_POSTERS: PromotionalPoster[] = [
   {
-    id: 'banner-01',
-    title: '🔥 ZERO INVESTMENT WORK | ONE TIME 🆔 ACTIVATION CHARGE ₹249 ONLY',
-    subtitle: 'SWIS 3.30% फिक्स्ड रिचार्ज कमीशन + TWIS ₹150 डायरेक्ट रेफरल इनकम। Start Young, Retire Young!',
-    ctaText: 'अभी रजिस्टर करें (₹249)',
+    id: 'poster-dhanteras-2026',
+    title: '🪙 धनतेरस महापर्व विशेष • ₹249 में डिजिटल आत्मनिर्भरता',
+    subtitle: 'सोना-चांदी के साथ इस धनतेरस लें ACC लाइफटाइम 🆔 और कमाएं SWIS 3.30% फिक्स्ड रिचार्ज कमीशन!',
+    imageUrl: '/src/assets/images/dhanteras_festival_banner_1793965565116.jpg',
+    ctaText: 'धनतेरस ऑफर में जॉइन करें (₹249)',
     ctaLink: 'register',
-    badge: 'SPECIAL OFFER',
+    badge: '🪙 DHANTERAS SPECIAL',
     isActive: true,
-    createdAt: '2026-08-01',
+    createdAt: '2026-11-01',
   },
   {
-    id: 'banner-02',
-    title: '🎓 कॉलेज व पढ़ाई के साथ अपनी पॉकेट मनी खुद कमाएं',
-    subtitle: '10 दोस्तों को जोड़ें और सीधा ₹1500 अपने बैंक में पाएं। कोई लैपटॉप नहीं, केवल आपका स्मार्टफोन!',
-    ctaText: 'ट्रेनिंग वीडियो देखें',
-    ctaLink: 'video',
-    badge: 'FOR STUDENTS',
+    id: 'poster-diwali-2026',
+    title: '🪔 शुभ दीपावली दीपोत्सव • हर घर खुशहाली व आमदनी',
+    subtitle: 'मां लक्ष्मी का आशीर्वाद • कॉलेज के साथ रोजाना ₹500 तक पॉकेट मनी। 2 दोस्तों पर सीधा ₹300 बैंक में!',
+    imageUrl: '/src/assets/images/diwali_deepotsav_banner_1793965580091.jpg',
+    ctaText: 'दिवाली पर सदस्य बनें (₹249)',
+    ctaLink: 'register',
+    badge: '🪔 DIWALI DEEPOTSAV',
     isActive: true,
-    createdAt: '2026-08-01',
+    createdAt: '2026-11-01',
+  },
+  {
+    id: 'poster-chhath-2026',
+    title: '☀️ छठ महापर्व विशेष • भगवान सूर्य व छठी मईया का आशीर्वाद',
+    subtitle: 'पवित्रता, आस्था और युवाओं के उज्ज्वल भविष्य का पावन संकल्प। Start Young, Retire Young!',
+    imageUrl: '/src/assets/images/chhath_puja_banner_1793965595973.jpg',
+    ctaText: 'छठ पर्व पर जुड़ें (₹249)',
+    ctaLink: 'register',
+    badge: '☀️ CHHATH PUJA',
+    isActive: true,
+    createdAt: '2026-11-01',
+  },
+  {
+    id: 'poster-govardhan-bhaidooj-2026',
+    title: '🌾 गोवर्धन पूजा एवं भाई दूज • स्नेह व समृद्धि का उत्सव',
+    subtitle: 'गोवर्धन व भाई दूज पर भाई-बहन मिलकर शुरू करें डिजिटल अर्निंग। जीरो इन्वेस्टमेंट वर्क!',
+    imageUrl: '/src/assets/images/govardhan_bhaidooj_banner_1793965611440.jpg',
+    ctaText: 'भाई दूज ऑफर (₹249)',
+    ctaLink: 'register',
+    badge: '🌾 GOVARDHAN & BHAI DOOJ',
+    isActive: true,
+    createdAt: '2026-11-01',
+  },
+  {
+    id: 'poster-student-earning-249',
+    title: '🎓 ₹249 स्टूडेंट अर्निंग क्रांति • कॉलेज के साथ पॉकेट मनी',
+    subtitle: 'पिज़्ज़ा-बर्गर का ₹249 फिजूलखर्च छोड़कर जीवनभर के लिए अपने मोबाइल को बनाएं कमाई का साधन!',
+    imageUrl: '/src/assets/images/acc_student_earning_banner_1793965628499.jpg',
+    ctaText: 'विद्यार्थी रजिस्ट्रेशन (₹249)',
+    ctaLink: 'register',
+    badge: '🔥 ₹249 REVOLUTION',
+    isActive: true,
+    createdAt: '2026-11-01',
   },
 ];
 
@@ -1023,7 +1058,10 @@ export const StorageService = {
         autoGrantAppLinkOnVerification: parsed.autoGrantAppLinkOnVerification !== false,
         appDownloadNotice: parsed.appDownloadNotice || 'केवल अधिकृत ACC वेबसाइट से ही APK डाउनलोड करें। इंस्टालेशन के समय "Install from Unknown Sources" को अनुमति दें।',
         services: Array.isArray(parsed.services) ? parsed.services : DEFAULT_SERVICES,
-        promotionalPosters: Array.isArray(parsed.promotionalPosters) ? parsed.promotionalPosters : DEFAULT_PROMOTIONAL_POSTERS,
+        promotionalPosters:
+          Array.isArray(parsed.promotionalPosters) && parsed.promotionalPosters.some((p: PromotionalPoster) => Boolean(p.imageUrl))
+            ? parsed.promotionalPosters
+            : DEFAULT_PROMOTIONAL_POSTERS,
       };
     } catch {
       return DEFAULT_SITE_CONFIG;

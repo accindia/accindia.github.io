@@ -11,11 +11,15 @@ import {
   Sparkles,
   Mail,
   Send,
+  Eye,
+  EyeOff,
+  ShieldCheck,
 } from 'lucide-react';
 import { Member } from '../types';
 import { StorageService } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
 import { ForgotCredentialsModal } from './ForgotCredentialsModal';
+import { AccLogo } from '../assets/logo';
 
 interface LoginModalProps {
   onLoginSuccess: (member: Member) => void;
@@ -26,10 +30,10 @@ interface LoginModalProps {
 export const LoginModal: React.FC<LoginModalProps> = ({
   onLoginSuccess,
   onGoToRegister,
-  onCancel,
 }) => {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -99,164 +103,212 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   };
 
   return (
-    <div className="max-w-md mx-auto space-y-5">
-      <div className="text-center">
-        <div className="w-12 h-12 rounded-full bg-blue-50 text-[#2874f0] mx-auto flex items-center justify-center border border-blue-200 mb-2 shadow-xs">
-          <LogIn className="w-6 h-6" />
-        </div>
-        <h2 className="text-xl font-black font-display text-slate-900">
-          ACC विद्यार्थी लॉगिन (Member Login)
-        </h2>
-        <p className="text-xs text-slate-500 mt-1">
-          अपनी यूनिक ACC 🆔 (उदा. SWACCRK01 / ACC249SWIS...) अथवा मोबाइल नंबर से सुरक्षित लॉगिन करें
-        </p>
-      </div>
+    <div className="max-w-md mx-auto space-y-6">
+      {/* Premium Glass Card Container with Rainbow Glow Border */}
+      <div className="rainbow-glow-card rounded-2xl p-5 sm:p-7 shadow-[0_10px_35px_-5px_rgba(0,0,0,0.12)] border border-slate-200/80">
+        {/* Top Branding Header with 3D ACC INDIA Logo */}
+        <div className="text-center space-y-3 pb-4 border-b border-slate-100">
+          {/* Animated Rainbow Halo Ring with 3D ACC INDIA Emblem */}
+          <div className="relative inline-block mx-auto">
+            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full rainbow-halo-ring p-1 flex items-center justify-center shadow-lg mx-auto">
+              <div className="w-full h-full rounded-full bg-gradient-to-b from-slate-900 via-[#0a1a3e] to-[#040e24] p-1.5 flex items-center justify-center overflow-hidden border border-white/20">
+                <AccLogo size="custom" className="w-full h-full drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)]" />
+              </div>
+            </div>
+            {/* National Badge Floating Accent */}
+            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-gradient-to-r from-orange-500 via-white to-emerald-600 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-full shadow-md border border-white whitespace-nowrap flex items-center gap-1">
+              <span>🇮🇳</span> ACC INDIA
+            </div>
+          </div>
 
-      {errorMessage && (
-        <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-sm flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-          <span>{errorMessage}</span>
-        </div>
-      )}
-
-      {successMessage && (
-        <div className="p-3 bg-green-50 border border-green-200 text-emerald-800 text-xs rounded-sm flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-          <span>{successMessage}</span>
-        </div>
-      )}
-
-      <form onSubmit={handleLogin} className="space-y-4">
-        <div>
-          <label className="block text-xs font-bold text-slate-800 mb-1">
-            Unique ACC 🆔 या पंजीकृत मोबाइल नंबर
-          </label>
-          <div className="relative">
-            <User className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-            <input
-              type="text"
-              value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
-              placeholder="उदा. SWACCRK01 या 8877490845"
-              className="w-full bg-white border border-gray-300 rounded-sm pl-9 pr-3 py-2 text-sm text-slate-900 font-mono-acc focus:outline-none focus:border-[#2874f0] focus:ring-1 focus:ring-[#2874f0]"
-              required
-            />
+          <div className="pt-2">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200/60 text-[#2874f0] font-black text-[10px] uppercase tracking-wider mb-1 shadow-xs">
+              <ShieldCheck className="w-3 h-3 text-blue-600" />
+              <span>Official Student & Member Portal</span>
+            </span>
+            <h2 className="text-xl sm:text-2xl font-black font-display text-slate-900 tracking-tight">
+              ACC विद्यार्थी लॉगिन (Member Login)
+            </h2>
+            <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+              अपनी यूनिक ACC 🆔 अथवा मोबाइल नंबर से सुरक्षित व त्वरित 1-क्लिक लॉगिन करें
+            </p>
           </div>
         </div>
 
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="block text-xs font-bold text-slate-800">
-              पासवर्ड (Password)
+        {/* Error / Success Feedback Alerts */}
+        {errorMessage && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2 animate-fadeIn shadow-xs">
+            <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+            <span className="font-medium">{errorMessage}</span>
+          </div>
+        )}
+
+        {successMessage && (
+          <div className="mt-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center gap-2 animate-fadeIn shadow-xs">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+            <span className="font-medium">{successMessage}</span>
+          </div>
+        )}
+
+        {/* Login Form */}
+        <form onSubmit={handleLogin} className="space-y-4 mt-5">
+          {/* Member ID / Mobile Input */}
+          <div>
+            <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center justify-between">
+              <span>Unique ACC 🆔 या पंजीकृत मोबाइल</span>
+              <span className="text-[10px] text-blue-600 font-semibold">उदा. SWACCRK01</span>
             </label>
+            <div className="relative group">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center absolute left-2 top-2 transition-colors group-focus-within:bg-blue-600 group-focus-within:text-white">
+                <User className="w-4 h-4" />
+              </div>
+              <input
+                type="text"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder="उदा. SWACCRK01 या 8877490845"
+                className="w-full bg-slate-50 hover:bg-white border border-slate-300 rounded-xl pl-12 pr-3 py-2.5 text-sm text-slate-900 font-mono-acc font-semibold transition-all focus:outline-none focus:bg-white focus:border-[#2874f0] focus:ring-2 focus:ring-[#2874f0]/20 shadow-xs"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Password Input with Show/Hide Toggle */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-slate-800 flex items-center gap-1">
+                <span>पासवर्ड (Password)</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForgotModal(true);
+                  setErrorMessage('');
+                  setSuccessMessage('');
+                }}
+                className="text-xs text-[#2874f0] hover:text-blue-700 hover:underline font-bold flex items-center gap-1 transition cursor-pointer"
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+                <span>🆔 या पासवर्ड भूल गए?</span>
+              </button>
+            </div>
+            <div className="relative group">
+              <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center absolute left-2 top-2 transition-colors group-focus-within:bg-amber-600 group-focus-within:text-white">
+                <Lock className="w-4 h-4" />
+              </div>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="अपना गुप्त पासवर्ड दर्ज करें"
+                className="w-full bg-slate-50 hover:bg-white border border-slate-300 rounded-xl pl-12 pr-10 py-2.5 text-sm text-slate-900 transition-all focus:outline-none focus:bg-white focus:border-[#2874f0] focus:ring-2 focus:ring-[#2874f0]/20 shadow-xs"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center absolute right-2 top-2 text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                title={showPassword ? 'पासवर्ड छुपाएं' : 'पासवर्ड देखें'}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          {/* ATTRACTIVE RAINBOW THEME EFFECT BUTTON */}
+          <div className="pt-2">
             <button
-              type="button"
-              onClick={() => {
-                setShowForgotModal(true);
-                setErrorMessage('');
-                setSuccessMessage('');
-              }}
-              className="text-xs text-[#2874f0] hover:underline font-bold flex items-center gap-1"
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-3.5 btn-premium-login btn-rainbow-sheen text-white font-black rounded-xl text-sm sm:text-base shadow-[0_8px_24px_rgba(37,99,235,0.4),0_2px_8px_rgba(0,0,0,0.3)] hover:shadow-[0_12px_28px_rgba(37,99,235,0.55),0_4px_12px_rgba(0,0,0,0.35)] active:translate-y-0.5 flex items-center justify-center gap-2.5 transition-all disabled:opacity-50 cursor-pointer border-t border-white/40 tracking-wide select-none"
             >
-              <KeyRound className="w-3.5 h-3.5" />
-              <span>🆔 या पासवर्ड भूल गए?</span>
+              {isLoading ? (
+                <span className="flex items-center gap-2 text-white drop-shadow">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>सत्यापित हो रहा है...</span>
+                </span>
+              ) : (
+                <>
+                  <div className="w-7 h-7 rounded-lg bg-white/20 border border-white/30 flex items-center justify-center shadow-inner shrink-0 text-cyan-200">
+                    <LogIn className="w-4 h-4 drop-shadow-sm" />
+                  </div>
+                  <span className="truncate drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.6)] font-black">
+                    पोर्टल में प्रवेश करें (Secure Login)
+                  </span>
+                  <ArrowRight className="w-4 h-4 ml-0.5 drop-shadow-sm shrink-0" />
+                </>
+              )}
             </button>
           </div>
-          <div className="relative">
-            <Lock className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="अपना गुप्त पासवर्ड दर्ज करें"
-              className="w-full bg-white border border-gray-300 rounded-sm pl-9 pr-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-[#2874f0] focus:ring-1 focus:ring-[#2874f0]"
-              required
-            />
-          </div>
-        </div>
+        </form>
 
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="w-full py-3 bg-gradient-to-b from-[#fb641b] via-[#ea580c] to-[#c2410c] hover:from-[#ff752b] hover:to-[#b03608] text-white font-black rounded-xl text-sm shadow-[0_4px_0_#7c2d12,0_8px_16px_rgba(251,100,27,0.35)] active:translate-y-0.5 active:shadow-[0_1px_0_#7c2d12] flex items-center justify-center gap-2.5 transition-all disabled:opacity-50 cursor-pointer"
-        >
-          {isLoading ? (
-            <span>सत्यापित हो रहा है...</span>
-          ) : (
-            <>
-              <div className="w-6 h-6 rounded-lg bg-white/20 border-t border-white/40 flex items-center justify-center shadow-inner">
-                <LogIn className="w-3.5 h-3.5 text-white" />
+        {/* Official Helpdesk Support Card */}
+        {(() => {
+          const siteConfig = StorageService.getSiteConfig();
+          return (
+            <div className="mt-5 bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200/90 rounded-xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+              <div className="text-left">
+                <span className="text-xs font-black text-slate-900 block flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  लॉगिन या 🆔 में कोई समस्या है?
+                </span>
+                <span className="text-[11px] text-slate-500 block mt-0.5">
+                  आधिकारिक सपोर्ट डेस्क से तुरंत 24x7 सहायता प्राप्त करें
+                </span>
               </div>
-              <span className="truncate">पोर्टल में प्रवेश करें (Secure Login)</span>
-              <ArrowRight className="w-4 h-4 ml-0.5" />
-            </>
-          )}
-        </button>
-      </form>
-
-      {/* Official Helpdesk Support */}
-      {(() => {
-        const siteConfig = StorageService.getSiteConfig();
-        return (
-          <div className="bg-[#f1f2f4] border border-gray-200 rounded-xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="text-left">
-              <span className="text-xs font-bold text-slate-900 block">
-                लॉगिन या 🆔 में कोई समस्या है?
-              </span>
-              <span className="text-[11px] text-slate-500">
-                आधिकारिक सपोर्ट डेस्क से तुरंत सहायता प्राप्त करें
-              </span>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              {siteConfig.showTelegramSupport !== false && (
-                <a
-                  href={siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-b from-[#229ed9] to-[#0088cc] hover:from-[#2eb0ee] hover:to-[#0077b3] text-white font-bold text-xs rounded-lg shadow-[0_2px_0_#005580] active:translate-y-0.5 active:shadow-none transition-all cursor-pointer whitespace-nowrap"
-                >
-                  <Send className="w-3.5 h-3.5 text-white" />
-                  <span>टेलीग्राम</span>
-                </a>
-              )}
-              {siteConfig.showEmailSupport !== false && (
-                <a
-                  href={`mailto:${siteConfig.officialEmail || 'newuserhelpline@gmail.com'}`}
-                  className="relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-b from-[#2874f0] to-[#1258c7] hover:from-[#3a82f7] hover:to-[#0f4eb8] text-white font-bold text-xs rounded-lg shadow-[0_2px_0_#0a3782] active:translate-y-0.5 active:shadow-none transition-all cursor-pointer whitespace-nowrap"
-                >
-                  <Mail className="w-3.5 h-3.5 text-white" />
-                  <span>ईमेल हेल्प</span>
-                </a>
-              )}
-              {siteConfig.showWhatsAppSupport === true && (
-                <a
-                  href={`https://api.whatsapp.com/send?phone=${(siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '')}&text=${encodeURIComponent(
+              <div className="flex items-center gap-2 flex-wrap shrink-0">
+                {siteConfig.showTelegramSupport !== false && (
+                  <a
+                    href={siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-b from-[#229ed9] to-[#0088cc] hover:from-[#2eb0ee] hover:to-[#0077b3] text-white font-bold text-xs rounded-lg shadow-[0_2px_0_#005580] active:translate-y-0.5 transition-all cursor-pointer whitespace-nowrap"
+                  >
+                    <Send className="w-3.5 h-3.5 text-white" />
+                    <span>टेलीग्राम</span>
+                  </a>
+                )}
+                {siteConfig.showEmailSupport !== false && (
+                  <a
+                    href={`mailto:${siteConfig.officialEmail || 'newuserhelpline@gmail.com'}`}
+                    className="relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-b from-[#2874f0] to-[#1258c7] hover:from-[#3a82f7] hover:to-[#0f4eb8] text-white font-bold text-xs rounded-lg shadow-[0_2px_0_#0a3782] active:translate-y-0.5 transition-all cursor-pointer whitespace-nowrap"
+                  >
+                    <Mail className="w-3.5 h-3.5 text-white" />
+                    <span>ईमेल</span>
+                  </a>
+                )}
+                {siteConfig.showWhatsAppSupport === true && (
+                  <a
+                    href={`https://api.whatsapp.com/send?phone=${(siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '')}&text=${encodeURIComponent(
                     'Namaste ACC Support, mujhe Achievers Club Community portal me login me sahayata chahiye.'
                   )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-b from-[#25D366] to-[#128C7E] hover:from-[#2be66f] hover:to-[#0f7267] text-white font-bold text-xs rounded-lg shadow-[0_2px_0_#075E54] active:translate-y-0.5 active:shadow-none transition-all cursor-pointer whitespace-nowrap"
-                >
-                  <MessageCircle className="w-3.5 h-3.5 text-white fill-white" />
-                  <span>WhatsApp</span>
-                </a>
-              )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-b from-[#25D366] to-[#128C7E] hover:from-[#2be66f] hover:to-[#0f7267] text-white font-bold text-xs rounded-lg shadow-[0_2px_0_#075E54] active:translate-y-0.5 transition-all cursor-pointer whitespace-nowrap"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5 text-white fill-white" />
+                    <span>WhatsApp</span>
+                  </a>
+                )}
+              </div>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
 
-      <div className="text-center pt-2 border-t border-gray-200">
-        <p className="text-xs text-slate-600 flex items-center justify-center gap-1 flex-wrap">
-          <span>क्या आप नए सदस्य हैं?</span>
-          <button
-            onClick={onGoToRegister}
-            className="text-[#2874f0] font-bold hover:underline inline-flex items-center gap-1"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span>नया रजिस्ट्रेशन करें (₹{StorageService.getSiteConfig().activationFee || 249})</span>
-          </button>
-        </p>
+        {/* Go to Registration Switcher */}
+        <div className="mt-5 text-center pt-4 border-t border-slate-100">
+          <p className="text-xs text-slate-600 flex items-center justify-center gap-2 flex-wrap">
+            <span className="font-medium">क्या आप नए सदस्य हैं?</span>
+            <button
+              onClick={onGoToRegister}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300/80 text-amber-900 font-black text-xs hover:from-amber-100 hover:to-orange-100 transition shadow-xs cursor-pointer group"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-600 group-hover:rotate-12 transition-transform" />
+              <span>नया रजिस्ट्रेशन करें (₹{StorageService.getSiteConfig().activationFee || 249})</span>
+              <ArrowRight className="w-3 h-3 text-amber-700" />
+            </button>
+          </p>
+        </div>
       </div>
 
       {showForgotModal && (

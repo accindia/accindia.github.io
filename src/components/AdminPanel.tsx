@@ -70,6 +70,8 @@ import {
   Droplets,
   Crown,
   Gem,
+  Bell,
+  Camera,
 } from 'lucide-react';
 import {
   Member,
@@ -84,6 +86,7 @@ import {
   RechargeTransaction,
   ReferralRecord,
   AvatarFrameType,
+  PrivateMessage,
 } from '../types';
 import { StorageService, subscribeToSync, SEED_MEMBERS } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
@@ -232,6 +235,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   const [memberNewPasswordInput, setMemberNewPasswordInput] = useState('');
   const [memberSecurityMsg, setMemberSecurityMsg] = useState('');
 
+  // Admin Live Notifications System (User Messages Alert)
+  const [adminMessages, setAdminMessages] = useState<PrivateMessage[]>(() =>
+    StorageService.getPrivateMessages()
+  );
+  const [showAdminNotifModal, setShowAdminNotifModal] = useState<boolean>(false);
+
   // Real-time Firestore sync on mount & when unlocked
   useEffect(() => {
     // 1. Initial background sync with Firestore
@@ -283,7 +292,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
       }
     });
 
-    // 6. Tab / local sync
+    // 6. Real-time private messages listener for user notifications
+    const unsubscribePrivateMessages = FirestoreService.subscribeToPrivateMessages('', (cloudMsgs) => {
+      if (cloudMsgs && cloudMsgs.length > 0) {
+        setAdminMessages(cloudMsgs);
+      }
+    });
+
+    // 7. Tab / local sync
     const unsubscribeSync = subscribeToSync(() => {
       setMembers(StorageService.getMembers());
       setWithdrawals(StorageService.getWithdrawals());
@@ -291,6 +307,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
       setAuditLogs(StorageService.getAuditLogs());
       setTransactions(StorageService.getTransactions());
       setReferrals(StorageService.getReferrals());
+      setAdminMessages(StorageService.getPrivateMessages());
     });
 
     return () => {
@@ -298,9 +315,37 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
       unsubscribeWithdrawals();
       unsubscribeSiteConfig();
       unsubscribeAuditLogs();
+      unsubscribePrivateMessages();
       unsubscribeSync();
     };
   }, []);
+
+  const userIncomingMessages = adminMessages
+    .filter((m) => m.senderRole === 'user')
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  const unreadUserMessagesCount = userIncomingMessages.filter((m) => !m.isRead).length;
+
+  const handleAdminReplyToMessage = (msg: PrivateMessage) => {
+    const member = members.find(
+      (m) =>
+        (m.accId || '').toUpperCase() === (msg.userAccId || msg.senderAccId || '').toUpperCase()
+    );
+    StorageService.markMessagesAsRead(msg.userAccId, 'admin');
+    setAdminMessages(StorageService.getPrivateMessages());
+    setShowAdminNotifModal(false);
+    if (member) {
+      setSelectedMemberFor360(member);
+      setMember360ActiveTab('private_chat');
+    }
+  };
+
+  const handleMarkAllUserMessagesRead = () => {
+    userIncomingMessages.forEach((m) => {
+      StorageService.markMessagesAsRead(m.userAccId, 'admin');
+    });
+    setAdminMessages(StorageService.getPrivateMessages());
+  };
 
   // Screenshot Preview & Verification Modal State
   const [screenshotModalMember, setScreenshotModalMember] = useState<Member | null>(null);
@@ -1212,6 +1257,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
 
         {/* Database backup, change password & logout buttons */}
         <div className="flex items-center gap-2 flex-wrap">
+          {/* 3D Admin Live Notification Button */}
+          <button
+            type="button"
+            onClick={() => setShowAdminNotifModal(true)}
+            className="relative flex items-center gap-2 px-3.5 py-1.5 bg-gradient-to-b from-[#e11d48] via-[#be123c] to-[#9f1239] hover:from-[#f43f5e] hover:to-[#be123c] text-white text-xs font-black rounded-lg shadow-[0_2.5px_0_#4c0519] active:translate-y-0.5 active:shadow-none border border-rose-400/40 transition cursor-pointer"
+            title="यूजर प्राइवेट मैसेज व लाइव नोटिफिकेशन"
+          >
+            <Bell className={`w-3.5 h-3.5 ${unreadUserMessagesCount > 0 ? 'animate-bounce text-amber-300' : 'text-white'}`} />
+            <span>यूजर संदेश</span>
+            <span className={`font-black text-[10px] px-2 py-0.2 rounded-full shadow-xs ${
+              unreadUserMessagesCount > 0
+                ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-300 animate-pulse'
+                : 'bg-emerald-950/80 text-emerald-300 border border-emerald-400/50'
+            }`}>
+              {unreadUserMessagesCount > 0 ? `${unreadUserMessagesCount} नए सन्देश` : '0 नए'}
+            </span>
+          </button>
+
           <button
             onClick={refreshData}
             disabled={isCloudSyncing}
@@ -5930,17 +5993,117 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-800 mb-1">
-                    पोस्टर छवि URL (Image URL):
+                    पोस्टर छवि (Image URL या फ़ाइल अपलोड):
                   </label>
                   <input
                     type="text"
                     value={posterImageUrlInput}
                     onChange={(e) => setPosterImageUrlInput(e.target.value)}
-                    placeholder="https://..."
+                    placeholder="छवि URL या नीचे से चुनें..."
                     className="w-full bg-white border border-gray-300 rounded-sm px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#fb641b] font-mono-acc"
                   />
+                  
+                  {/* Festival Poster Presets Quick Select */}
+                  <div className="mt-1.5 space-y-1">
+                    <span className="text-[10px] text-slate-500 font-bold block">
+                      🎨 तैयार 8K फेस्टिव पोस्टर्स में से चुनें:
+                    </span>
+                    <div className="grid grid-cols-2 gap-1 text-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPosterImageUrlInput('/src/assets/images/dhanteras_festival_banner_1793965565116.jpg');
+                          if (!posterTitleInput) setPosterTitleInput('🪙 धनतेरस महापर्व विशेष • ₹249 में डिजिटल आत्मनिर्भरता');
+                        }}
+                        className="p-1 text-left bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded truncate font-medium text-amber-900 cursor-pointer"
+                      >
+                        🪙 धनतेरस 2026
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPosterImageUrlInput('/src/assets/images/diwali_deepotsav_banner_1793965580091.jpg');
+                          if (!posterTitleInput) setPosterTitleInput('🪔 शुभ दीपावली दीपोत्सव • हर घर खुशहाली व आमदनी');
+                        }}
+                        className="p-1 text-left bg-purple-50 hover:bg-purple-100 border border-purple-300 rounded truncate font-medium text-purple-900 cursor-pointer"
+                      >
+                        🪔 दीपावली 2026
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPosterImageUrlInput('/src/assets/images/chhath_puja_banner_1793965595973.jpg');
+                          if (!posterTitleInput) setPosterTitleInput('☀️ लोक आस्था का महापर्व छठ पूजा • भगवान सूर्य का आशीर्वाद');
+                        }}
+                        className="p-1 text-left bg-orange-50 hover:bg-orange-100 border border-orange-300 rounded truncate font-medium text-orange-900 cursor-pointer"
+                      >
+                        ☀️ छठ पूजा 2026
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPosterImageUrlInput('/src/assets/images/govardhan_bhaidooj_banner_1793965611440.jpg');
+                          if (!posterTitleInput) setPosterTitleInput('🌾 गोवर्धन पूजा एवं भाई दूज • स्नेह व समृद्धि का उत्सव');
+                        }}
+                        className="p-1 text-left bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded truncate font-medium text-emerald-900 cursor-pointer"
+                      >
+                        🌾 गोवर्धन / भाई दूज
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPosterImageUrlInput('/src/assets/images/acc_student_earning_banner_1793965628499.jpg');
+                          if (!posterTitleInput) setPosterTitleInput('🎓 ₹249 स्टूडेंट अर्निंग क्रांति • कॉलेज के साथ पॉकेट मनी');
+                        }}
+                        className="p-1 text-left bg-blue-50 hover:bg-blue-100 border border-blue-300 rounded truncate font-medium text-[#2874f0] cursor-pointer col-span-2"
+                      >
+                        🎓 ₹249 स्टूडेंट अर्निंग
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Direct File Upload */}
+                  <div className="mt-2 flex items-center gap-2">
+                    <label className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] font-bold rounded border border-gray-300 cursor-pointer flex items-center gap-1">
+                      <Camera className="w-3 h-3 text-slate-600" />
+                      <span>गैलरी / डिवाइस से अपलोड करें</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              if (typeof reader.result === 'string') {
+                                setPosterImageUrlInput(reader.result);
+                              }
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
                 </div>
               </div>
+
+              {/* Live Banner Preview in Modal */}
+              {posterImageUrlInput && (
+                <div className="p-2.5 bg-slate-50 border border-gray-200 rounded-lg space-y-1">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                    👁️ लाइव पोस्टर प्रीव्यू:
+                  </span>
+                  <div className="h-28 rounded-lg overflow-hidden border border-gray-300 bg-black/10">
+                    <img
+                      src={posterImageUrlInput}
+                      alt="Banner Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="bg-[#f1f2f4] p-3 rounded-lg border border-gray-200">
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-800">
@@ -7170,11 +7333,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                           <span className="text-[10px] text-indigo-300 block font-bold uppercase">3D लाइव अवतार फ्रेम</span>
                           <div className="flex items-center justify-between mt-1">
                             <strong className="text-sky-300 text-xs flex items-center gap-1.5">
-                              {activeM.avatarFrame === 'fire' ? '🔥 Fire Flame' :
-                               activeM.avatarFrame === 'water' ? '💧 Water Ocean' :
-                               activeM.avatarFrame === 'work_hard' ? '⚡ Work Hard Neon' :
-                               activeM.avatarFrame === 'royal_gold' ? '👑 Royal Gold VIP' :
-                               activeM.avatarFrame === 'neon_cyber' ? '💎 Cosmic Diamond' : '⚪ Classic Clean'}
+                              {AVATAR_FRAMES.find((f) => f.id === activeM.avatarFrame)?.name || '⚪ Classic Clean'}
                             </strong>
                             <button
                               type="button"
@@ -8703,6 +8862,160 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
       );
       return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
     })()}
+      {/* 3D Admin Live Notifications Modal (User Messages) */}
+      {showAdminNotifModal &&
+        (() => {
+          const modalContent = (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-fadeIn">
+              <div className="bg-white border-2 border-slate-300 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+                {/* Header */}
+                <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-[#1e293b] text-white p-4 sm:p-5 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-600 to-amber-500 flex items-center justify-center shadow-md">
+                      <Bell className="w-5 h-5 text-white animate-bounce" />
+                    </div>
+                    <div>
+                      <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                        <span>यूजर लाइव संदेश व चैट अलर्ट</span>
+                        {unreadUserMessagesCount > 0 && (
+                          <span className="text-[10px] bg-rose-500 text-white px-2 py-0.5 rounded-full font-black animate-pulse">
+                            {unreadUserMessagesCount} नया
+                          </span>
+                        )}
+                      </h3>
+                      <p className="text-xs text-slate-300">
+                        छात्रों व सदस्यों द्वारा भेजे गए प्राइवेट संदेश - 1 क्लिक में सीधे प्राइवेट चैट में रिप्लाई करें
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminNotifModal(false)}
+                    className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Body List */}
+                <div className="p-4 overflow-y-auto space-y-3 flex-1 min-h-[220px] bg-slate-50">
+                  {userIncomingMessages.length === 0 ? (
+                    <div className="text-center py-12 px-4 space-y-3">
+                      <div className="w-14 h-14 mx-auto rounded-full bg-slate-200 flex items-center justify-center text-slate-500">
+                        <Bell className="w-7 h-7 text-slate-400" />
+                      </div>
+                      <h4 className="text-sm font-bold text-slate-800">फिलहाल कोई नया यूजर संदेश नहीं है</h4>
+                      <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                        जैसे ही कोई छात्र या सदस्य हेल्पडेस्क चैट से संदेश भेजेगा, आपको यहां तुरंत लाइव अलर्ट दिखाई देगा।
+                      </p>
+                    </div>
+                  ) : (
+                    userIncomingMessages.map((msg) => {
+                      const member = members.find(
+                        (m) =>
+                          (m.accId || '').toUpperCase() === (msg.userAccId || msg.senderAccId || '').toUpperCase()
+                      );
+                      const displayName = member?.fullName || msg.senderName || 'सदस्य';
+                      const accId = member?.accId || msg.userAccId || msg.senderAccId;
+
+                      return (
+                        <div
+                          key={msg.id}
+                          className={`p-4 rounded-xl border transition-all ${
+                            !msg.isRead
+                              ? 'bg-rose-50/70 border-rose-300 shadow-sm ring-1 ring-rose-200'
+                              : 'bg-white border-gray-200 hover:border-gray-300 shadow-xs'
+                          }`}
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-sm text-slate-900 font-display">
+                                {displayName}
+                              </span>
+                              <span className="font-mono-acc font-black text-xs px-2.5 py-0.5 rounded id-badge-rainbow text-gold-solid tracking-wider">
+                                {accId}
+                              </span>
+                              {member && (
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                    member.status === 'verified'
+                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                      : 'bg-amber-100 text-amber-800 border border-amber-300'
+                                  }`}
+                                >
+                                  {member.status === 'verified' ? '✓ VERIFIED' : '⏳ PENDING'}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {!msg.isRead && (
+                                <span className="text-[10px] bg-rose-600 text-white font-black px-2 py-0.5 rounded-full shadow-xs">
+                                  नया सन्देश
+                                </span>
+                              )}
+                              <span className="text-xs text-slate-500 font-mono">
+                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}{' '}
+                                •{' '}
+                                {new Date(msg.timestamp).toLocaleDateString('hi-IN', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                })}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="bg-white/80 p-2.5 rounded-lg border border-gray-200/80 text-xs sm:text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
+                            {msg.text}
+                          </div>
+
+                          <div className="mt-3 flex items-center justify-between gap-2 pt-2 border-t border-gray-200/60">
+                            <span className="text-[11px] text-slate-500">
+                              मोबाइल: <strong className="text-slate-700">{member?.mobile || 'N/A'}</strong>
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => handleAdminReplyToMessage(msg)}
+                              className="px-3.5 py-1.5 bg-gradient-to-b from-[#229ed9] to-[#0088cc] hover:from-[#2eb0ee] hover:to-[#0077b3] text-white text-xs font-black rounded-lg shadow-[0_2.5px_0_#005580] active:translate-y-0.5 active:shadow-none inline-flex items-center gap-1.5 transition cursor-pointer"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                              <span>💬 डायरेक्ट रिप्लाई करें (Reply in Pvt Chat)</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="p-3 bg-white border-t border-gray-200 flex items-center justify-between gap-2">
+                  {unreadUserMessagesCount > 0 ? (
+                    <button
+                      type="button"
+                      onClick={handleMarkAllUserMessagesRead}
+                      className="text-xs text-slate-600 hover:text-slate-900 font-bold transition cursor-pointer"
+                    >
+                      ✓ सभी को पढ़ा हुआ मार्क करें
+                    </button>
+                  ) : (
+                    <span className="text-xs text-slate-500">सभी यूजर संदेश पढ़े जा चुके हैं</span>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminNotifModal(false)}
+                    className="px-4 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition cursor-pointer"
+                  >
+                    बंद करें
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+          return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
+        })()}
     </div>
   );
 };

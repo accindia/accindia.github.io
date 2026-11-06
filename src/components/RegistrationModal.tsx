@@ -37,6 +37,7 @@ import { FirestoreService } from '../services/firestore';
 import { compressImage } from '../utils/imageCompressor';
 import { UpiQrCode } from './UpiQrCode';
 import { ImageCropperModal, CropShape } from './ImageCropperModal';
+import { AccLogo } from '../assets/logo';
 
 interface RegistrationModalProps {
   onSuccess: (newMember: Member) => void;
@@ -489,12 +490,21 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
   if (createdMember) {
     return (
       <div className="max-w-2xl mx-auto space-y-6 text-center py-4 animate-fadeIn">
-        <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center border-2 border-emerald-300 shadow-sm">
-          <CheckCircle2 className="w-10 h-10" />
+        {/* Animated Rainbow Halo Ring with 3D ACC INDIA Emblem */}
+        <div className="relative inline-block mx-auto">
+          <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full rainbow-halo-ring p-1 flex items-center justify-center shadow-lg mx-auto">
+            <div className="w-full h-full rounded-full bg-gradient-to-b from-slate-900 via-[#0a1a3e] to-[#040e24] p-1.5 flex items-center justify-center overflow-hidden border border-white/20">
+              <AccLogo size="custom" className="w-full h-full drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)]" />
+            </div>
+          </div>
+          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-gradient-to-r from-orange-500 via-white to-emerald-600 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-full shadow-md border border-white whitespace-nowrap flex items-center gap-1">
+            <span>🇮🇳</span> ACC INDIA
+          </div>
         </div>
 
         <div>
-          <span className="text-xs font-bold text-emerald-800 uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded border border-emerald-200">
+          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
             रजिस्ट्रेशन सफलतापूर्वक पूर्ण हुआ!
           </span>
           <h2 className="text-2xl font-black font-display text-slate-900 mt-2">
@@ -572,11 +582,11 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
           <button
             onClick={() => onSuccess(createdMember)}
-            className="w-full sm:w-auto px-6 py-3 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold rounded-sm shadow-md flex items-center justify-center gap-2 transition"
+            className="w-full sm:w-auto px-7 py-3.5 btn-rainbow-theme btn-rainbow-sheen text-white font-black rounded-xl shadow-[0_8px_24px_rgba(255,0,122,0.35),0_4px_12px_rgba(37,99,235,0.35)] hover:shadow-[0_12px_32px_rgba(255,0,122,0.5),0_6px_16px_rgba(37,99,235,0.45)] active:translate-y-0.5 flex items-center justify-center gap-2.5 transition cursor-pointer border-t border-white/40"
           >
-            <LayoutDashboard className="w-4 h-4" />
-            <span>डैशबोर्ड एवं डिजिटल ID कार्ड खोलें</span>
-            <ArrowRight className="w-4 h-4" />
+            <LayoutDashboard className="w-4 h-4 drop-shadow" />
+            <span className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">डैशबोर्ड एवं डिजिटल ID कार्ड खोलें</span>
+            <ArrowRight className="w-4 h-4 drop-shadow" />
           </button>
 
           <a
@@ -611,30 +621,50 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
 
   // STEP BY STEP FORM
   return (
-    <div className="max-w-2xl mx-auto">
-      {/* Top Title & Step Indicator */}
-      <div className="text-center mb-6">
-        <h2 className="text-xl sm:text-2xl font-black font-display text-slate-900">
-          ACC विद्यार्थी सदस्यता 🆔 रजिस्ट्रेशन फॉर्म
-        </h2>
-        <p className="text-xs text-slate-500 mt-1">
-          Start Young, Retire Young • ₹249 One-Time Joining Fee (Zero Investment Work)
-        </p>
+    <div className="max-w-2xl mx-auto space-y-6">
+      {/* Top Title & Step Indicator Card with Rainbow Glow */}
+      <div className="rainbow-glow-card rounded-2xl p-5 sm:p-6 shadow-[0_10px_35px_-5px_rgba(0,0,0,0.1)] border border-slate-200/80 text-center">
+        {/* Animated Rainbow Halo Ring with 3D ACC INDIA Emblem */}
+        <div className="relative inline-block mx-auto mb-3">
+          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full rainbow-halo-ring p-1 flex items-center justify-center shadow-lg mx-auto">
+            <div className="w-full h-full rounded-full bg-gradient-to-b from-slate-900 via-[#0a1a3e] to-[#040e24] p-1.5 flex items-center justify-center overflow-hidden border border-white/20">
+              <AccLogo size="custom" className="w-full h-full drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)]" />
+            </div>
+          </div>
+          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-gradient-to-r from-orange-500 via-white to-emerald-600 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-full shadow-md border border-white whitespace-nowrap flex items-center gap-1">
+            <span>🇮🇳</span> ACC INDIA
+          </div>
+        </div>
 
-        {/* Step Indicator - Responsive 4 Steps */}
+        <div>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200/60 text-[#2874f0] font-black text-[10px] uppercase tracking-wider mb-1 shadow-xs">
+            <ShieldCheck className="w-3 h-3 text-blue-600" />
+            <span>Official ACC Registration Portal</span>
+          </span>
+          <h2 className="text-xl sm:text-2xl font-black font-display text-slate-900 tracking-tight">
+            ACC विद्यार्थी सदस्यता 🆔 रजिस्ट्रेशन फॉर्म
+          </h2>
+          <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+            Start Young, Retire Young • ₹249 One-Time Joining Fee (Zero Investment Work)
+          </p>
+        </div>
+
+        {/* Step Indicator - Responsive 4 Steps with Rainbow Highlight */}
         <div className="flex items-center justify-start sm:justify-center gap-1.5 sm:gap-2 mt-4 overflow-x-auto no-scrollbar pb-1">
           {[1, 2, 3, 4].map((s) => (
             <div
               key={s}
-              className={`flex items-center gap-1 text-[11px] sm:text-xs font-bold px-2 sm:px-3 py-1 rounded transition shrink-0 ${
+              className={`flex items-center gap-1.5 text-[11px] sm:text-xs font-bold px-3 py-1.5 rounded-xl transition-all shrink-0 ${
                 step === s
-                  ? 'bg-[#2874f0] text-white shadow-xs'
+                  ? 'btn-rainbow-theme text-white shadow-md font-black'
                   : step > s
-                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-300'
-                  : 'bg-slate-100 text-slate-500 border border-gray-200'
+                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold'
+                  : 'bg-slate-100 text-slate-500 border border-slate-200'
               }`}
             >
-              <span>{s}.</span>
+              <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${step === s ? 'bg-white/30 text-white' : step > s ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                {step > s ? '✓' : s}
+              </span>
               <span className="sm:hidden">{s === 1 ? 'विवरण' : s === 2 ? 'सिस्टम' : s === 3 ? 'पेआउट' : 'पेमेंट'}</span>
               <span className="hidden sm:inline">{s === 1 ? 'व्यक्तिगत जानकारी' : s === 2 ? 'सिस्टम व स्पॉन्सर' : s === 3 ? 'पेआउट खाता (UPI / Bank)' : '₹249 भुगतान एवं UTR'}</span>
             </div>
@@ -953,14 +983,14 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
               </div>
             </div>
 
-            <div className="flex justify-end pt-2">
+            <div className="flex justify-end pt-3">
               <button
                 type="button"
                 onClick={handleNext}
-                className="px-6 py-2.5 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold rounded-sm flex items-center gap-2 shadow-sm transition"
+                className="px-7 py-3 btn-rainbow-theme btn-rainbow-sheen text-white font-black rounded-xl flex items-center gap-2.5 shadow-[0_4px_16px_rgba(255,0,122,0.35)] hover:shadow-[0_6px_20px_rgba(255,0,122,0.45)] active:translate-y-0.5 transition cursor-pointer border-t border-white/40 text-sm"
               >
-                <span>आगे बढ़ें (Choose System)</span>
-                <ArrowRight className="w-4 h-4" />
+                <span className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">आगे बढ़ें (Choose System)</span>
+                <ArrowRight className="w-4 h-4 drop-shadow" />
               </button>
             </div>
           </div>
@@ -1100,11 +1130,11 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center justify-between pt-3">
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-sm flex items-center gap-2 transition"
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl flex items-center gap-2 transition cursor-pointer border border-slate-200"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span>पिछला पृष्ठ</span>
@@ -1112,11 +1142,11 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
               <button
                 type="button"
                 onClick={handleNext}
-                className="px-6 py-2.5 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold rounded-sm flex items-center gap-2 shadow-sm transition"
+                className="px-6 py-3 btn-rainbow-theme btn-rainbow-sheen text-white font-black rounded-xl flex items-center gap-2.5 shadow-[0_4px_16px_rgba(255,0,122,0.35)] hover:shadow-[0_6px_20px_rgba(255,0,122,0.45)] active:translate-y-0.5 transition cursor-pointer border-t border-white/40 text-xs sm:text-sm"
               >
-                <Wallet className="w-4 h-4" />
-                <span>पेआउट खाता विवरण पर जाएं (Next)</span>
-                <ArrowRight className="w-4 h-4" />
+                <Wallet className="w-4 h-4 drop-shadow" />
+                <span className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">पेआउट खाता विवरण पर जाएं (Next)</span>
+                <ArrowRight className="w-4 h-4 drop-shadow" />
               </button>
             </div>
           </div>
@@ -1302,11 +1332,11 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
               </div>
             )}
 
-            <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center justify-between pt-3">
               <button
                 type="button"
                 onClick={() => setStep(2)}
-                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-sm flex items-center gap-2 transition"
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl flex items-center gap-2 transition cursor-pointer border border-slate-200"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span>पिछला पृष्ठ</span>
@@ -1314,11 +1344,11 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
               <button
                 type="button"
                 onClick={handleNext}
-                className="px-6 py-2.5 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold rounded-sm flex items-center gap-2 shadow-sm transition"
+                className="px-6 py-3 btn-rainbow-theme btn-rainbow-sheen text-white font-black rounded-xl flex items-center gap-2.5 shadow-[0_4px_16px_rgba(255,0,122,0.35)] hover:shadow-[0_6px_20px_rgba(255,0,122,0.45)] active:translate-y-0.5 transition cursor-pointer border-t border-white/40 text-xs sm:text-sm"
               >
-                <CreditCard className="w-4 h-4" />
-                <span>₹249 भुगतान पर जाएं (Next)</span>
-                <ArrowRight className="w-4 h-4" />
+                <CreditCard className="w-4 h-4 drop-shadow" />
+                <span className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">₹249 भुगतान पर जाएं (Next)</span>
+                <ArrowRight className="w-4 h-4 drop-shadow" />
               </button>
             </div>
           </div>
@@ -1450,11 +1480,11 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center justify-between pt-3">
               <button
                 type="button"
                 onClick={() => setStep(3)}
-                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-sm flex items-center gap-2 transition"
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl flex items-center gap-2 transition cursor-pointer border border-slate-200"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span>पिछला पृष्ठ</span>
@@ -1462,14 +1492,20 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-8 py-3 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold rounded-sm shadow-md flex items-center gap-2 transition disabled:opacity-50"
+                className="px-8 py-3.5 btn-rainbow-theme btn-rainbow-sheen text-white font-black rounded-xl shadow-[0_8px_24px_rgba(255,0,122,0.4),0_4px_12px_rgba(37,99,235,0.4)] hover:shadow-[0_12px_32px_rgba(255,0,122,0.55),0_6px_16px_rgba(37,99,235,0.5)] active:translate-y-0.5 flex items-center gap-2.5 transition disabled:opacity-50 cursor-pointer border-t border-white/40 text-sm sm:text-base select-none"
               >
                 {isSubmitting ? (
-                  <span>आईडी बन रही है...</span>
+                  <span className="flex items-center gap-2 drop-shadow">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>आईडी बन रही है...</span>
+                  </span>
                 ) : (
                   <>
-                    <Sparkles className="w-4 h-4" />
-                    <span>आईडी एक्टिवेट करें (Submit)</span>
+                    <Sparkles className="w-5 h-5 text-amber-300 drop-shadow" />
+                    <span className="drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.6)] font-black">
+                      आईडी एक्टिवेट करें (Submit)
+                    </span>
+                    <ArrowRight className="w-4 h-4 drop-shadow" />
                   </>
                 )}
               </button>
@@ -1479,15 +1515,16 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
       </form>
 
       {/* Already Registered helper */}
-      <div className="mt-6 text-center border-t border-gray-200 pt-4">
-        <p className="text-xs text-slate-600 flex items-center justify-center gap-1 flex-wrap">
-          <span>पहले से पंजीकृत हैं?</span>
+      <div className="mt-6 text-center border-t border-slate-200 pt-4">
+        <p className="text-xs text-slate-600 flex items-center justify-center gap-2 flex-wrap">
+          <span className="font-medium">पहले से पंजीकृत हैं?</span>
           <button
             onClick={onGoToLogin}
-            className="text-[#2874f0] font-bold hover:underline inline-flex items-center gap-1"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl btn-premium-login text-white font-black text-xs shadow-md active:translate-y-0.5 transition cursor-pointer border-t border-white/30 group"
           >
-            <LogIn className="w-3.5 h-3.5" />
-            <span>यहां क्लिक करके लॉगिन करें</span>
+            <LogIn className="w-3.5 h-3.5 text-cyan-200" />
+            <span className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">यहां क्लिक करके लॉगिन करें</span>
+            <ArrowRight className="w-3 h-3 text-cyan-200" />
           </button>
         </p>
       </div>
