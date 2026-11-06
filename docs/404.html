@@ -5,13 +5,16 @@
     <title>Achievers Club Community (ACC)</title>
     <script type="text/javascript">
       // Single Page Apps for GitHub Pages
-      // Redirects 404 subpaths to index.html with query parameter
-      var pathSegmentsToKeep = 0;
+      // Accurately keep repository name in pathSegmentsToKeep for username.github.io/repo-name/
       var l = window.location;
+      var pathSegments = l.pathname.split('/').filter(Boolean);
+      var isProjectPage = l.hostname.endsWith('github.io') && pathSegments.length > 0;
+      var pathSegmentsToKeep = isProjectPage ? 1 : 0;
+      
       l.replace(
         l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
-        l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?/' +
-        l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
+        (isProjectPage ? '/' + pathSegments[0] : '') + '/?/' +
+        pathSegments.slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
         (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
         l.hash
       );

@@ -78,7 +78,7 @@ export const FESTIVE_ARTICLE_SLIDES: FestiveArticleSlide[] = [
     accentBg: 'bg-yellow-400 text-slate-950',
     accentText: 'text-yellow-200',
     iconEmoji: '💰',
-    imageUrl: '/src/assets/images/dhanteras_festival_banner_1793965565116.jpg',
+    imageUrl: './images/dhanteras_festival_banner_1793965565116.jpg',
   },
   {
     id: 'diwali',
@@ -100,7 +100,7 @@ export const FESTIVE_ARTICLE_SLIDES: FestiveArticleSlide[] = [
     accentBg: 'bg-amber-400 text-slate-950',
     accentText: 'text-amber-200',
     iconEmoji: '🪔',
-    imageUrl: '/src/assets/images/diwali_deepotsav_banner_1793965580091.jpg',
+    imageUrl: './images/diwali_deepotsav_banner_1793965580091.jpg',
   },
   {
     id: 'govardhan',
@@ -122,7 +122,7 @@ export const FESTIVE_ARTICLE_SLIDES: FestiveArticleSlide[] = [
     accentBg: 'bg-emerald-400 text-slate-950',
     accentText: 'text-emerald-200',
     iconEmoji: '🏔️',
-    imageUrl: '/src/assets/images/govardhan_bhaidooj_banner_1793965611440.jpg',
+    imageUrl: './images/govardhan_bhaidooj_banner_1793965611440.jpg',
   },
   {
     id: 'bhaidooj',
@@ -144,7 +144,7 @@ export const FESTIVE_ARTICLE_SLIDES: FestiveArticleSlide[] = [
     accentBg: 'bg-rose-400 text-slate-950',
     accentText: 'text-rose-200',
     iconEmoji: '✨',
-    imageUrl: '/src/assets/images/govardhan_bhaidooj_banner_1793965611440.jpg',
+    imageUrl: './images/govardhan_bhaidooj_banner_1793965611440.jpg',
   },
   {
     id: 'chhath',
@@ -166,7 +166,7 @@ export const FESTIVE_ARTICLE_SLIDES: FestiveArticleSlide[] = [
     accentBg: 'bg-orange-400 text-slate-950',
     accentText: 'text-orange-200',
     iconEmoji: '🌅',
-    imageUrl: '/src/assets/images/chhath_puja_banner_1793965595973.jpg',
+    imageUrl: './images/chhath_puja_banner_1793965595973.jpg',
   },
   {
     id: 'value249',
@@ -188,7 +188,7 @@ export const FESTIVE_ARTICLE_SLIDES: FestiveArticleSlide[] = [
     accentBg: 'bg-[#2874f0] text-white',
     accentText: 'text-sky-200',
     iconEmoji: '🍕',
-    imageUrl: '/src/assets/images/acc_student_earning_banner_1793965628499.jpg',
+    imageUrl: './images/acc_student_earning_banner_1793965628499.jpg',
   },
   {
     id: 'swistwis',
@@ -210,7 +210,7 @@ export const FESTIVE_ARTICLE_SLIDES: FestiveArticleSlide[] = [
     accentBg: 'bg-emerald-400 text-slate-950',
     accentText: 'text-emerald-200',
     iconEmoji: '🚀',
-    imageUrl: '/src/assets/images/acc_student_earning_banner_1793965628499.jpg',
+    imageUrl: './images/acc_student_earning_banner_1793965628499.jpg',
   }
 ];
 

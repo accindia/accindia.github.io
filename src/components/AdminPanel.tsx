@@ -6012,7 +6012,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                       <button
                         type="button"
                         onClick={() => {
-                          setPosterImageUrlInput('/src/assets/images/dhanteras_festival_banner_1793965565116.jpg');
+                          setPosterImageUrlInput('./images/dhanteras_festival_banner_1793965565116.jpg');
                           if (!posterTitleInput) setPosterTitleInput('🪙 धनतेरस महापर्व विशेष • ₹249 में डिजिटल आत्मनिर्भरता');
                         }}
                         className="p-1 text-left bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded truncate font-medium text-amber-900 cursor-pointer"
@@ -6022,7 +6022,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                       <button
                         type="button"
                         onClick={() => {
-                          setPosterImageUrlInput('/src/assets/images/diwali_deepotsav_banner_1793965580091.jpg');
+                          setPosterImageUrlInput('./images/diwali_deepotsav_banner_1793965580091.jpg');
                           if (!posterTitleInput) setPosterTitleInput('🪔 शुभ दीपावली दीपोत्सव • हर घर खुशहाली व आमदनी');
                         }}
                         className="p-1 text-left bg-purple-50 hover:bg-purple-100 border border-purple-300 rounded truncate font-medium text-purple-900 cursor-pointer"
@@ -6032,7 +6032,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                       <button
                         type="button"
                         onClick={() => {
-                          setPosterImageUrlInput('/src/assets/images/chhath_puja_banner_1793965595973.jpg');
+                          setPosterImageUrlInput('./images/chhath_puja_banner_1793965595973.jpg');
                           if (!posterTitleInput) setPosterTitleInput('☀️ लोक आस्था का महापर्व छठ पूजा • भगवान सूर्य का आशीर्वाद');
                         }}
                         className="p-1 text-left bg-orange-50 hover:bg-orange-100 border border-orange-300 rounded truncate font-medium text-orange-900 cursor-pointer"
@@ -6042,7 +6042,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                       <button
                         type="button"
                         onClick={() => {
-                          setPosterImageUrlInput('/src/assets/images/govardhan_bhaidooj_banner_1793965611440.jpg');
+                          setPosterImageUrlInput('./images/govardhan_bhaidooj_banner_1793965611440.jpg');
                           if (!posterTitleInput) setPosterTitleInput('🌾 गोवर्धन पूजा एवं भाई दूज • स्नेह व समृद्धि का उत्सव');
                         }}
                         className="p-1 text-left bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded truncate font-medium text-emerald-900 cursor-pointer"
@@ -6052,7 +6052,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                       <button
                         type="button"
                         onClick={() => {
-                          setPosterImageUrlInput('/src/assets/images/acc_student_earning_banner_1793965628499.jpg');
+                          setPosterImageUrlInput('./images/acc_student_earning_banner_1793965628499.jpg');
                           if (!posterTitleInput) setPosterTitleInput('🎓 ₹249 स्टूडेंट अर्निंग क्रांति • कॉलेज के साथ पॉकेट मनी');
                         }}
                         className="p-1 text-left bg-blue-50 hover:bg-blue-100 border border-blue-300 rounded truncate font-medium text-[#2874f0] cursor-pointer col-span-2"
