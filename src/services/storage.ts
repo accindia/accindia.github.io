@@ -713,11 +713,49 @@ export const StorageService = {
       const data = localStorage.getItem(PRIVATE_MESSAGES_KEY);
       const msgs: PrivateMessage[] = data ? JSON.parse(data) : [];
       if (userAccId) {
-        return msgs.filter((m) => (m.userAccId || '').toUpperCase() === userAccId.toUpperCase());
+        const needle = userAccId.toUpperCase();
+        return msgs.filter((m) => {
+          const directMatch = (m.userAccId || '').toUpperCase() === needle;
+          const participantMatch =
+            (m.senderAccId || '').toUpperCase() === needle ||
+            (m.recipientAccId || '').toUpperCase() === needle;
+          return directMatch || participantMatch;
+        });
       }
       return msgs;
     } catch {
       return [];
+    }
+  },
+
+  getSponsorChannelKey(accId1: string, accId2: string): string {
+    const ids = [accId1.trim().toUpperCase(), accId2.trim().toUpperCase()].sort();
+    return `sp_${ids[0]}_${ids[1]}`;
+  },
+
+  getChannelMessages(channelKey: string): PrivateMessage[] {
+    try {
+      const msgs = this.getPrivateMessages();
+      const needle = channelKey.toUpperCase();
+      return msgs.filter((m) => (m.userAccId || '').toUpperCase() === needle);
+    } catch {
+      return [];
+    }
+  },
+
+  getUserUnreadMessageCount(userAccId: string): number {
+    try {
+      if (!userAccId) return 0;
+      const needle = userAccId.trim().toUpperCase();
+      const msgs = this.getPrivateMessages();
+      return msgs.filter((m) => {
+        // Message is sent to this user or in their channel, not sent by this user, and unread
+        const isRecipient = (m.recipientAccId || '').toUpperCase() === needle || (m.userAccId || '').toUpperCase() === needle;
+        const isNotSender = (m.senderAccId || '').toUpperCase() !== needle;
+        return isRecipient && isNotSender && !m.isRead;
+      }).length;
+    } catch {
+      return 0;
     }
   },
 
@@ -743,12 +781,12 @@ export const StorageService = {
   markMessagesAsRead(userAccId: string, readerRole: 'admin' | 'user'): void {
     const current = this.getPrivateMessages();
     let hasChanges = false;
+    const needle = (userAccId || '').toUpperCase();
     const updated = current.map((m) => {
-      if (
-        (m.userAccId || '').toUpperCase() === userAccId.toUpperCase() &&
-        m.senderRole !== readerRole &&
-        !m.isRead
-      ) {
+      const matches =
+        (m.userAccId || '').toUpperCase() === needle ||
+        (m.recipientAccId || '').toUpperCase() === needle;
+      if (matches && m.senderRole !== readerRole && !m.isRead) {
         hasChanges = true;
         return { ...m, isRead: true };
       }
@@ -761,6 +799,113 @@ export const StorageService = {
         console.warn('Storage markMessagesAsRead error:', e);
       }
       notifySync();
+    }
+  },
+
+  markChannelMessagesAsRead(channelKey: string, readerAccId: string): void {
+    const current = this.getPrivateMessages();
+    let hasChanges = false;
+    const needleChannel = (channelKey || '').toUpperCase();
+    const needleReader = (readerAccId || '').toUpperCase();
+    const updated = current.map((m) => {
+      if (
+        (m.userAccId || '').toUpperCase() === needleChannel &&
+        (m.senderAccId || '').toUpperCase() !== needleReader &&
+        !m.isRead
+      ) {
+        hasChanges = true;
+        return { ...m, isRead: true };
+      }
+      return m;
+    });
+    if (hasChanges) {
+      try {
+        localStorage.setItem(PRIVATE_MESSAGES_KEY, JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Storage markChannelMessagesAsRead error:', e);
+      }
+      notifySync();
+    }
+  },
+
+  getAllConversationsForAdmin(): {
+    conversationId: string;
+    chatType: 'admin' | 'sponsor' | 'member';
+    participantA: { accId: string; name: string };
+    participantB: { accId: string; name: string };
+    lastMessage: PrivateMessage;
+    totalMessages: number;
+    unreadCount: number;
+  }[] {
+    try {
+      const allMsgs = this.getPrivateMessages();
+      const members = this.getMembers();
+      const memberMap = new Map(members.map((m) => [m.accId.toUpperCase(), m]));
+
+      // Group by userAccId
+      const groups = new Map<string, PrivateMessage[]>();
+      allMsgs.forEach((msg) => {
+        const key = (msg.userAccId || 'general').toUpperCase();
+        const list = groups.get(key) || [];
+        list.push(msg);
+        groups.set(key, list);
+      });
+
+      const results: {
+        conversationId: string;
+        chatType: 'admin' | 'sponsor' | 'member';
+        participantA: { accId: string; name: string };
+        participantB: { accId: string; name: string };
+        lastMessage: PrivateMessage;
+        totalMessages: number;
+        unreadCount: number;
+      }[] = [];
+
+      groups.forEach((msgs, convId) => {
+        if (!msgs.length) return;
+        const sorted = [...msgs].sort(
+          (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        );
+        const last = sorted[sorted.length - 1];
+        const isSponsorChat = convId.startsWith('SP_') || last.chatType === 'sponsor';
+
+        let pA = { accId: '', name: '' };
+        let pB = { accId: '', name: '' };
+
+        if (isSponsorChat && convId.startsWith('SP_')) {
+          const parts = convId.replace('SP_', '').split('_');
+          const idA = parts[0] || '';
+          const idB = parts[1] || '';
+          const memA = memberMap.get(idA);
+          const memB = memberMap.get(idB);
+          pA = { accId: idA, name: memA ? memA.fullName : 'सदस्य A' };
+          pB = { accId: idB, name: memB ? memB.fullName : 'स्पॉन्सर B' };
+        } else {
+          // Admin helpdesk conversation
+          const mem = memberMap.get(convId);
+          pA = { accId: convId, name: mem ? mem.fullName : last.senderName || 'विद्यार्थी' };
+          pB = { accId: 'ADMIN', name: 'ACC Admin Helpdesk' };
+        }
+
+        const unreadForAdmin = msgs.filter((m) => m.senderRole === 'user' && !m.isRead).length;
+
+        results.push({
+          conversationId: convId,
+          chatType: isSponsorChat ? 'sponsor' : 'admin',
+          participantA: pA,
+          participantB: pB,
+          lastMessage: last,
+          totalMessages: msgs.length,
+          unreadCount: unreadForAdmin,
+        });
+      });
+
+      // Sort newest first
+      return results.sort(
+        (a, b) => new Date(b.lastMessage.timestamp).getTime() - new Date(a.lastMessage.timestamp).getTime()
+      );
+    } catch {
+      return [];
     }
   },
 

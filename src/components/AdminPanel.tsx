@@ -107,8 +107,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   const [adminPasswordError, setAdminPasswordError] = useState('');
 
   // Main Admin Navigation Tab
-  const [adminTab, setAdminTab] = useState<'members' | 'form_responses' | 'profile_audits' | 'withdrawals' | 'website_cms'>('members');
+  const [adminTab, setAdminTab] = useState<'members' | 'form_responses' | 'profile_audits' | 'withdrawals' | 'website_cms' | 'chat_monitor'>('members');
   const [formResponseModalMember, setFormResponseModalMember] = useState<Member | null>(null);
+
+  // Secret Chat Inspector & Interceptor States (गुप्त चैट मॉनिटर)
+  const [chatMonitorFilter, setChatMonitorFilter] = useState<'all' | 'sponsor' | 'admin' | 'unread'>('all');
+  const [chatMonitorSearch, setChatMonitorSearch] = useState<string>('');
+  const [selectedChatConvKey, setSelectedChatConvKey] = useState<string | null>(null);
+  const [adminChatReplyText, setAdminChatReplyText] = useState<string>('');
+  const [adminChatMsgList, setAdminChatMsgList] = useState<PrivateMessage[]>([]);
 
   // Profile Edit Audit Logs & Member 360 Database State
   const [auditLogs, setAuditLogs] = useState<ProfileEditAuditLog[]>(() => StorageService.getAuditLogs());
@@ -392,7 +399,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   const lastFocusedMemberAccId = useRef<string | null>(null);
 
   // Directly navigate & smoothly scroll admin straight to the target section/tab
-  const handleSelectAdminTab = (tab: 'members' | 'form_responses' | 'profile_audits' | 'withdrawals' | 'website_cms') => {
+  const handleSelectAdminTab = (tab: 'members' | 'form_responses' | 'profile_audits' | 'withdrawals' | 'website_cms' | 'chat_monitor') => {
     setAdminTab(tab);
     setTimeout(() => {
       if (adminTabContentRef.current) {
@@ -1396,6 +1403,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
         >
           <Sliders className="w-4 h-4 text-emerald-600 shrink-0" />
           <span className="truncate">वेबपेज नियंत्रण</span>
+        </button>
+
+        <button
+          onClick={() => handleSelectAdminTab('chat_monitor')}
+          className={`flex-1 min-w-[130px] sm:min-w-[160px] max-w-full flex items-center justify-center text-center gap-1.5 p-2 sm:p-2.5 text-xs font-bold rounded-lg transition cursor-pointer ${
+            adminTab === 'chat_monitor'
+              ? 'bg-rose-50 text-rose-800 border border-rose-300 shadow-xs'
+              : 'text-slate-700 hover:bg-slate-50 border border-transparent'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4 text-rose-600 shrink-0" />
+          <span className="truncate">🕵️ गुप्त चैट मॉनिटर</span>
         </button>
       </div>
 
@@ -4166,6 +4185,385 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
       </div>
     </div>
   )}
+
+        {/* ========================================================================= */}
+        {/* TAB 6: SECRET CHAT MONITOR (गुप्त चैट मॉनिटर एवं बातचीत निरीक्षक)          */}
+        {/* ========================================================================= */}
+        {adminTab === 'chat_monitor' && (() => {
+          const allConvs = StorageService.getAllConversationsForAdmin();
+
+          // Filtering
+          const filteredConvs = allConvs.filter((conv) => {
+            if (chatMonitorFilter === 'sponsor' && conv.chatType !== 'sponsor') return false;
+            if (chatMonitorFilter === 'admin' && conv.chatType !== 'admin') return false;
+            if (chatMonitorFilter === 'unread' && conv.unreadCount === 0) return false;
+
+            if (chatMonitorSearch.trim()) {
+              const q = chatMonitorSearch.trim().toLowerCase();
+              const matchA = conv.participantA.name.toLowerCase().includes(q) || conv.participantA.accId.toLowerCase().includes(q);
+              const matchB = conv.participantB.name.toLowerCase().includes(q) || conv.participantB.accId.toLowerCase().includes(q);
+              const matchMsg = conv.lastMessage?.text?.toLowerCase().includes(q);
+              return matchA || matchB || matchMsg;
+            }
+            return true;
+          });
+
+          // Active Selected Conversation
+          const activeConv = allConvs.find((c) => c.conversationId === selectedChatConvKey) || filteredConvs[0] || null;
+          const activeMsgs = activeConv
+            ? activeConv.chatType === 'sponsor'
+              ? StorageService.getChannelMessages(activeConv.conversationId)
+              : StorageService.getPrivateMessages(activeConv.conversationId)
+            : [];
+
+          const handleSendAdminIntercept = (e: React.FormEvent) => {
+            e.preventDefault();
+            if (!activeConv || !adminChatReplyText.trim()) return;
+
+            const newMsg = StorageService.sendPrivateMessage({
+              userAccId: activeConv.conversationId,
+              senderAccId: 'ADMIN',
+              senderName: 'ACC केंद्रीय एडमिन (Admin Oversight)',
+              senderRole: 'admin',
+              text: adminChatReplyText.trim(),
+              isRead: true,
+              chatType: activeConv.chatType,
+              recipientAccId: activeConv.participantA.accId,
+              recipientName: activeConv.participantA.name,
+            });
+
+            setAdminChatReplyText('');
+          };
+
+          const totalSponsorChats = allConvs.filter((c) => c.chatType === 'sponsor').length;
+          const totalAdminChats = allConvs.filter((c) => c.chatType === 'admin').length;
+          const totalUnreadCount = allConvs.reduce((acc, c) => acc + c.unreadCount, 0);
+
+          return (
+            <div className="space-y-4 animate-fadeIn">
+              {/* Header Banner */}
+              <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-4 sm:p-6 border-2 border-rose-500/40 shadow-xl relative overflow-hidden">
+                <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-600 via-red-500 to-amber-500 text-white flex items-center justify-center font-black shadow-lg shrink-0 border border-white/20">
+                      <ShieldCheck className="w-6 h-6 text-white animate-pulse" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-lg sm:text-xl font-black text-white font-display tracking-tight flex items-center gap-1.5">
+                          <span>🕵️‍♂️ गुप्त चैट मॉनिटर (Secret Conversation Monitor)</span>
+                        </h3>
+                        <span className="text-[10px] bg-rose-500/30 text-rose-300 border border-rose-400/50 px-2 py-0.5 rounded-full font-black">
+                          🔒 SILENT OBSERVER
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
+                        प्लेटफॉर्म पर सभी सदस्यों के बीच होने वाली बातचीत का 100% प्रशासनिक रिकॉर्ड। उपयोगकर्ताओं को यह एंड-टू-एंड 256-बिट प्राइवेट चैनल दिखाई देता है, जबकि एडमिन के पास सुरक्षा व सत्यता की जांच हेतु पूर्ण रीयल-टाइम एक्सेस है।
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Quick Stat Capsules */}
+                  <div className="flex items-center gap-2 flex-wrap shrink-0">
+                    <div className="bg-black/40 border border-white/10 px-3 py-1.5 rounded-xl text-center">
+                      <span className="text-[10px] text-slate-400 uppercase font-bold block">कुल बातचीत</span>
+                      <span className="text-sm font-black text-amber-300 font-mono-acc">{allConvs.length}</span>
+                    </div>
+                    <div className="bg-black/40 border border-white/10 px-3 py-1.5 rounded-xl text-center">
+                      <span className="text-[10px] text-slate-400 uppercase font-bold block">स्पॉन्सर चैट्स</span>
+                      <span className="text-sm font-black text-emerald-400 font-mono-acc">{totalSponsorChats}</span>
+                    </div>
+                    <div className="bg-black/40 border border-white/10 px-3 py-1.5 rounded-xl text-center">
+                      <span className="text-[10px] text-slate-400 uppercase font-bold block">सपोर्ट चैट्स</span>
+                      <span className="text-sm font-black text-cyan-400 font-mono-acc">{totalAdminChats}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter and Search Bar */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-3 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+                {/* Search Input */}
+                <div className="relative w-full sm:w-80">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    value={chatMonitorSearch}
+                    onChange={(e) => setChatMonitorSearch(e.target.value)}
+                    placeholder="छात्र नाम, ACC 🆔, स्पॉन्सर 🆔 या कीवर्ड खोजें..."
+                    className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-gray-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-rose-500 font-medium"
+                  />
+                  {chatMonitorSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setChatMonitorSearch('')}
+                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Filter Pills */}
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full sm:w-auto">
+                  {[
+                    { id: 'all', label: `सभी (${allConvs.length})` },
+                    { id: 'sponsor', label: `स्पॉन्सर ↔ छात्र (${totalSponsorChats})` },
+                    { id: 'admin', label: `एडमिन सपोर्ट (${totalAdminChats})` },
+                    { id: 'unread', label: `अनपढ़े (${totalUnreadCount})` },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setChatMonitorFilter(tab.id as any)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                        chatMonitorFilter === tab.id
+                          ? 'bg-rose-600 text-white shadow-xs font-black'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Two Column Split: Conversations List on Left, Active Transcript on Right */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                {/* LEFT COLUMN: Conversation Threads List (5 Cols) */}
+                <div className="lg:col-span-5 bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-xs flex flex-col max-h-[750px]">
+                  <div className="p-3 bg-slate-50 border-b border-gray-200 flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-800">
+                      सक्रिय चैट धागे ({filteredConvs.length})
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-bold">
+                      लाइव सिंक सक्रिय ✓
+                    </span>
+                  </div>
+
+                  <div className="overflow-y-auto divide-y divide-gray-100 flex-1">
+                    {filteredConvs.length === 0 ? (
+                      <div className="p-8 text-center text-slate-500 text-xs">
+                        कोई वार्तालाप उपलब्ध नहीं है।
+                      </div>
+                    ) : (
+                      filteredConvs.map((conv) => {
+                        const isSelected = activeConv && activeConv.conversationId === conv.conversationId;
+                        const isSponsor = conv.chatType === 'sponsor';
+                        return (
+                          <div
+                            key={conv.conversationId}
+                            onClick={() => setSelectedChatConvKey(conv.conversationId)}
+                            className={`p-3.5 transition-all cursor-pointer flex items-start gap-3 select-none ${
+                              isSelected
+                                ? 'bg-rose-50/80 border-l-4 border-rose-600 shadow-inner'
+                                : 'hover:bg-slate-50 border-l-4 border-transparent'
+                            }`}
+                          >
+                            <div className="relative shrink-0">
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs text-white shadow-xs ${
+                                isSponsor
+                                  ? 'bg-gradient-to-tr from-amber-500 to-orange-600'
+                                  : 'bg-gradient-to-tr from-blue-600 to-indigo-700'
+                              }`}>
+                                {isSponsor ? '👥' : '🛡️'}
+                              </div>
+                              {conv.unreadCount > 0 && (
+                                <span className="absolute -top-1 -right-1 bg-rose-600 text-white font-black text-[9px] px-1.5 py-0.2 rounded-full border border-white">
+                                  {conv.unreadCount}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-1 mb-1">
+                                <span className="font-bold text-xs text-slate-900 truncate">
+                                  {conv.participantA.name} ({conv.participantA.accId})
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                                  {conv.lastMessage?.timestamp
+                                    ? new Date(conv.lastMessage.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                    : ''}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 mb-1.5">
+                                <span className="text-[10px] text-slate-500 font-medium">↔</span>
+                                <span className="text-[11px] font-bold text-slate-700 truncate">
+                                  {isSponsor ? `स्पॉन्सर: ${conv.participantB.name} (${conv.participantB.accId})` : 'ACC Admin Helpdesk'}
+                                </span>
+                              </div>
+
+                              <p className="text-xs text-slate-600 line-clamp-1 italic">
+                                "{conv.lastMessage?.text || 'मीडिया संदेश'}"
+                              </p>
+
+                              <div className="mt-2 flex items-center justify-between text-[10px]">
+                                <span className={`px-2 py-0.5 rounded font-black ${
+                                  isSponsor
+                                    ? 'bg-amber-100 text-amber-900'
+                                    : 'bg-blue-100 text-blue-900'
+                                }`}>
+                                  {isSponsor ? '🔒 स्पॉन्सर E2E' : '💬 एडमिन सपोर्ट'}
+                                </span>
+                                <span className="text-slate-400 font-bold">
+                                  {conv.totalMessages} संदेश
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* RIGHT COLUMN: Active Conversation Live Transcript Inspector (7 Cols) */}
+                <div className="lg:col-span-7 bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-xs flex flex-col max-h-[750px]">
+                  {activeConv ? (
+                    <>
+                      {/* Active Chat Header */}
+                      <div className="p-3.5 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white flex items-center justify-between gap-3 border-b border-white/10 shrink-0">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-500 to-amber-500 text-slate-950 font-black flex items-center justify-center text-xs shrink-0 shadow-md">
+                            {activeConv.chatType === 'sponsor' ? 'SP' : 'AD'}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-bold text-xs sm:text-sm text-white truncate">
+                                {activeConv.participantA.name} ↔ {activeConv.participantB.name}
+                              </h4>
+                              <span className="text-[9px] bg-rose-500 text-white font-black px-1.5 py-0.2 rounded">
+                                गुप्त रिकॉर्ड
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-amber-300 font-mono block">
+                              Channel Key: {activeConv.conversationId} ({activeConv.chatType.toUpperCase()})
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-2 py-1 rounded-lg font-bold flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            <span>लाइव सक्रिय</span>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Security Transparency Notice for Admin */}
+                      <div className="bg-amber-50 border-b border-amber-200 px-3.5 py-1.5 text-[11px] text-amber-900 flex items-center justify-between gap-2 shrink-0">
+                        <div className="flex items-center gap-1.5">
+                          <Lock className="w-3.5 h-3.5 text-amber-700" />
+                          <span>
+                            उपयोगकर्ता स्क्रीन पर यह चैनल <strong>256-Bit E2E Encrypted</strong> प्रदर्शित होता है।
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-amber-700 font-bold hidden sm:inline">
+                          Admin Observer Mode
+                        </span>
+                      </div>
+
+                      {/* Messages Scroll Area */}
+                      <div className="p-4 overflow-y-auto space-y-3 flex-1 bg-slate-50 min-h-[350px]">
+                        {activeMsgs.length === 0 ? (
+                          <div className="p-8 text-center text-slate-500 text-xs">
+                            इस बातचीत में अभी कोई संदेश नहीं है।
+                          </div>
+                        ) : (
+                          activeMsgs.map((msg) => {
+                            const isAdmin = msg.senderRole === 'admin';
+                            return (
+                              <div
+                                key={msg.id}
+                                className={`flex flex-col ${isAdmin ? 'items-end' : 'items-start'}`}
+                              >
+                                <div className="flex items-center gap-1.5 mb-0.5 text-[10px] text-slate-500">
+                                  <span className="font-bold text-slate-700">{msg.senderName}</span>
+                                  <span>({msg.senderAccId})</span>
+                                  <span>•</span>
+                                  <span className="font-mono">
+                                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                </div>
+
+                                <div
+                                  className={`max-w-[85%] rounded-2xl p-3 shadow-xs text-xs sm:text-sm ${
+                                    isAdmin
+                                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-tr-none'
+                                      : 'bg-white text-slate-900 border border-gray-200 rounded-tl-none'
+                                  }`}
+                                >
+                                  {/* Media Attachment if present */}
+                                  {msg.attachmentUrl && (
+                                    <div className="mb-2 rounded-xl overflow-hidden border border-white/20 bg-black/10">
+                                      {msg.attachmentType === 'image' && (
+                                        <img
+                                          src={msg.attachmentUrl}
+                                          alt="Attachment"
+                                          className="max-h-60 w-full object-contain cursor-pointer"
+                                          onClick={() => window.open(msg.attachmentUrl, '_blank')}
+                                        />
+                                      )}
+                                      {msg.attachmentType === 'video' && (
+                                        <video src={msg.attachmentUrl} controls className="max-h-60 w-full" />
+                                      )}
+                                      {msg.attachmentType === 'link' && (
+                                        <a
+                                          href={msg.attachmentUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="p-2 flex items-center gap-1.5 text-xs text-amber-200 hover:underline"
+                                        >
+                                          <ExternalLink className="w-3.5 h-3.5" />
+                                          <span className="truncate">{msg.attachmentUrl}</span>
+                                        </a>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  <p className="whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+
+                      {/* Admin Message Injection / Advisory Form */}
+                      <form
+                        onSubmit={handleSendAdminIntercept}
+                        className="p-3 bg-white border-t border-gray-200 flex items-center gap-2 shrink-0"
+                      >
+                        <input
+                          type="text"
+                          value={adminChatReplyText}
+                          onChange={(e) => setAdminChatReplyText(e.target.value)}
+                          placeholder="इस बातचीत में आधिकारिक एडमिन संदेश / सूचना प्रेषित करें..."
+                          className="flex-1 px-3 py-2 bg-slate-50 border border-gray-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-rose-500 font-medium"
+                        />
+                        <button
+                          type="submit"
+                          disabled={!adminChatReplyText.trim()}
+                          className="px-4 py-2 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs rounded-xl shadow-xs disabled:opacity-40 transition cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          <span>भेजें</span>
+                        </button>
+                      </form>
+                    </>
+                  ) : (
+                    <div className="p-16 text-center text-slate-400 space-y-2">
+                      <ShieldCheck className="w-12 h-12 text-slate-300 mx-auto" />
+                      <p className="font-bold text-slate-700 text-sm">किसी भी वार्तालाप पर क्लिक करें</p>
+                      <p className="text-xs">उसकी पूरी ट्रांसक्रिप्ट, फोटो, वीडियो और चैट रीयल-टाइम में यहाँ दिखाई देगी।</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* ========================================================================= */}

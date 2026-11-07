@@ -20,12 +20,15 @@ import { StorageService } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
 import { ensureSafeFirestoreSize } from '../utils/imageCompressor';
 
+import { Lock, ShieldCheck } from 'lucide-react';
+
 interface PrivateChatBoxProps {
   userAccId: string;
   currentUserRole: 'admin' | 'user';
   currentUserName: string;
   currentUserAccId: string;
   targetMember?: Member;
+  currentUser?: Member | null;
   className?: string;
 }
 
@@ -35,10 +38,22 @@ export const PrivateChatBox: React.FC<PrivateChatBoxProps> = ({
   currentUserName,
   currentUserAccId,
   targetMember,
+  currentUser,
   className = '',
 }) => {
+  const [activeChannel, setActiveChannel] = useState<'admin' | 'sponsor'>('admin');
+  const sponsorAccId = currentUser?.sponsorId || '';
+  const sponsorChannelKey = sponsorAccId
+    ? StorageService.getSponsorChannelKey(currentUserAccId, sponsorAccId)
+    : '';
+
+  const activeConversationKey =
+    activeChannel === 'sponsor' && sponsorChannelKey ? sponsorChannelKey : userAccId;
+
   const [messages, setMessages] = useState<PrivateMessage[]>(() =>
-    StorageService.getPrivateMessages(userAccId)
+    activeChannel === 'sponsor' && sponsorChannelKey
+      ? StorageService.getChannelMessages(sponsorChannelKey)
+      : StorageService.getPrivateMessages(userAccId)
   );
   const [textInput, setTextInput] = useState('');
   const [showAttachMenu, setShowAttachMenu] = useState(false);
@@ -56,22 +71,34 @@ export const PrivateChatBox: React.FC<PrivateChatBoxProps> = ({
 
   // Sync messages from Firestore & local storage
   useEffect(() => {
-    // Initial local load
-    setMessages(StorageService.getPrivateMessages(userAccId));
-    StorageService.markMessagesAsRead(userAccId, currentUserRole);
+    const loadCurrentMessages = () => {
+      if (activeChannel === 'sponsor' && sponsorChannelKey) {
+        setMessages(StorageService.getChannelMessages(sponsorChannelKey));
+        StorageService.markChannelMessagesAsRead(sponsorChannelKey, currentUserAccId);
+      } else {
+        setMessages(StorageService.getPrivateMessages(userAccId));
+        StorageService.markMessagesAsRead(userAccId, currentUserRole);
+      }
+    };
+
+    loadCurrentMessages();
 
     // Subscribe to real-time Firestore updates
-    const unsubscribe = FirestoreService.subscribeToPrivateMessages(userAccId, (cloudMsgs) => {
+    const unsubscribe = FirestoreService.subscribeToPrivateMessages(activeConversationKey, (cloudMsgs) => {
       if (cloudMsgs && cloudMsgs.length > 0) {
         setMessages(cloudMsgs);
-        StorageService.markMessagesAsRead(userAccId, currentUserRole);
+        if (activeChannel === 'sponsor' && sponsorChannelKey) {
+          StorageService.markChannelMessagesAsRead(sponsorChannelKey, currentUserAccId);
+        } else {
+          StorageService.markMessagesAsRead(userAccId, currentUserRole);
+        }
       }
     });
 
     return () => {
       unsubscribe();
     };
-  }, [userAccId, currentUserRole]);
+  }, [userAccId, currentUserRole, activeChannel, sponsorChannelKey, activeConversationKey, currentUserAccId]);
 
   // Auto scroll to bottom
   useEffect(() => {
@@ -82,17 +109,35 @@ export const PrivateChatBox: React.FC<PrivateChatBoxProps> = ({
     e.preventDefault();
     if (!textInput.trim()) return;
 
-    StorageService.sendPrivateMessage({
-      userAccId,
-      senderRole: currentUserRole,
-      senderAccId: currentUserAccId,
-      senderName: currentUserName,
-      text: textInput.trim(),
-      mediaType: 'text',
-    });
-
-    setTextInput('');
-    setMessages(StorageService.getPrivateMessages(userAccId));
+    if (activeChannel === 'sponsor' && sponsorChannelKey) {
+      StorageService.sendPrivateMessage({
+        userAccId: sponsorChannelKey,
+        recipientAccId: sponsorAccId,
+        recipientName: currentUser?.sponsorName || 'स्पॉन्सर',
+        chatType: 'sponsor',
+        senderRole: 'user',
+        senderAccId: currentUserAccId,
+        senderName: currentUserName,
+        text: textInput.trim(),
+        mediaType: 'text',
+      });
+      setTextInput('');
+      setMessages(StorageService.getChannelMessages(sponsorChannelKey));
+    } else {
+      StorageService.sendPrivateMessage({
+        userAccId,
+        recipientAccId: currentUserRole === 'admin' ? userAccId : 'ADMIN',
+        recipientName: currentUserRole === 'admin' ? targetMember?.fullName || 'विद्यार्थी' : 'ACC Admin',
+        chatType: 'admin',
+        senderRole: currentUserRole,
+        senderAccId: currentUserAccId,
+        senderName: currentUserName,
+        text: textInput.trim(),
+        mediaType: 'text',
+      });
+      setTextInput('');
+      setMessages(StorageService.getPrivateMessages(userAccId));
+    }
   };
 
   const handleSendAttachment = async (e: React.FormEvent) => {

@@ -81,7 +81,10 @@ export interface OriginalRegistrationData {
 
 export interface PrivateMessage {
   id: string;
-  userAccId: string; // Conversation identifier (the student's ACC ID)
+  userAccId: string; // Conversation identifier (the student's ACC ID or channel key)
+  recipientAccId?: string; // Target recipient (Sponsor ID, Member ID or 'ADMIN')
+  recipientName?: string;
+  chatType?: 'admin' | 'sponsor' | 'member'; // 'admin' = Helpdesk, 'sponsor' = Direct Sponsor-Member chat
   senderRole: 'admin' | 'user';
   senderAccId: string;
   senderName: string;
@@ -89,6 +92,8 @@ export interface PrivateMessage {
   mediaType?: 'text' | 'image' | 'video' | 'link';
   mediaUrl?: string;
   mediaCaption?: string;
+  attachmentType?: 'image' | 'video' | 'link';
+  attachmentUrl?: string;
   linkUrl?: string;
   linkTitle?: string;
   timestamp: string;

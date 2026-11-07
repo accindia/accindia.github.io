@@ -37,14 +37,15 @@
           var decoded = l.search.slice(1).split('&').map(function(s) { 
             return s.replace(/~and~/g, '&');
           }).join('?');
+          var basePath = l.pathname.endsWith('/') ? l.pathname.slice(0, -1) : l.pathname;
           window.history.replaceState(null, null,
-            l.pathname.slice(0, -1) + decoded + l.hash
+            basePath + decoded + l.hash
           );
         }
       }(window.location));
     </script>
-    <script type="module" crossorigin src="./assets/index-j8h9sgGm.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-Wt-l4iEz.css">
+    <script type="module" crossorigin src="./assets/index-D7m3b3DL.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DCTYWkcy.css">
   </head>
   <body class="h-full bg-[#f1f2f4] text-slate-800 antialiased selection:bg-[#2874f0] selection:text-white">
     <div id="root"></div>
@@ -56,8 +57,10 @@
         if (l.hostname.endsWith('github.io')) {
           var unbuiltScript = document.querySelector('script[src*="main.tsx"]');
           if (unbuiltScript && !l.pathname.includes('/docs/')) {
-            var p = l.pathname.endsWith('/') ? l.pathname : l.pathname + '/';
-            l.replace(p + 'docs/' + l.search + l.hash);
+            var origin = l.origin || (l.protocol + '//' + l.host);
+            var cleanPath = l.pathname.replace(/\/index\.html$/, '');
+            if (!cleanPath.endsWith('/')) cleanPath += '/';
+            window.location.replace(origin + cleanPath + 'docs/' + l.search + l.hash);
           }
         }
       })();

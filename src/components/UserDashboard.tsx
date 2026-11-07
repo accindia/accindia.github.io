@@ -3385,6 +3385,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
             currentUserRole="user"
             currentUserName={currentUser.fullName}
             currentUserAccId={currentUser.accId}
+            currentUser={currentUser}
           />
         </div>
       )}

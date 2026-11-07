@@ -25,11 +25,19 @@ import {
   ChevronDown,
   MoreHorizontal,
   Users,
+  Bell,
+  Sunrise,
+  Sun,
+  Sunset,
+  Moon,
+  Lock,
 } from 'lucide-react';
-import { ActiveWindow, Member, SiteConfig } from '../types';
+import { ActiveWindow, Member, SiteConfig, PrivateMessage } from '../types';
 import { StorageService, subscribeToSync } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
 import { AccLogo } from '../assets/logo';
+import { WelcomeWindow, detectCurrentGreetingPeriod, GREETING_DETAILS, GreetingPeriod } from './WelcomeWindow';
+import { PrivateChatBox } from './PrivateChatBox';
 
 interface HeaderProps {
   activeWindow: ActiveWindow;
@@ -54,6 +62,14 @@ export const Header: React.FC<HeaderProps> = ({
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [siteConfig, setSiteConfig] = useState<SiteConfig>(() => StorageService.getSiteConfig());
   const [featureIndex, setFeatureIndex] = useState(0);
+
+  // Welcome Window & Notifications Drawer & Live Chat Popups
+  const [showWelcomeModal, setShowWelcomeModal] = useState<boolean>(false);
+  const [showNotificationDrawer, setShowNotificationDrawer] = useState<boolean>(false);
+  const [showAdminChatModal, setShowAdminChatModal] = useState<boolean>(false);
+  const [unreadChatCount, setUnreadChatCount] = useState<number>(0);
+  const [currentGreetingPeriod, setCurrentGreetingPeriod] = useState<GreetingPeriod>(() => detectCurrentGreetingPeriod());
+  const [headerMessages, setHeaderMessages] = useState<PrivateMessage[]>([]);
 
   // Standout Website Features & Highlights (वेबसाइट की खासियतें)
   const websiteFeatures = [
@@ -136,6 +152,7 @@ export const Header: React.FC<HeaderProps> = ({
       });
       setCurrentTime(timeStr);
       setCurrentDate(dateStr);
+      setCurrentGreetingPeriod(detectCurrentGreetingPeriod());
     };
 
     updateTime();
@@ -146,6 +163,24 @@ export const Header: React.FC<HeaderProps> = ({
       unsubscribeFirestore();
     };
   }, []);
+
+  // Live Unread Message Count Synchronization
+  useEffect(() => {
+    const updateUnread = () => {
+      if (currentUser?.accId) {
+        const count = StorageService.getUserUnreadMessageCount(currentUser.accId);
+        setUnreadChatCount(count);
+        const msgs = StorageService.getPrivateMessages(currentUser.accId);
+        setHeaderMessages(msgs);
+      } else {
+        setUnreadChatCount(0);
+        setHeaderMessages([]);
+      }
+    };
+    updateUnread();
+    const unsub = subscribeToSync(updateUnread);
+    return () => unsub();
+  }, [currentUser?.accId]);
 
   const handleNavClick = (id: ActiveWindow) => {
     if (id === 'idcard') {
@@ -361,6 +396,68 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Top Action Buttons - 3D Icons & Sized Text Boxes (Zero Cutoff on Mobile) */}
           <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-auto">
+            {/* 1. 3D Dynamic Welcome Greeting Window Button (Morning / Afternoon / Evening / Night) */}
+            <button
+              type="button"
+              onClick={() => setShowWelcomeModal(true)}
+              className="group relative flex items-center gap-1 sm:gap-1.5 bg-gradient-to-b from-amber-300 via-yellow-400 to-amber-500 hover:from-yellow-200 hover:to-amber-400 text-slate-950 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl font-black text-[10px] sm:text-xs shadow-[0_3px_8px_rgba(245,158,11,0.4),inset_0_1.5px_1px_rgba(255,255,255,0.9)] border border-amber-200 active:translate-y-0.5 transition cursor-pointer shrink-0 select-none"
+              title="स्वागतम विंडो खोलें • Welcome Window (हिंदी & English)"
+            >
+              <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-lg bg-slate-950 text-amber-300 flex items-center justify-center shadow-inner shrink-0 border border-amber-300/50">
+                {currentGreetingPeriod === 'morning' && <Sunrise className="w-3.5 h-3.5 text-amber-300 animate-pulse" />}
+                {currentGreetingPeriod === 'afternoon' && <Sun className="w-3.5 h-3.5 text-yellow-300 animate-spin-slow" />}
+                {currentGreetingPeriod === 'evening' && <Sunset className="w-3.5 h-3.5 text-pink-300" />}
+                {currentGreetingPeriod === 'night' && <Moon className="w-3.5 h-3.5 text-sky-200" />}
+              </div>
+              <span className="whitespace-nowrap leading-none hidden md:inline">
+                {GREETING_DETAILS[currentGreetingPeriod].titleHi}
+              </span>
+              <span className="whitespace-nowrap leading-none text-[9px] text-slate-900/80 font-bold hidden xl:inline">
+                ({GREETING_DETAILS[currentGreetingPeriod].titleEn.split(' ')[1]})
+              </span>
+            </button>
+
+            {/* 2. 3D Notification Alert Button with Live Unread Message Count */}
+            <button
+              type="button"
+              onClick={() => setShowNotificationDrawer(true)}
+              className="relative p-1 sm:p-1.5 bg-gradient-to-b from-[#1c52b8] to-[#124299] hover:from-[#2463da] hover:to-[#174fb5] text-white rounded-xl shadow-[0_3px_8px_rgba(0,0,0,0.25),inset_0_1.5px_1px_rgba(255,255,255,0.35)] border border-blue-300/40 active:translate-y-0.5 transition cursor-pointer shrink-0"
+              title={`सूचनाएं एवं अलर्ट्स (${unreadChatCount} नए संदेश)`}
+            >
+              <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 flex items-center justify-center">
+                <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-300 animate-pulse" />
+              </div>
+              {unreadChatCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-rose-600 text-white font-black text-[9px] min-w-[17px] h-[17px] flex items-center justify-center rounded-full border-2 border-white animate-pulse shadow-md px-0.5">
+                  {unreadChatCount}
+                </span>
+              )}
+            </button>
+
+            {/* 3. 3D Admin / Sponsor Live Chat Button with Count */}
+            <button
+              type="button"
+              onClick={() => {
+                if (currentUser) {
+                  setShowAdminChatModal(true);
+                } else {
+                  setActiveWindow('login');
+                }
+              }}
+              className="relative flex items-center gap-1 sm:gap-1.5 bg-gradient-to-b from-emerald-500 via-emerald-600 to-teal-700 hover:from-emerald-400 hover:to-teal-600 text-white px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl font-black text-[10px] sm:text-xs shadow-[0_3px_8px_rgba(16,185,129,0.35),inset_0_1.5px_1px_rgba(255,255,255,0.4)] border border-emerald-300/50 active:translate-y-0.5 transition cursor-pointer shrink-0 select-none"
+              title="एडमिन व स्पॉन्सर चैट बॉक्स खोलें"
+            >
+              <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-lg bg-emerald-950/40 text-emerald-200 flex items-center justify-center shrink-0 border border-emerald-300/40">
+                <MessageCircle className="w-3.5 h-3.5 text-white" />
+              </div>
+              <span className="whitespace-nowrap leading-none hidden sm:inline">चैट</span>
+              {unreadChatCount > 0 && (
+                <span className="bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full border border-white">
+                  {unreadChatCount}
+                </span>
+              )}
+            </button>
+
             {currentUser ? (
               /* LOGGED IN USER ACTIONS WITH 3D BUTTONS */
               <div className="flex items-center gap-1 sm:gap-2 bg-[#1c52b8]/80 border border-blue-400/40 rounded-xl p-1 pr-1.5 sm:pr-2 shadow-[0_2px_6px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.2)] shrink-0">
@@ -767,6 +864,181 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
               <span className="whitespace-nowrap">Telegram</span>
             </a>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 5. DUAL-LANGUAGE WELCOME WINDOW (Good Morning/Afternoon/Evening/Night)    */}
+      {/* ========================================================================= */}
+      <WelcomeWindow
+        isOpen={showWelcomeModal}
+        onClose={() => setShowWelcomeModal(false)}
+        currentUser={currentUser}
+        onNavigate={(w) => {
+          setShowWelcomeModal(false);
+          setActiveWindow(w);
+        }}
+        siteConfig={siteConfig}
+      />
+
+      {/* ========================================================================= */}
+      {/* 6. HEADER NOTIFICATIONS DRAWER / POPUP                                    */}
+      {/* ========================================================================= */}
+      {showNotificationDrawer && (
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 sm:p-4 pt-16 sm:pt-4 bg-black/75 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-[#17212b] text-white border-2 border-[#2481cc]/60 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="bg-gradient-to-r from-[#17212b] via-[#202b36] to-[#0e1621] p-4 border-b border-[#2481cc]/40 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-rose-600 to-amber-500 flex items-center justify-center shadow-md">
+                  <Bell className="w-5 h-5 text-white animate-bounce" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-white flex items-center gap-2">
+                    <span>सूचनाएं व संदेश अलर्ट्स</span>
+                    {unreadChatCount > 0 && (
+                      <span className="text-[10px] bg-rose-500 text-white px-2 py-0.5 rounded-full font-black animate-pulse">
+                        {unreadChatCount} नया
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-[11px] text-sky-200">ACC हेल्पडेस्क व स्पॉन्सर सीधे संवाद</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNotificationDrawer(false)}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto space-y-3 flex-1 min-h-[200px]">
+              {headerMessages.length === 0 ? (
+                <div className="text-center py-10 px-4 space-y-2">
+                  <div className="w-12 h-12 mx-auto rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-400">
+                    <Bell className="w-6 h-6 text-slate-400" />
+                  </div>
+                  <h4 className="text-xs font-bold text-white">फिलहाल कोई नया संदेश या सूचना नहीं है</h4>
+                  <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                    {currentUser
+                      ? 'किसी भी प्रश्न के लिए आप सीधे एडमिन या अपने स्पॉन्सर से चैट कर सकते हैं।'
+                      : 'सूचनाएं देखने के लिए कृपया विद्यार्थी लॉगिन करें।'}
+                  </p>
+                </div>
+              ) : (
+                headerMessages.slice(0, 15).map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`p-3 rounded-xl border transition-all ${
+                      !msg.isRead
+                        ? 'bg-[#2481cc]/15 border-[#2481cc] shadow-md ring-1 ring-[#2481cc]/40'
+                        : 'bg-white/5 border-white/10 hover:bg-white/10'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${msg.senderRole === 'admin' ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+                        <span className="text-xs font-bold text-sky-200">{msg.senderName}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {!msg.isRead && (
+                          <span className="text-[9px] bg-rose-500 text-white font-black px-1.5 py-0.2 rounded-full">
+                            नया
+                          </span>
+                        )}
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-100 font-medium whitespace-pre-wrap leading-relaxed">
+                      {msg.text}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="p-3 bg-[#111922] border-t border-white/10 flex items-center justify-between gap-2">
+              {currentUser ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    StorageService.markMessagesAsRead(currentUser.accId, 'user');
+                    setUnreadChatCount(0);
+                    setHeaderMessages(StorageService.getPrivateMessages(currentUser.accId));
+                  }}
+                  className="text-xs text-sky-300 hover:text-white font-bold transition cursor-pointer"
+                >
+                  ✓ सभी पढ़ा हुआ मार्क करें
+                </button>
+              ) : (
+                <span className="text-[11px] text-slate-400">लॉगिन आवश्यक</span>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNotificationDrawer(false);
+                  if (currentUser) {
+                    setShowAdminChatModal(true);
+                  } else {
+                    setActiveWindow('login');
+                  }
+                }}
+                className="px-4 py-1.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-black rounded-xl shadow-md transition cursor-pointer flex items-center gap-1.5"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>लाइव चैट बॉक्स खोलें</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 7. HEADER ADMIN & SPONSOR LIVE CHAT MODAL                                  */}
+      {/* ========================================================================= */}
+      {showAdminChatModal && currentUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/80 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] border-2 border-blue-400/50">
+            <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-[#2874f0] text-white p-3.5 sm:p-4 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center shadow-inner">
+                  <MessageCircle className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-white flex items-center gap-2">
+                    <span>ACC प्राइवेट व सुरक्षित चैट बॉक्स</span>
+                    <span className="text-[9px] bg-emerald-500 text-slate-950 px-2 py-0.2 rounded-full font-black">
+                      256-Bit E2E
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-blue-100">
+                    एडमिन सहायता व अपने स्पॉन्सर 🆔 से सुरक्षित संवाद
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAdminChatModal(false)}
+                className="p-1.5 rounded-xl bg-white/10 hover:bg-rose-600 hover:text-white text-white transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 sm:p-4 overflow-y-auto flex-1 bg-slate-50">
+              <PrivateChatBox
+                userAccId={currentUser.accId}
+                currentUserRole="user"
+                currentUserName={currentUser.fullName}
+                currentUserAccId={currentUser.accId}
+                currentUser={currentUser}
+              />
+            </div>
           </div>
         </div>
       )}
