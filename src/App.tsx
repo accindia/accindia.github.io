@@ -16,12 +16,18 @@ import { PromotionBrandingHub } from './components/PromotionBrandingHub';
 import { LockedFooterBar } from './components/LockedFooterBar';
 import { UserGuidelines } from './components/UserGuidelines';
 import { ReferAndEarnModal } from './components/ReferAndEarnModal';
+import { SponsorRegisterMemberModal } from './components/SponsorRegisterMemberModal';
+import { MandatoryPasswordUpdateModal } from './components/MandatoryPasswordUpdateModal';
+import { AccChatAndHelpHub } from './components/AccChatAndHelpHub';
+import { DeviceKickoutAlertModal } from './components/DeviceKickoutAlertModal';
+import { ForgotCredentialsModal } from './components/ForgotCredentialsModal';
 import { ActiveWindow, Member, SiteConfig } from './types';
 import { StorageService, subscribeToSync } from './services/storage';
 import { FirestoreService } from './services/firestore';
 import {
   FileText,
   Users,
+  UserPlus,
   Video,
   CreditCard,
   LayoutDashboard,
@@ -48,6 +54,8 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<Member | null>(null);
   const [siteConfig, setSiteConfig] = useState<SiteConfig>(() => StorageService.getSiteConfig());
   const [referralSponsor, setReferralSponsor] = useState<Member | null>(null);
+  const [deviceKickoutAlertOpen, setDeviceKickoutAlertOpen] = useState(false);
+  const [showForgotCredentialsModal, setShowForgotCredentialsModal] = useState(false);
 
   // Detect ?sponsor= or ?ref= parameter from URL or sessionStorage
   useEffect(() => {
@@ -108,6 +116,16 @@ export default function App() {
       if (current) {
         const found = cloudMembers.find((m) => m.accId.toUpperCase() === current.accId.toUpperCase());
         if (found) {
+          // Check multi-device single active session protection!
+          const localSessionId = StorageService.getLocalSessionId();
+          if (found.activeSessionId && localSessionId && found.activeSessionId !== localSessionId) {
+            // A newer session was created on another device!
+            StorageService.clearSession();
+            setCurrentUser(null);
+            setDeviceKickoutAlertOpen(true);
+            return;
+          }
+
           StorageService.setCurrentUser(found);
           setCurrentUser(found);
         }
@@ -134,6 +152,13 @@ export default function App() {
     const unsubscribeSync = subscribeToSync(() => {
       const refreshedUser = StorageService.getCurrentUser();
       if (refreshedUser && refreshedUser.id !== 'mem-001' && refreshedUser.id !== 'mem-002') {
+        const localSessionId = StorageService.getLocalSessionId();
+        if (refreshedUser.activeSessionId && localSessionId && refreshedUser.activeSessionId !== localSessionId) {
+          StorageService.clearSession();
+          setCurrentUser(null);
+          setDeviceKickoutAlertOpen(true);
+          return;
+        }
         setCurrentUser(refreshedUser);
       } else {
         setCurrentUser(null);
@@ -141,10 +166,27 @@ export default function App() {
       setSiteConfig(StorageService.getSiteConfig());
     });
 
+    // 5. Periodic heartbeat session validator (runs every 3.5 seconds)
+    const sessionHeartbeat = setInterval(() => {
+      const activeMem = StorageService.getCurrentUser();
+      if (activeMem && activeMem.accId) {
+        const localSess = StorageService.getLocalSessionId();
+        const memRecord = StorageService.getMembers().find(
+          (m) => m.accId.toUpperCase() === activeMem.accId.toUpperCase()
+        );
+        if (memRecord?.activeSessionId && localSess && memRecord.activeSessionId !== localSess) {
+          StorageService.clearSession();
+          setCurrentUser(null);
+          setDeviceKickoutAlertOpen(true);
+        }
+      }
+    }, 3500);
+
     return () => {
       unsubscribeFirestore();
       unsubscribeConfig();
       unsubscribeSync();
+      clearInterval(sessionHeartbeat);
     };
   }, []);
 
@@ -160,6 +202,17 @@ export default function App() {
   };
 
   const handleNavigateWithScroll = (windowName: ActiveWindow) => {
+    // If user is already logged in, never let them open public login or register
+    if (currentUser) {
+      if (windowName === 'login') {
+        setActiveWindow('dashboard');
+        return;
+      }
+      if (windowName === 'register') {
+        setActiveWindow('add-member');
+        return;
+      }
+    }
     setActiveWindow(windowName);
     if (windowName === 'home') {
       scrollToTopSection(false);
@@ -210,11 +263,11 @@ export default function App() {
         onNavigateToIdCard={handleNavigateToIdCard}
       />
 
-      {/* Spacer ensuring page content starts right below the permanently fixed header */}
-      <div className="h-[96px] md:h-[96px] w-full shrink-0" aria-hidden="true" />
+      {/* Spacer ensuring page content starts completely below the permanently fixed header on any screen */}
+      <div className="h-[200px] xs:h-[195px] sm:h-[154px] md:h-[156px] w-full shrink-0" aria-hidden="true" />
 
-      {/* Main Container - 100% Mobile Fluid Fit */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-2 sm:p-4 md:p-6 pb-16 overflow-x-hidden">
+      {/* Main Container - 100% Mobile Fluid Fit with Zero Header Overlap */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-2 sm:p-4 md:p-6 pb-24 overflow-x-hidden pt-1 sm:pt-2">
         {/* VIEW: HOME (Persistent base view - stays active under modal popups) */}
         <HomeView
           onNavigate={(view) => {
@@ -246,8 +299,8 @@ export default function App() {
           </WindowFrame>
         )}
 
-        {/* VIEW: REGISTRATION FORM */}
-        {activeWindow === 'register' && (
+        {/* VIEW: REGISTRATION FORM (Only for non-logged in visitors) */}
+        {activeWindow === 'register' && !currentUser && (
           <WindowFrame
             title="ACC नवीन सदस्यता 🆔 रजिस्ट्रेशन फॉर्म (ACC Official Registration Portal)"
             subtitle="₹249 One-Time Joining Fee • SWIS & TWIS Activation"
@@ -262,8 +315,8 @@ export default function App() {
           </WindowFrame>
         )}
 
-        {/* VIEW: LOGIN */}
-        {activeWindow === 'login' && (
+        {/* VIEW: LOGIN (Only for non-logged in visitors) */}
+        {activeWindow === 'login' && !currentUser && (
           <WindowFrame
             title="ACC सदस्य लॉगिन (Member Portal Login)"
             subtitle="Unique ACC 🆔 या मोबाइल नंबर से प्रवेश करें"
@@ -274,6 +327,24 @@ export default function App() {
               onLoginSuccess={handleLoginSuccess}
               onGoToRegister={() => setActiveWindow('register')}
               onCancel={() => setActiveWindow('home')}
+            />
+          </WindowFrame>
+        )}
+
+        {/* VIEW: SPONSOR DIRECT MEMBER ENROLLMENT (Exclusive for Logged in Sponsor) */}
+        {activeWindow === 'add-member' && currentUser && (
+          <WindowFrame
+            title={`अपने नीचे नया सदस्य जोड़ें (Sponsor: ${currentUser.accId})`}
+            subtitle="डायरेक्ट डाउनलाइन सदस्य रजिस्ट्रेशन • ₹150 रेफरल पेआउट • अनिवार्य पासवर्ड सुरक्षा नियम"
+            icon={<UserPlus className="w-4 h-4 text-orange-400" />}
+            onClose={() => setActiveWindow('dashboard')}
+          >
+            <SponsorRegisterMemberModal
+              currentUser={currentUser}
+              onSuccess={() => {
+                // Handled inside modal with digital receipt
+              }}
+              onClose={() => setActiveWindow('dashboard')}
             />
           </WindowFrame>
         )}
@@ -385,6 +456,7 @@ export default function App() {
                 onClose={() => handleNavigateWithScroll('home')}
                 onGoToPromotions={() => handleNavigateWithScroll('promotions')}
                 onGoToIdCard={() => handleNavigateWithScroll('idcard')}
+                onGoToAddMember={() => handleNavigateWithScroll('add-member')}
               />
             ) : (
               <StudentPortalGate
@@ -409,6 +481,7 @@ export default function App() {
                 currentUser={currentUser}
                 onUpdateUser={(updated) => setCurrentUser(updated)}
                 onNavigateToPromotions={() => setActiveWindow('promotions')}
+                onNavigateToChat={() => handleNavigateWithScroll('chat')}
               />
             ) : (
               <StudentPortalGate
@@ -418,6 +491,52 @@ export default function App() {
               />
             )}
           </WindowFrame>
+        )}
+
+        {/* VIEW: ACC CHAT & HELP (Complete Facebook-like Social System) */}
+        {activeWindow === 'chat' && (
+          currentUser ? (
+            <div className="fixed inset-0 z-[60] bg-slate-950 overflow-y-auto animate-fadeIn">
+              <AccChatAndHelpHub
+                currentUser={currentUser}
+                onClose={() => handleNavigateWithScroll('dashboard')}
+                onNavigateToDashboard={() => handleNavigateWithScroll('dashboard')}
+              />
+            </div>
+          ) : (
+            <WindowFrame
+              title="ACC MEMBER CHAT (कम्युनिटी सोशल व संवाद केंद्र)"
+              subtitle="स्पॉन्सर चैट, कम्युनिटी ग्रुप्स, फोटो/वीडियो शेयरिंग एवं मित्र नेटवर्क"
+              icon={<MessageCircle className="w-4 h-4 text-amber-400" />}
+              onClose={() => handleNavigateWithScroll('home')}
+            >
+              <div className="py-12 px-4 max-w-md mx-auto text-center space-y-4">
+                <div className="w-16 h-16 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-3xl mx-auto shadow-inner">
+                  💬
+                </div>
+                <h3 className="text-lg font-black text-slate-900">
+                  ACC MEMBER CHAT में प्रवेश करें
+                </h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  स्पॉन्सर से 1-क्लिक सीधी बातचीत, कम्युनिटी ग्रुप्स और अपने साथियों के साथ फोटो, वीडियो व लिंक शेयर करने के लिए कृपया अपने ACC खाते से लॉगिन करें।
+                </p>
+                <div className="pt-2 flex gap-3">
+                  <button
+                    onClick={() => handleNavigateWithScroll('login')}
+                    className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-bold text-xs shadow-md hover:brightness-110"
+                  >
+                    सदस्य लॉगिन करें
+                  </button>
+                  <button
+                    onClick={() => handleNavigateWithScroll('register')}
+                    className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-xs shadow-md hover:brightness-110"
+                  >
+                    रजिस्ट्रेशन (₹249)
+                  </button>
+                </div>
+              </div>
+            </WindowFrame>
+          )
         )}
 
         {/* VIEW: ADMIN PANEL */}
@@ -762,6 +881,37 @@ export default function App() {
         activeWindow={activeWindow}
         setActiveWindow={handleNavigateWithScroll}
       />
+
+      {/* MANDATORY PASSWORD UPDATE MODAL (When registered by sponsor) */}
+      {currentUser && currentUser.mustUpdatePassword && (
+        <MandatoryPasswordUpdateModal
+          currentUser={currentUser}
+          onPasswordUpdated={(updatedMember) => {
+            setCurrentUser(updatedMember);
+          }}
+        />
+      )}
+
+      {/* MULTI-DEVICE SECURITY KICKOUT ALERT MODAL */}
+      <DeviceKickoutAlertModal
+        isOpen={deviceKickoutAlertOpen}
+        onClose={() => setDeviceKickoutAlertOpen(false)}
+        onGoToResetPassword={() => {
+          setDeviceKickoutAlertOpen(false);
+          setShowForgotCredentialsModal(true);
+        }}
+      />
+
+      {/* FORGOT CREDENTIALS / PASSWORD RESET MODAL */}
+      {showForgotCredentialsModal && (
+        <ForgotCredentialsModal
+          onClose={() => setShowForgotCredentialsModal(false)}
+          onSuccessLogin={(member) => {
+            setShowForgotCredentialsModal(false);
+            handleLoginSuccess(member);
+          }}
+        />
+      )}
     </div>
   );
 }

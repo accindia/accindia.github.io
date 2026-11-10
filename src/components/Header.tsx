@@ -31,6 +31,7 @@ import {
   Sunset,
   Moon,
   Lock,
+  UserPlus,
 } from 'lucide-react';
 import { ActiveWindow, Member, SiteConfig, PrivateMessage } from '../types';
 import { StorageService, subscribeToSync } from '../services/storage';
@@ -194,53 +195,102 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  const primaryNavItems = [
-    {
-      id: 'home' as ActiveWindow,
-      label: 'होम',
-      icon: <Sparkles className="w-3.5 h-3.5" />,
-      colorClass: 'from-amber-400 to-amber-600 text-white',
-    },
-    {
-      id: 'register' as ActiveWindow,
-      label: 'रजिस्ट्रेशन',
-      icon: <FileText className="w-3.5 h-3.5" />,
-      colorClass: 'from-orange-500 to-amber-600 text-white',
-    },
-    {
-      id: 'login' as ActiveWindow,
-      label: 'लॉगिन',
-      icon: <LogIn className="w-3.5 h-3.5" />,
-      colorClass: 'from-indigo-600 to-blue-700 text-white',
-    },
-    {
-      id: 'dashboard' as ActiveWindow,
-      label: 'डैशबोर्ड',
-      icon: <LayoutDashboard className="w-3.5 h-3.5" />,
-      colorClass: 'from-[#2874f0] to-blue-700 text-white',
-    },
-    {
-      id: 'admin' as ActiveWindow,
-      label: 'एडमिन पैनल',
-      icon: <ShieldCheck className="w-3.5 h-3.5" />,
-      colorClass: 'from-red-500 to-rose-700 text-white',
-    },
-    {
-      id: 'idcard' as ActiveWindow,
-      label: 'डिजिटल ID',
-      icon: <CreditCard className="w-3.5 h-3.5" />,
-      colorClass: 'from-cyan-500 to-blue-600 text-white',
-    },
-  ];
+  const primaryNavItems = currentUser
+    ? [
+        {
+          id: 'home' as ActiveWindow,
+          label: 'होम',
+          icon: <Sparkles className="w-3.5 h-3.5" />,
+          colorClass: 'from-amber-400 to-amber-600 text-white',
+        },
+        {
+          id: 'chat' as ActiveWindow,
+          label: 'ACC MEMBER CHAT',
+          icon: <MessageCircle className="w-3.5 h-3.5" />,
+          colorClass: 'from-amber-400 via-orange-500 to-amber-600 text-slate-950 font-black',
+        },
+        {
+          id: 'add-member' as ActiveWindow,
+          label: 'नया सदस्य जोड़ें',
+          icon: <UserPlus className="w-3.5 h-3.5" />,
+          colorClass: 'from-orange-500 to-amber-600 text-white',
+        },
+        {
+          id: 'dashboard' as ActiveWindow,
+          label: 'डैशबोर्ड',
+          icon: <LayoutDashboard className="w-3.5 h-3.5" />,
+          colorClass: 'from-[#2874f0] to-blue-700 text-white',
+        },
+        {
+          id: 'refer' as ActiveWindow,
+          label: 'रेफर & कमाएं',
+          icon: <Users className="w-3.5 h-3.5" />,
+          colorClass: 'from-emerald-500 to-teal-700 text-white',
+        },
+        {
+          id: 'admin' as ActiveWindow,
+          label: 'एडमिन पैनल',
+          icon: <ShieldCheck className="w-3.5 h-3.5" />,
+          colorClass: 'from-red-500 to-rose-700 text-white',
+        },
+        {
+          id: 'idcard' as ActiveWindow,
+          label: 'डिजिटल ID',
+          icon: <CreditCard className="w-3.5 h-3.5" />,
+          colorClass: 'from-cyan-500 to-blue-600 text-white',
+        },
+      ]
+    : [
+        {
+          id: 'home' as ActiveWindow,
+          label: 'होम',
+          icon: <Sparkles className="w-3.5 h-3.5" />,
+          colorClass: 'from-amber-400 to-amber-600 text-white',
+        },
+        {
+          id: 'register' as ActiveWindow,
+          label: 'रजिस्ट्रेशन',
+          icon: <FileText className="w-3.5 h-3.5" />,
+          colorClass: 'from-orange-500 to-amber-600 text-white',
+        },
+        {
+          id: 'login' as ActiveWindow,
+          label: 'लॉगिन',
+          icon: <LogIn className="w-3.5 h-3.5" />,
+          colorClass: 'from-indigo-600 to-blue-700 text-white',
+        },
+        {
+          id: 'dashboard' as ActiveWindow,
+          label: 'डैशबोर्ड',
+          icon: <LayoutDashboard className="w-3.5 h-3.5" />,
+          colorClass: 'from-[#2874f0] to-blue-700 text-white',
+        },
+        {
+          id: 'admin' as ActiveWindow,
+          label: 'एडमिन पैनल',
+          icon: <ShieldCheck className="w-3.5 h-3.5" />,
+          colorClass: 'from-red-500 to-rose-700 text-white',
+        },
+        {
+          id: 'idcard' as ActiveWindow,
+          label: 'डिजिटल ID',
+          icon: <CreditCard className="w-3.5 h-3.5" />,
+          colorClass: 'from-cyan-500 to-blue-600 text-white',
+        },
+      ];
 
   const moreNavItems = [
-    {
-      id: 'refer' as ActiveWindow,
-      label: 'रेफर & कमाएं',
-      desc: 'प्रति रेफरल ₹150 तुरंत पेआउट व प्रचार सामग्री',
-      icon: <Users className="w-3.5 h-3.5" />,
-      colorClass: 'from-orange-500 to-amber-600 text-white',
-    },
+    ...(currentUser
+      ? []
+      : [
+          {
+            id: 'refer' as ActiveWindow,
+            label: 'रेफर & कमाएं',
+            desc: 'प्रति रेफरल ₹150 तुरंत पेआउट व प्रचार सामग्री',
+            icon: <Users className="w-3.5 h-3.5" />,
+            colorClass: 'from-orange-500 to-amber-600 text-white',
+          },
+        ]),
     {
       id: 'video' as ActiveWindow,
       label: 'ट्रेनिंग वीडियो',
@@ -299,7 +349,7 @@ export const Header: React.FC<HeaderProps> = ({
   const cleanWhatsApp = (siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '');
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 w-full shadow-md bg-[#2874f0] select-none">
+    <header className={`fixed top-0 left-0 right-0 ${mobileMenuOpen ? 'z-[60]' : 'z-50'} w-full shadow-md bg-[#2874f0] select-none`}>
       {/* ------------------------------------------------------------- */}
       {/* 1. Top Yellow Announcement Banner - Highlights & Features     */}
       {/* ------------------------------------------------------------- */}
@@ -339,223 +389,434 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* ------------------------------------------------------------- */}
-      {/* 2. Main Royal Blue Header Bar - 100% Responsive for All      */}
-      {/* ------------------------------------------------------------- */}
-      <div className="bg-[#2874f0] text-white w-full border-b border-blue-400/20">
-        <div className="max-w-7xl mx-auto px-2 sm:px-4 md:px-6 py-1.5 sm:py-2 flex items-center justify-between gap-1.5 sm:gap-3 w-full">
-          {/* Brand Logo - 3D Embossed ACC Badge */}
+      {/* ------------------------------------------------------------------- */}
+      {/* 2. DEDICATED BRAND HEADER (ACC INDIA LOGO & COMPLETE VIEW NAME)     */}
+      {/*    बिना स्क्रोल वाला हेडर: 100% Identical Look Across All Devices    */}
+      {/* ------------------------------------------------------------------- */}
+      <div className="bg-gradient-to-r from-[#17469e] via-[#2874f0] to-[#17469e] text-white w-full border-b border-blue-400/30 shadow-sm select-none">
+        <div className="max-w-7xl mx-auto px-1.5 sm:px-4 py-1.5 sm:py-2 flex items-center justify-between gap-1.5 sm:gap-2 w-full flex-wrap xs:flex-nowrap">
+          {/* Brand Logo & Full Name - 100% Complete View, Zero Scroll, Identical on Every Screen */}
           <div 
             onClick={() => setActiveWindow('home')}
-            className="flex items-center gap-1.5 sm:gap-2.5 cursor-pointer group select-none min-w-0 shrink"
-            title="Achievers Club Community - होम"
+            className="flex items-center gap-1.5 sm:gap-3 cursor-pointer group select-none min-w-0"
+            title="Achievers Club Community (ACC) - Start Young · होम"
           >
-            {/* Official 3D ACC Emblem Logo (Frameless, Complete & No Side Cut) */}
-            <AccLogo size="custom" className="w-8 h-8 sm:w-10 sm:h-10 group-hover:scale-105 active:translate-y-0.5" />
-            <div className="flex flex-col min-w-0 justify-center">
-              <div className="flex items-center gap-1 sm:gap-1.5">
-                <span className="font-display font-black text-xs sm:text-base md:text-lg tracking-tight text-white leading-tight truncate drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]">
+            {/* Official 3D ACC Emblem Logo (Frameless, Complete, No Cutoff) */}
+            <AccLogo size="custom" className="w-8 h-8 xs:w-10 xs:h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 group-hover:scale-105 active:translate-y-0.5 drop-shadow-md shrink-0 transition-transform" />
+            
+            {/* Complete View Name & Badges */}
+            <div className="flex flex-col justify-center min-w-0">
+              <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+                <span className="font-display font-black text-xs xs:text-sm sm:text-lg md:text-xl tracking-tight text-white leading-tight break-words drop-shadow-[0_1.5px_2px_rgba(0,0,0,0.4)]">
                   Achievers Club
                 </span>
-                <span className="bg-gradient-to-r from-orange-500 via-white to-emerald-500 text-slate-950 font-black text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-0.5 border border-white/60">
-                  <span className="text-[9px]">🇮🇳</span> INDIA
+                <span className="bg-gradient-to-r from-orange-500 via-white to-emerald-500 text-slate-950 font-black text-[8px] sm:text-[9.5px] px-1.5 sm:px-2 py-0.2 sm:py-0.5 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-0.5 border border-white/80 shrink-0">
+                  <span className="text-[8.5px]">🇮🇳</span> INDIA
                 </span>
               </div>
-              <span className="text-[9.5px] sm:text-[11px] text-[#ffe500] italic font-bold flex items-center gap-1 leading-none mt-0.5 truncate">
+              <div className="flex items-center gap-1 sm:gap-1.5 text-[9px] sm:text-xs text-[#ffe500] font-bold leading-tight mt-0.5 flex-wrap drop-shadow-xs">
                 <span>Community (ACC)</span>
-                <span className="hidden sm:inline text-[9px] text-blue-100 font-normal not-italic">· Start Young</span>
-              </span>
+                <span className="text-blue-100 font-semibold not-italic">· Start Young</span>
+                <span className="inline-flex items-center gap-0.5 text-emerald-300 font-bold text-[8.5px] sm:text-[9px] bg-emerald-950/40 px-1 py-0.2 rounded border border-emerald-400/30">
+                  ★ ISO 9001:2015
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Real-time IST Digital Clock (Desktop only) */}
-          <div className="hidden lg:flex items-center gap-3 bg-[#1c52b8] border border-blue-400/40 rounded-xl px-3 py-1 shadow-[0_2px_6px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(0,0,0,0.25)] text-xs shrink-0">
-            <div className="flex items-center gap-2 border-r border-blue-400/40 pr-2.5">
-              <div className="w-6 h-6 rounded-lg bg-gradient-to-b from-yellow-300 to-amber-500 text-slate-900 flex items-center justify-center shadow-[0_1.5px_3px_rgba(0,0,0,0.2),inset_0_1px_0.5px_rgba(255,255,255,0.7)] shrink-0">
-                <Clock className="w-3.5 h-3.5" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[9px] text-blue-200 font-semibold uppercase tracking-wider">IST Time</span>
-                <span className="font-mono-acc font-bold text-white text-xs">
+          {/* Right Side Info: Live IST Time & Verified Badge (Non-scrollable, Compact) */}
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+            {/* Real-time IST Digital Clock & Date */}
+            <div className="hidden sm:flex items-center gap-2 bg-[#124299]/85 border border-blue-300/30 rounded-xl px-2.5 py-1 text-xs shadow-inner">
+              <div className="flex items-center gap-1 text-yellow-300">
+                <Clock className="w-3.5 h-3.5 text-yellow-300 shrink-0" />
+                <span className="font-mono-acc font-bold text-white text-[11px] sm:text-xs">
                   {currentTime || '12:00:00 PM'}
                 </span>
               </div>
+              <div className="hidden md:flex items-center gap-1 border-l border-blue-300/30 pl-2 text-cyan-200 text-[10.5px]">
+                <Calendar className="w-3 h-3 text-cyan-200 shrink-0" />
+                <span>{currentDate}</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg bg-gradient-to-b from-blue-400 to-blue-600 text-white flex items-center justify-center shadow-[0_1.5px_3px_rgba(0,0,0,0.2),inset_0_1px_0.5px_rgba(255,255,255,0.5)] shrink-0">
-                <Calendar className="w-3.5 h-3.5" />
+
+            {/* Official Portal Seal Badge */}
+            <div className="flex items-center gap-1 bg-gradient-to-b from-amber-300 to-amber-500 text-slate-950 font-black text-[8.5px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md sm:rounded-lg shadow-sm border border-amber-200 shrink-0">
+              <ShieldCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-950" />
+              <span>Govt. Verified</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ------------------------------------------------------------------- */}
+      {/* 3. DEDICATED ACTION BUTTONS BAR (उसके नीचे बाकी बटन)                */}
+      {/*    All Buttons & Options 100% Inside Screen on Any Device           */}
+      {/* ------------------------------------------------------------------- */}
+      <div className="bg-[#1c52b8] text-white w-full border-b border-blue-400/25 shadow-md">
+        <div className="max-w-7xl mx-auto px-1.5 sm:px-3 md:px-4 py-1 sm:py-1.5 w-full">
+          {/* MOBILE SCREENS (< sm): 2 Clean, Symmetrical Rows, 0% Overlap, 100% Inside Screen */}
+          <div className="flex sm:hidden flex-col gap-1.5 w-full">
+            {/* Mobile Row 1: User / Login + Control + Menu */}
+            <div className="flex items-center justify-between gap-1.5 w-full">
+              {currentUser ? (
+                /* Logged in User Profile Chip */
+                <div className="flex items-center gap-1.5 bg-[#124299]/95 border border-blue-400/40 rounded-lg p-1 pr-1.5 shadow-inner min-w-0 flex-1">
+                  <div 
+                    onClick={() => handleNavClick('idcard')}
+                    className="w-7 h-7 rounded-md bg-gradient-to-b from-[#fff777] via-[#ffe500] to-[#e6cf00] text-[#1258c7] flex items-center justify-center font-black text-[10px] cursor-pointer shadow-xs overflow-hidden shrink-0 border border-yellow-200"
+                    title="डिजिटल ID कार्ड देखें"
+                  >
+                    {currentUser.avatarUrl ? (
+                      <img src={currentUser.avatarUrl} alt={currentUser.fullName} className="w-full h-full object-cover" />
+                    ) : (
+                      currentUser.fullName.substring(0, 2).toUpperCase()
+                    )}
+                  </div>
+                  <div 
+                    onClick={() => setActiveWindow('dashboard')}
+                    className="flex flex-col text-left cursor-pointer min-w-0 flex-1 leading-tight"
+                    title={`लॉगिन सदस्य: ${currentUser.fullName} (${currentUser.accId})`}
+                  >
+                    <span className="text-[10.5px] font-black text-yellow-300 drop-shadow-xs break-words leading-tight">
+                      {currentUser.fullName}
+                    </span>
+                    <span className="text-[8.5px] font-mono-acc text-cyan-200 font-bold leading-none mt-0.5">
+                      {currentUser.accId}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                /* Logged Out: Compact Login & Register ₹249 */
+                <div className="flex items-center gap-1 flex-1 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => setActiveWindow('login')}
+                    className="flex-1 flex items-center justify-center gap-1 btn-premium-login text-white py-1 px-1.5 rounded-lg font-black text-[10px] shadow-xs active:translate-y-0.5 border-t border-white/40 cursor-pointer"
+                  >
+                    <LogIn className="w-3 h-3 text-cyan-200 shrink-0" />
+                    <span className="whitespace-nowrap leading-none">लॉगिन</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveWindow('register')}
+                    className="flex-1 flex items-center justify-center gap-1 btn-rainbow-theme btn-rainbow-sheen text-white py-1 px-1.5 rounded-lg font-black text-[10px] shadow-xs active:translate-y-0.5 border-t border-white/50 cursor-pointer"
+                  >
+                    <Sparkles className="w-3 h-3 text-yellow-300 shrink-0" />
+                    <span className="whitespace-nowrap leading-none">रजिस्टर ₹249</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Control Button - Strictly "Control" with Logo */}
+              <button
+                type="button"
+                onClick={() => setActiveWindow('admin')}
+                className="flex items-center gap-1 bg-gradient-to-b from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 px-2 py-1 rounded-lg font-black text-[10.5px] shadow-[0_2px_5px_rgba(217,119,6,0.4),inset_0_1px_1px_rgba(255,255,255,0.9)] border border-amber-200 active:translate-y-0.5 shrink-0 cursor-pointer"
+                title="Control (एडमिन कंट्रोल पैनल)"
+              >
+                <div className="w-4 h-4 rounded bg-slate-950 text-amber-300 flex items-center justify-center shrink-0 border border-amber-300/60">
+                  <ShieldCheck className="w-2.5 h-2.5 text-amber-300" />
+                </div>
+                <span className="font-display font-black tracking-tight leading-none">Control</span>
+              </button>
+
+              {/* Hamburger Menu Toggle */}
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="p-1 text-white bg-gradient-to-b from-blue-500 to-[#1c52b8] hover:from-blue-400 hover:to-[#17469e] active:translate-y-0.5 rounded-lg shadow-sm border border-blue-300/40 flex items-center justify-center w-7 h-7 shrink-0 cursor-pointer"
+                aria-label="मेनू खोलें"
+              >
+                {mobileMenuOpen ? (
+                  <X className="w-3.5 h-3.5 text-yellow-300" />
+                ) : (
+                  <Menu className="w-3.5 h-3.5 text-white" />
+                )}
+              </button>
+            </div>
+
+            {/* Mobile Row 2: Tool Strip (Greeting, Alert Bell, Live Chat, Dashboard, Logout) */}
+            <div className="flex items-center justify-between gap-1 w-full pt-0.5 border-t border-blue-400/20">
+              <div className="flex items-center gap-1 min-w-0">
+                {/* 3D Greeting Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowWelcomeModal(true)}
+                  className="flex items-center gap-1 bg-gradient-to-b from-amber-300 via-yellow-400 to-amber-500 text-slate-950 px-1.5 py-0.5 rounded-md font-black text-[9px] border border-amber-200 active:translate-y-0.5 shadow-xs shrink-0 cursor-pointer"
+                  title="स्वागतम विंडो"
+                >
+                  <div className="w-3.5 h-3.5 rounded bg-slate-950 text-amber-300 flex items-center justify-center shrink-0">
+                    {currentGreetingPeriod === 'morning' && <Sunrise className="w-2 h-2 text-amber-300 animate-pulse" />}
+                    {currentGreetingPeriod === 'afternoon' && <Sun className="w-2 h-2 text-yellow-300 animate-spin-slow" />}
+                    {currentGreetingPeriod === 'evening' && <Sunset className="w-2 h-2 text-pink-300" />}
+                    {currentGreetingPeriod === 'night' && <Moon className="w-2 h-2 text-sky-200" />}
+                  </div>
+                  <span className="leading-none whitespace-nowrap">{GREETING_DETAILS[currentGreetingPeriod].titleHi}</span>
+                </button>
+
+                {/* 3D Notification Bell */}
+                <button
+                  type="button"
+                  onClick={() => setShowNotificationDrawer(true)}
+                  className="relative p-1 bg-gradient-to-b from-[#2463da] to-[#124299] text-white rounded-md border border-blue-300/40 active:translate-y-0.5 shadow-xs shrink-0 cursor-pointer"
+                  title="सूचनाएं"
+                >
+                  <Bell className="w-3 h-3 text-yellow-300 animate-pulse" />
+                  {unreadChatCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-rose-600 text-white font-black text-[7.5px] min-w-[13px] h-[13px] flex items-center justify-center rounded-full border border-white">
+                      {unreadChatCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* 3D Live Chat */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (currentUser) {
+                      setShowAdminChatModal(true);
+                    } else {
+                      setActiveWindow('login');
+                    }
+                  }}
+                  className="flex items-center gap-1 bg-gradient-to-b from-emerald-500 to-teal-700 text-white px-1.5 py-0.5 rounded-md font-black text-[9px] border border-emerald-300/50 active:translate-y-0.5 shadow-xs shrink-0 cursor-pointer"
+                  title="लाइव चैट"
+                >
+                  <MessageCircle className="w-2.5 h-2.5 text-white" />
+                  <span className="leading-none">चैट</span>
+                  {unreadChatCount > 0 && (
+                    <span className="bg-rose-500 text-white text-[7.5px] font-black px-1 rounded-full">
+                      {unreadChatCount}
+                    </span>
+                  )}
+                </button>
               </div>
-              <div className="flex flex-col">
-                <span className="text-[9px] text-blue-200 font-semibold uppercase tracking-wider">Today</span>
-                <span className="text-xs font-semibold text-white">
-                  {currentDate || 'Saturday, 19 Sep'}
-                </span>
-              </div>
+
+              {currentUser && (
+                <div className="flex items-center gap-1 shrink-0">
+                  {/* Add Member Under Me */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveWindow('add-member')}
+                    className="flex items-center gap-1 bg-gradient-to-b from-orange-500 to-amber-600 text-white px-1.5 py-0.5 rounded-md font-black text-[9px] border border-amber-300/40 shadow-xs active:translate-y-0.5 cursor-pointer shrink-0"
+                    title="अपने नीचे नया सदस्य जोड़ें"
+                  >
+                    <UserPlus className="w-2.5 h-2.5 text-yellow-200" />
+                    <span className="leading-none whitespace-nowrap">सदस्य जोड़ें</span>
+                  </button>
+
+                  {/* Dashboard link */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveWindow('dashboard')}
+                    className="flex items-center gap-1 bg-white text-[#2874f0] px-1.5 py-0.5 rounded-md font-black text-[9px] border border-slate-200 shadow-xs active:translate-y-0.5 cursor-pointer shrink-0"
+                  >
+                    <LayoutDashboard className="w-2.5 h-2.5 text-[#2874f0]" />
+                    <span className="leading-none">डैशबोर्ड</span>
+                  </button>
+
+                  {/* Logout */}
+                  <button
+                    type="button"
+                    onClick={onLogout}
+                    className="p-1 text-red-200 hover:text-white bg-red-600/40 rounded border border-red-400/40 active:translate-y-0.5 shadow-xs cursor-pointer shrink-0"
+                    title="लॉगआउट"
+                  >
+                    <LogOut className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Top Action Buttons - 3D Icons & Sized Text Boxes (Zero Cutoff on Mobile) */}
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-auto">
-            {/* 1. 3D Dynamic Welcome Greeting Window Button (Morning / Afternoon / Evening / Night) */}
-            <button
-              type="button"
-              onClick={() => setShowWelcomeModal(true)}
-              className="group relative flex items-center gap-1 sm:gap-1.5 bg-gradient-to-b from-amber-300 via-yellow-400 to-amber-500 hover:from-yellow-200 hover:to-amber-400 text-slate-950 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl font-black text-[10px] sm:text-xs shadow-[0_3px_8px_rgba(245,158,11,0.4),inset_0_1.5px_1px_rgba(255,255,255,0.9)] border border-amber-200 active:translate-y-0.5 transition cursor-pointer shrink-0 select-none"
-              title="स्वागतम विंडो खोलें • Welcome Window (हिंदी & English)"
-            >
-              <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-lg bg-slate-950 text-amber-300 flex items-center justify-center shadow-inner shrink-0 border border-amber-300/50">
-                {currentGreetingPeriod === 'morning' && <Sunrise className="w-3.5 h-3.5 text-amber-300 animate-pulse" />}
-                {currentGreetingPeriod === 'afternoon' && <Sun className="w-3.5 h-3.5 text-yellow-300 animate-spin-slow" />}
-                {currentGreetingPeriod === 'evening' && <Sunset className="w-3.5 h-3.5 text-pink-300" />}
-                {currentGreetingPeriod === 'night' && <Moon className="w-3.5 h-3.5 text-sky-200" />}
-              </div>
-              <span className="whitespace-nowrap leading-none hidden md:inline">
-                {GREETING_DETAILS[currentGreetingPeriod].titleHi}
-              </span>
-              <span className="whitespace-nowrap leading-none text-[9px] text-slate-900/80 font-bold hidden xl:inline">
-                ({GREETING_DETAILS[currentGreetingPeriod].titleEn.split(' ')[1]})
-              </span>
-            </button>
-
-            {/* 2. 3D Notification Alert Button with Live Unread Message Count */}
-            <button
-              type="button"
-              onClick={() => setShowNotificationDrawer(true)}
-              className="relative p-1 sm:p-1.5 bg-gradient-to-b from-[#1c52b8] to-[#124299] hover:from-[#2463da] hover:to-[#174fb5] text-white rounded-xl shadow-[0_3px_8px_rgba(0,0,0,0.25),inset_0_1.5px_1px_rgba(255,255,255,0.35)] border border-blue-300/40 active:translate-y-0.5 transition cursor-pointer shrink-0"
-              title={`सूचनाएं एवं अलर्ट्स (${unreadChatCount} नए संदेश)`}
-            >
-              <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 flex items-center justify-center">
-                <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-300 animate-pulse" />
-              </div>
-              {unreadChatCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-rose-600 text-white font-black text-[9px] min-w-[17px] h-[17px] flex items-center justify-center rounded-full border-2 border-white animate-pulse shadow-md px-0.5">
-                  {unreadChatCount}
-                </span>
-              )}
-            </button>
-
-            {/* 3. 3D Admin / Sponsor Live Chat Button with Count */}
-            <button
-              type="button"
-              onClick={() => {
-                if (currentUser) {
-                  setShowAdminChatModal(true);
-                } else {
-                  setActiveWindow('login');
-                }
-              }}
-              className="relative flex items-center gap-1 sm:gap-1.5 bg-gradient-to-b from-emerald-500 via-emerald-600 to-teal-700 hover:from-emerald-400 hover:to-teal-600 text-white px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl font-black text-[10px] sm:text-xs shadow-[0_3px_8px_rgba(16,185,129,0.35),inset_0_1.5px_1px_rgba(255,255,255,0.4)] border border-emerald-300/50 active:translate-y-0.5 transition cursor-pointer shrink-0 select-none"
-              title="एडमिन व स्पॉन्सर चैट बॉक्स खोलें"
-            >
-              <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-lg bg-emerald-950/40 text-emerald-200 flex items-center justify-center shrink-0 border border-emerald-300/40">
-                <MessageCircle className="w-3.5 h-3.5 text-white" />
-              </div>
-              <span className="whitespace-nowrap leading-none hidden sm:inline">चैट</span>
-              {unreadChatCount > 0 && (
-                <span className="bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full border border-white">
-                  {unreadChatCount}
-                </span>
-              )}
-            </button>
-
-            {currentUser ? (
-              /* LOGGED IN USER ACTIONS WITH 3D BUTTONS */
-              <div className="flex items-center gap-1 sm:gap-2 bg-[#1c52b8]/80 border border-blue-400/40 rounded-xl p-1 pr-1.5 sm:pr-2 shadow-[0_2px_6px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.2)] shrink-0">
-                {/* 3D User Avatar Badge */}
-                <div 
-                  onClick={() => handleNavClick('idcard')}
-                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-b from-[#fff777] via-[#ffe500] to-[#e6cf00] text-[#1258c7] flex items-center justify-center font-black text-xs cursor-pointer shadow-[0_2px_5px_rgba(0,0,0,0.25),inset_0_1px_1px_rgba(255,255,255,0.9)] hover:scale-105 active:translate-y-0.5 transition-all overflow-hidden shrink-0 border border-yellow-200"
-                  title="डिजिटल ID कार्ड देखें"
-                >
-                  {currentUser.avatarUrl ? (
-                    <img src={currentUser.avatarUrl} alt={currentUser.fullName} className="w-full h-full object-cover" />
-                  ) : (
-                    currentUser.fullName.substring(0, 2).toUpperCase()
-                  )}
+          {/* DESKTOP & TABLET SCREENS (sm:flex): Single Wide Balanced Row */}
+          <div className="hidden sm:flex items-center justify-between gap-2 w-full">
+            {/* Left Cluster: Welcome Window, Notification Bell, Live Chat */}
+            <div className="flex items-center gap-1.5 shrink-0 min-w-0">
+              {/* 1. 3D Dynamic Welcome Greeting Window Button */}
+              <button
+                type="button"
+                onClick={() => setShowWelcomeModal(true)}
+                className="group relative flex items-center gap-1.5 bg-gradient-to-b from-amber-300 via-yellow-400 to-amber-500 hover:from-yellow-200 hover:to-amber-400 text-slate-950 px-2.5 py-1 rounded-lg font-black text-[11px] shadow-[0_2px_5px_rgba(245,158,11,0.4),inset_0_1px_1px_rgba(255,255,255,0.9)] border border-amber-200 active:translate-y-0.5 transition cursor-pointer shrink-0 select-none"
+                title="स्वागतम विंडो खोलें • Welcome Window (हिंदी & English)"
+              >
+                <div className="w-4.5 h-4.5 rounded bg-slate-950 text-amber-300 flex items-center justify-center shadow-inner shrink-0 border border-amber-300/50">
+                  {currentGreetingPeriod === 'morning' && <Sunrise className="w-3 h-3 text-amber-300 animate-pulse" />}
+                  {currentGreetingPeriod === 'afternoon' && <Sun className="w-3 h-3 text-yellow-300 animate-spin-slow" />}
+                  {currentGreetingPeriod === 'evening' && <Sunset className="w-3 h-3 text-pink-300" />}
+                  {currentGreetingPeriod === 'night' && <Moon className="w-3 h-3 text-sky-200" />}
                 </div>
+                <span className="whitespace-nowrap leading-none">
+                  {GREETING_DETAILS[currentGreetingPeriod].titleHi}
+                </span>
+              </button>
 
-                {/* 3D Dashboard Button */}
-                <button
-                  type="button"
-                  onClick={() => setActiveWindow('dashboard')}
-                  className="group relative flex items-center gap-1 sm:gap-1.5 bg-gradient-to-b from-white via-slate-50 to-slate-100 text-[#2874f0] hover:text-[#1258c7] px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl font-black text-[11px] sm:text-xs shadow-[0_3px_8px_rgba(0,0,0,0.2),inset_0_1.5px_1px_rgba(255,255,255,1)] border border-slate-200 active:translate-y-0.5 transition cursor-pointer shrink-0"
-                >
-                  <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-lg bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white flex items-center justify-center shadow-[0_2px_4px_rgba(40,116,240,0.4),inset_0_1px_0.5px_rgba(255,255,255,0.6)] shrink-0">
-                    <LayoutDashboard className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              {/* 2. 3D Notification Alert Button with Live Unread Message Count */}
+              <button
+                type="button"
+                onClick={() => setShowNotificationDrawer(true)}
+                className="relative p-1.5 bg-gradient-to-b from-[#2463da] to-[#124299] hover:from-[#2e71f0] hover:to-[#174fb5] text-white rounded-lg shadow-[0_2px_5px_rgba(0,0,0,0.25),inset_0_1px_1px_rgba(255,255,255,0.35)] border border-blue-300/40 active:translate-y-0.5 transition cursor-pointer shrink-0"
+                title={`सूचनाएं एवं अलर्ट्स (${unreadChatCount} नए संदेश)`}
+              >
+                <div className="w-4.5 h-4.5 flex items-center justify-center">
+                  <Bell className="w-3.5 h-3.5 text-yellow-300 animate-pulse" />
+                </div>
+                {unreadChatCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-rose-600 text-white font-black text-[8px] min-w-[14px] h-[14px] flex items-center justify-center rounded-full border border-white animate-pulse shadow-md px-0.5">
+                    {unreadChatCount}
+                  </span>
+                )}
+              </button>
+
+              {/* 3. 3D Admin / Sponsor Live Chat Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (currentUser) {
+                    setShowAdminChatModal(true);
+                  } else {
+                    setActiveWindow('login');
+                  }
+                }}
+                className="relative flex items-center gap-1.5 bg-gradient-to-b from-emerald-500 via-emerald-600 to-teal-700 hover:from-emerald-400 hover:to-teal-600 text-white px-2.5 py-1 rounded-lg font-black text-[11px] shadow-[0_2px_5px_rgba(16,185,129,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)] border border-emerald-300/50 active:translate-y-0.5 transition cursor-pointer shrink-0 select-none"
+                title="एडमिन व स्पॉन्सर चैट बॉक्स खोलें"
+              >
+                <div className="w-4.5 h-4.5 rounded bg-emerald-950/40 text-emerald-200 flex items-center justify-center shrink-0 border border-emerald-300/40">
+                  <MessageCircle className="w-3 h-3 text-white" />
+                </div>
+                <span className="whitespace-nowrap leading-none">चैट</span>
+                {unreadChatCount > 0 && (
+                  <span className="bg-rose-500 text-white text-[8px] font-black px-1 py-0.2 rounded-full border border-white">
+                    {unreadChatCount}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Right Cluster: User Profile / Login / Register + Control Button + Menu */}
+            <div className="flex items-center gap-1.5 shrink-0 min-w-0 justify-end">
+              {currentUser ? (
+                /* LOGGED IN USER ACTIONS - COMPACT & 100% VISIBLE FULL NAME WITHOUT TRUNCATION */
+                <div className="flex items-center gap-1.5 bg-[#124299]/90 border border-blue-400/40 rounded-lg p-1 pr-1.5 shadow-inner shrink-0 min-w-0">
+                  {/* 3D User Avatar Badge */}
+                  <div 
+                    onClick={() => handleNavClick('idcard')}
+                    className="w-7 h-7 rounded-md bg-gradient-to-b from-[#fff777] via-[#ffe500] to-[#e6cf00] text-[#1258c7] flex items-center justify-center font-black text-[10px] cursor-pointer shadow-xs hover:scale-105 active:translate-y-0.5 transition-all overflow-hidden shrink-0 border border-yellow-200"
+                    title="डिजिटल ID कार्ड देखें"
+                  >
+                    {currentUser.avatarUrl ? (
+                      <img src={currentUser.avatarUrl} alt={currentUser.fullName} className="w-full h-full object-cover" />
+                    ) : (
+                      currentUser.fullName.substring(0, 2).toUpperCase()
+                    )}
                   </div>
-                  <span className="whitespace-nowrap leading-none">डैशबोर्ड</span>
-                </button>
 
-                {/* 3D Logout Button */}
-                <button
-                  type="button"
-                  onClick={onLogout}
-                  className="p-1 sm:p-1.5 text-red-200 hover:text-white bg-red-600/25 hover:bg-red-600/40 rounded-lg border border-red-400/30 transition shadow-xs active:translate-y-0.5 shrink-0"
-                  title="लॉगआउट करें"
-                >
-                  <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                </button>
-              </div>
-            ) : (
-              /* LOGGED OUT ACTIONS: 3D LOGIN & 3D REGISTER (ZERO TEXT CUTOFF) */
-              <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                {/* 3D Premium Login Button */}
-                <button
-                  type="button"
-                  onClick={() => setActiveWindow('login')}
-                  className="group relative flex items-center gap-1 sm:gap-1.5 btn-premium-login text-white px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl font-black text-[11px] sm:text-xs shadow-[0_3px_12px_rgba(37,99,235,0.4),0_1px_3px_rgba(0,0,0,0.2)] active:translate-y-0.5 transition cursor-pointer shrink-0 border-t border-white/40 select-none"
-                  title="विद्यार्थी लॉगिन करें"
-                >
-                  <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-lg bg-white/20 border border-white/30 text-cyan-200 flex items-center justify-center shadow-inner shrink-0">
-                    <LogIn className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                  {/* Logged in User Full Name & ACC ID Badge - Complete & Fully Readable */}
+                  <div 
+                    onClick={() => setActiveWindow('dashboard')}
+                    className="flex flex-col text-left cursor-pointer select-none leading-tight pr-0.5 min-w-0"
+                    title={`लॉगिन सदस्य: ${currentUser.fullName} (${currentUser.accId})`}
+                  >
+                    <span className="text-xs font-black text-yellow-300 drop-shadow-xs break-words leading-tight">
+                      {currentUser.fullName}
+                    </span>
+                    <span className="text-[8.5px] font-mono-acc text-cyan-200 font-bold leading-none mt-0.5">
+                      {currentUser.accId}
+                    </span>
                   </div>
-                  <span className="whitespace-nowrap leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">लॉगिन</span>
-                </button>
 
-                {/* 3D Register Button with Rainbow Theme */}
-                <button
-                  type="button"
-                  onClick={() => setActiveWindow('register')}
-                  className="group relative flex items-center gap-1 sm:gap-1.5 btn-rainbow-theme btn-rainbow-sheen text-white px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl font-black text-[11px] sm:text-xs shadow-[0_3px_12px_rgba(255,0,122,0.35)] active:translate-y-0.5 transition cursor-pointer shrink-0 border-t border-white/50 select-none"
-                  title="कंपनी डायरेक्ट ₹249 में रजिस्ट्रेशन करें"
-                >
-                  <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-lg bg-white/25 border border-white/40 text-yellow-300 flex items-center justify-center shadow-inner shrink-0">
-                    <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-pulse" />
-                  </div>
-                  <span className="whitespace-nowrap leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">रजिस्टर ₹249</span>
-                </button>
-              </div>
-            )}
+                  {/* 3D Add Member Under Me Button */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveWindow('add-member')}
+                    className="group relative flex items-center gap-1 bg-gradient-to-b from-[#fb641b] via-[#ea580c] to-[#c2410c] hover:from-[#ea580c] hover:to-[#9a3412] text-white px-2 py-1 rounded-md font-black text-[10.5px] shadow-xs border border-amber-300/40 active:translate-y-0.5 transition cursor-pointer shrink-0"
+                    title="अपने नीचे नया सदस्य जोड़ें (₹150 डायरेक्ट पेआउट)"
+                  >
+                    <UserPlus className="w-3 h-3 text-yellow-300" />
+                    <span className="whitespace-nowrap leading-none">सदस्य जोड़ें</span>
+                  </button>
 
-            {/* 3D Control Panel Login Button for Admin */}
-            <button
-              type="button"
-              onClick={() => setActiveWindow('admin')}
-              className="group relative flex items-center gap-1 sm:gap-1.5 bg-gradient-to-b from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 px-2 sm:px-2.5 md:px-3 py-1 sm:py-1.5 rounded-xl font-black text-[10px] sm:text-xs shadow-[0_3px_8px_rgba(217,119,6,0.4),inset_0_1.5px_1px_rgba(255,255,255,0.9)] border border-amber-200 active:translate-y-0.5 transition cursor-pointer shrink-0 select-none"
-              title="Admin Control Panel Login"
-            >
-              <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-lg bg-slate-950 text-amber-300 flex items-center justify-center shadow-inner shrink-0 border border-amber-300/60">
-                <ShieldCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-300" />
-              </div>
-              <span className="whitespace-nowrap leading-none font-display font-black tracking-tight">
-                Control Panel Login
-              </span>
-            </button>
+                  {/* 3D Dashboard Button */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveWindow('dashboard')}
+                    className="group relative flex items-center gap-1 bg-gradient-to-b from-white via-slate-50 to-slate-100 text-[#2874f0] hover:text-[#1258c7] px-2 py-1 rounded-md font-black text-[10.5px] shadow-xs border border-slate-200 active:translate-y-0.5 transition cursor-pointer shrink-0"
+                    title="डैशबोर्ड खोलें"
+                  >
+                    <div className="w-4 h-4 rounded bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white flex items-center justify-center shrink-0">
+                      <LayoutDashboard className="w-3 h-3" />
+                    </div>
+                    <span className="whitespace-nowrap leading-none">डैशबोर्ड</span>
+                  </button>
 
-            {/* 3D Mobile Menu Toggle Button */}
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-1 sm:p-1.5 text-white bg-gradient-to-b from-blue-500 to-[#1c52b8] hover:from-blue-400 hover:to-[#17469e] active:translate-y-0.5 rounded-xl shadow-[0_3px_8px_rgba(0,0,0,0.25),inset_0_1.5px_1px_rgba(255,255,255,0.4)] border border-blue-300/40 flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 shrink-0 transition cursor-pointer"
-              aria-label="मेनू खोलें"
-              title="मेनू खोलें"
-            >
-              {mobileMenuOpen ? (
-                <X className="w-4 h-4 text-yellow-300 drop-shadow-sm" />
+                  {/* 3D Logout Button */}
+                  <button
+                    type="button"
+                    onClick={onLogout}
+                    className="p-1 text-red-200 hover:text-white bg-red-600/30 hover:bg-red-600/50 rounded border border-red-400/30 transition shadow-xs active:translate-y-0.5 shrink-0 cursor-pointer"
+                    title="लॉगआउट करें"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               ) : (
-                <Menu className="w-4 h-4 text-white drop-shadow-sm" />
+                /* LOGGED OUT ACTIONS: COMPACT LOGIN & REGISTER ₹249 */
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {/* 3D Premium Login Button */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveWindow('login')}
+                    className="group relative flex items-center gap-1 btn-premium-login text-white px-2.5 py-1 rounded-lg font-black text-[11px] shadow-[0_2px_6px_rgba(37,99,235,0.4)] active:translate-y-0.5 transition cursor-pointer shrink-0 border-t border-white/40 select-none"
+                    title="विद्यार्थी लॉगिन करें"
+                  >
+                    <LogIn className="w-3.5 h-3.5 text-cyan-200 shrink-0" />
+                    <span className="whitespace-nowrap leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">लॉगिन</span>
+                  </button>
+
+                  {/* 3D Register Button with Rainbow Theme */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveWindow('register')}
+                    className="group relative flex items-center gap-1 btn-rainbow-theme btn-rainbow-sheen text-white px-2.5 py-1 rounded-lg font-black text-[11px] shadow-[0_2px_6px_rgba(255,0,122,0.35)] active:translate-y-0.5 transition cursor-pointer shrink-0 border-t border-white/50 select-none"
+                    title="कंपनी डायरेक्ट ₹249 में रजिस्ट्रेशन करें"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-pulse shrink-0" />
+                    <span className="whitespace-nowrap leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">रजिस्टर ₹249</span>
+                  </button>
+                </div>
               )}
-            </button>
+
+              {/* 3D Control Button for Admin (Requested: Name ONLY 'Control' with Logo) */}
+              <button
+                type="button"
+                onClick={() => setActiveWindow('admin')}
+                className="group relative flex items-center gap-1 bg-gradient-to-b from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 px-2.5 py-1 rounded-lg font-black text-[11px] shadow-[0_2px_5px_rgba(217,119,6,0.4),inset_0_1px_1px_rgba(255,255,255,0.9)] border border-amber-200 active:translate-y-0.5 transition cursor-pointer shrink-0 select-none"
+                title="Control (एडमिन कंट्रोल पैनल)"
+              >
+                <div className="w-4 h-4 rounded bg-slate-950 text-amber-300 flex items-center justify-center shadow-inner shrink-0 border border-amber-300/60">
+                  <ShieldCheck className="w-3 h-3 text-amber-300" />
+                </div>
+                <span className="whitespace-nowrap leading-none font-display font-black tracking-tight">
+                  Control
+                </span>
+              </button>
+
+              {/* 3D Mobile Menu Toggle Button */}
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="md:hidden p-1.5 text-white bg-gradient-to-b from-blue-500 to-[#1c52b8] hover:from-blue-400 hover:to-[#17469e] active:translate-y-0.5 rounded-lg shadow-[0_2px_5px_rgba(0,0,0,0.25),inset_0_1px_1px_rgba(255,255,255,0.4)] border border-blue-300/40 flex items-center justify-center w-8 h-8 shrink-0 transition cursor-pointer"
+                aria-label="मेनू खोलें"
+                title="मेनू खोलें"
+              >
+                {mobileMenuOpen ? (
+                  <X className="w-3.5 h-3.5 text-yellow-300 drop-shadow-sm" />
+                ) : (
+                  <Menu className="w-3.5 h-3.5 text-white drop-shadow-sm" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -623,7 +884,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* MORE Dropdown Popover (Placed OUTSIDE overflow-x-auto container so it is NEVER clipped) */}
         {moreMenuOpen && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center sm:justify-end max-w-7xl mx-auto px-4 pt-[90px] sm:pt-[96px] pointer-events-none">
+          <div className="fixed inset-0 z-50 flex items-start justify-center sm:justify-end max-w-7xl mx-auto px-4 pt-[144px] sm:pt-[150px] pointer-events-none">
             {/* Clickable backdrop */}
             <div
               className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs z-40 pointer-events-auto animate-fadeIn"
@@ -689,183 +950,238 @@ export const Header: React.FC<HeaderProps> = ({
       {/* 4. Mobile Drawer Navigation - 3D Buttons & Zero Cutoff Grid    */}
       {/* ------------------------------------------------------------- */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-white border-b border-gray-200 px-3.5 py-4 space-y-3 animate-fadeIn text-slate-800 shadow-2xl max-h-[85vh] overflow-y-auto">
-          {/* User Account Card inside Mobile Menu */}
-          {currentUser ? (
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-2xl border border-blue-200 shadow-[0_3px_10px_rgba(40,116,240,0.1),inset_0_1px_0_rgba(255,255,255,0.8)] flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white flex items-center justify-center font-bold text-sm shadow-[0_3px_6px_rgba(40,116,240,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)] overflow-hidden shrink-0 border border-white">
-                  {currentUser.avatarUrl ? (
-                    <img src={currentUser.avatarUrl} alt={currentUser.fullName} className="w-full h-full object-cover" />
-                  ) : (
-                    currentUser.fullName.substring(0, 2).toUpperCase()
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <p className="font-bold text-slate-900 text-xs truncate">{currentUser.fullName}</p>
-                  <p className="text-[#2874f0] font-mono-acc text-[11px] font-semibold">{currentUser.accId}</p>
-                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-md inline-block mt-0.5">
-                    {currentUser.plan} Plan
-                  </span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  onLogout();
-                  setMobileMenuOpen(false);
-                }}
-                className="text-xs text-red-600 flex items-center gap-1 bg-white hover:bg-red-50 px-2.5 py-1.5 rounded-xl border border-red-200 font-bold shadow-[0_2px_4px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] active:translate-y-0.5 shrink-0 cursor-pointer"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>लॉगआउट</span>
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2 pb-2 border-b border-gray-100">
-              {/* 3D Mobile Premium Login */}
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveWindow('login');
-                  setMobileMenuOpen(false);
-                }}
-                className="group py-2.5 px-3 btn-premium-login text-white font-black text-xs rounded-xl shadow-[0_4px_14px_rgba(37,99,235,0.35)] active:translate-y-0.5 flex items-center justify-center gap-2 cursor-pointer border-t border-white/40 select-none"
-              >
-                <div className="w-6 h-6 rounded-lg bg-white/20 border border-white/30 text-cyan-200 flex items-center justify-center shadow-inner shrink-0">
-                  <LogIn className="w-3.5 h-3.5" />
-                </div>
-                <span className="leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">विद्यार्थी लॉगिन</span>
-              </button>
+        <>
+          {/* Backdrop Overlay - Closes menu on background tap */}
+          <div
+            onClick={() => setMobileMenuOpen(false)}
+            className="md:hidden fixed inset-0 top-[140px] bg-slate-950/65 backdrop-blur-xs z-[59] animate-fadeIn"
+            aria-hidden="true"
+          />
 
-              {/* 3D Mobile Register with Rainbow Theme */}
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveWindow('register');
-                  setMobileMenuOpen(false);
-                }}
-                className="group py-2.5 px-3 btn-rainbow-theme btn-rainbow-sheen text-white font-black text-xs rounded-xl shadow-[0_4px_14px_rgba(255,0,122,0.35)] active:translate-y-0.5 flex items-center justify-center gap-2 cursor-pointer border-t border-white/40 select-none"
-              >
-                <div className="w-6 h-6 rounded-lg bg-white/25 border border-white/40 text-yellow-300 flex items-center justify-center shadow-inner shrink-0">
-                  <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+          <div className="md:hidden relative z-[60] bg-white border-b-2 border-blue-500 px-3.5 pt-3 pb-36 space-y-3.5 animate-fadeIn text-slate-800 shadow-[0_25px_60px_rgba(0,0,0,0.6)] max-h-[calc(100dvh-130px)] overflow-y-auto overscroll-contain">
+            {/* User Account Card inside Mobile Menu */}
+            {currentUser ? (
+              <>
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-2xl border border-blue-200 shadow-[0_3px_10px_rgba(40,116,240,0.1),inset_0_1px_0_rgba(255,255,255,0.8)] flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white flex items-center justify-center font-bold text-sm shadow-[0_3px_6px_rgba(40,116,240,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)] overflow-hidden shrink-0 border border-white">
+                      {currentUser.avatarUrl ? (
+                        <img src={currentUser.avatarUrl} alt={currentUser.fullName} className="w-full h-full object-cover" />
+                      ) : (
+                        currentUser.fullName.substring(0, 2).toUpperCase()
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-900 text-xs break-words leading-tight">{currentUser.fullName}</p>
+                      <p className="text-[#2874f0] font-mono-acc text-[11px] font-semibold">{currentUser.accId}</p>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-md inline-block mt-0.5">
+                        {currentUser.plan} Plan
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onLogout();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="text-xs text-red-600 flex items-center gap-1 bg-white hover:bg-red-50 px-2.5 py-1.5 rounded-xl border border-red-200 font-bold shadow-[0_2px_4px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] active:translate-y-0.5 shrink-0 cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>लॉगआउट</span>
+                  </button>
                 </div>
-                <span className="leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">रजिस्टर ₹249</span>
-              </button>
-            </div>
-          )}
 
-          {/* Mobile Clock & Status */}
-          <div className="bg-slate-50 p-2.5 rounded-xl border border-gray-200 flex items-center justify-between text-xs shadow-inner">
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-md bg-gradient-to-b from-blue-500 to-[#2874f0] text-white flex items-center justify-center shadow-xs">
-                <Clock className="w-3 h-3" />
-              </div>
-              <span className="font-mono-acc font-bold text-slate-800">{currentTime}</span>
-            </div>
-            <span className="text-slate-500 text-[11px] font-semibold">{currentDate}</span>
-          </div>
-
-          {/* 3D Control Panel Login for Admin on Mobile */}
-          <button
-            type="button"
-            onClick={() => {
-              setActiveWindow('admin');
-              setMobileMenuOpen(false);
-            }}
-            className="w-full p-2.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs shadow-[0_3px_8px_rgba(217,119,6,0.4),inset_0_1.5px_1px_rgba(255,255,255,0.9)] border border-amber-200 active:translate-y-0.5 transition cursor-pointer flex items-center justify-between"
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-slate-950 text-amber-300 flex items-center justify-center shadow-inner border border-amber-300/60 shrink-0">
-                <ShieldCheck className="w-4 h-4 text-amber-300" />
-              </div>
-              <div className="text-left">
-                <span className="block font-display font-black text-xs tracking-tight">Control Panel Login</span>
-                <span className="block text-[10px] text-slate-800 font-semibold">एडमिनिस्ट्रेटर डैशबोर्ड व नियंत्रण</span>
-              </div>
-            </div>
-            <span className="text-[10px] font-black bg-slate-950 text-amber-300 px-2 py-0.5 rounded-md border border-amber-300/40">
-              Admin ↗
-            </span>
-          </button>
-
-          {/* Navigation Items 2-Column Grid with 3D Icons & Multi-Line Text Boxes */}
-          <div className="grid grid-cols-2 gap-2 pt-1">
-            {navItems.map((item) => {
-              const isActive = activeWindow === item.id;
-              return (
+                {/* Mobile Menu Action: Quick Add Member under user */}
                 <button
-                  key={item.id}
                   type="button"
                   onClick={() => {
-                    handleNavClick(item.id);
+                    setActiveWindow('add-member');
                     setMobileMenuOpen(false);
                   }}
-                  className={`group flex items-center gap-2 p-2.5 rounded-xl text-left text-xs font-bold transition-all active:translate-y-0.5 cursor-pointer min-w-0 ${
-                    isActive
-                      ? 'bg-gradient-to-b from-blue-50 to-blue-100 text-[#2874f0] border-2 border-[#2874f0] shadow-[0_3px_8px_rgba(40,116,240,0.25),inset_0_1px_1px_rgba(255,255,255,0.9)]'
-                      : 'bg-gradient-to-b from-white via-slate-50 to-slate-100 text-slate-800 border border-slate-200/90 hover:border-blue-300 shadow-[0_2px_5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.9)]'
-                  }`}
+                  className="w-full py-2.5 px-3 bg-gradient-to-r from-[#fb641b] via-[#ea580c] to-[#c2410c] text-white font-black text-xs rounded-xl shadow-md border border-amber-300/40 flex items-center justify-center gap-2 cursor-pointer active:translate-y-0.5"
                 >
-                  {/* 3D Icon Capsule */}
-                  <div
-                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 border border-white/50 ${
+                  <UserPlus className="w-4 h-4 text-yellow-300" />
+                  <span>अपने नीचे नया सदस्य जोड़ें (₹150 पेआउट)</span>
+                </button>
+
+                {/* ACC MEMBER CHAT Mobile Quick Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveWindow('chat');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full py-2.5 px-3 bg-gradient-to-r from-amber-400 via-yellow-400 to-orange-500 text-slate-950 font-black text-xs rounded-xl shadow-md border border-amber-200 flex items-center justify-center gap-2 cursor-pointer active:translate-y-0.5"
+                >
+                  <MessageCircle className="w-4 h-4 text-slate-950" />
+                  <span>ACC MEMBER CHAT (चैट, ग्रुप्स व मित्र)</span>
+                </button>
+              </>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 pb-2 border-b border-gray-100">
+                {/* 3D Mobile Premium Login */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveWindow('login');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="group py-2.5 px-3 btn-premium-login text-white font-black text-xs rounded-xl shadow-[0_4px_14px_rgba(37,99,235,0.35)] active:translate-y-0.5 flex items-center justify-center gap-2 cursor-pointer border-t border-white/40 select-none"
+                >
+                  <div className="w-6 h-6 rounded-lg bg-white/20 border border-white/30 text-cyan-200 flex items-center justify-center shadow-inner shrink-0">
+                    <LogIn className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">विद्यार्थी लॉगिन</span>
+                </button>
+
+                {/* 3D Mobile Register with Rainbow Theme */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveWindow('register');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="group py-2.5 px-3 btn-rainbow-theme btn-rainbow-sheen text-white font-black text-xs rounded-xl shadow-[0_4px_14px_rgba(255,0,122,0.35)] active:translate-y-0.5 flex items-center justify-center gap-2 cursor-pointer border-t border-white/40 select-none"
+                >
+                  <div className="w-6 h-6 rounded-lg bg-white/25 border border-white/40 text-yellow-300 flex items-center justify-center shadow-inner shrink-0">
+                    <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                  </div>
+                  <span className="leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">रजिस्टर ₹249</span>
+                </button>
+              </div>
+            )}
+
+            {/* Mobile Clock & Status */}
+            <div className="bg-slate-50 p-2.5 rounded-xl border border-gray-200 flex items-center justify-between text-xs shadow-inner">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-md bg-gradient-to-b from-blue-500 to-[#2874f0] text-white flex items-center justify-center shadow-xs">
+                  <Clock className="w-3 h-3" />
+                </div>
+                <span className="font-mono-acc font-bold text-slate-800">{currentTime}</span>
+              </div>
+              <span className="text-slate-500 text-[11px] font-semibold">{currentDate}</span>
+            </div>
+
+            {/* 3D Control Panel Login for Admin on Mobile */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveWindow('admin');
+                setMobileMenuOpen(false);
+              }}
+              className="w-full p-2.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs shadow-[0_3px_8px_rgba(217,119,6,0.4),inset_0_1.5px_1px_rgba(255,255,255,0.9)] border border-amber-200 active:translate-y-0.5 transition cursor-pointer flex items-center justify-between"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-slate-950 text-amber-300 flex items-center justify-center shadow-inner border border-amber-300/60 shrink-0">
+                  <ShieldCheck className="w-4 h-4 text-amber-300" />
+                </div>
+                <div className="text-left">
+                  <span className="block font-display font-black text-xs tracking-tight">Control</span>
+                  <span className="block text-[10px] text-slate-800 font-semibold">एडमिनिस्ट्रेटर डैशबोर्ड व नियंत्रण</span>
+                </div>
+              </div>
+              <span className="text-[10px] font-black bg-slate-950 text-amber-300 px-2 py-0.5 rounded-md border border-amber-300/40">
+                Admin ↗
+              </span>
+            </button>
+
+            {/* Navigation Items 2-Column Grid with 3D Icons & Multi-Line Text Boxes */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              {navItems.map((item) => {
+                const isActive = activeWindow === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      handleNavClick(item.id);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`group flex items-center gap-2 p-2.5 rounded-xl text-left text-xs font-bold transition-all active:translate-y-0.5 cursor-pointer min-w-0 ${
                       isActive
-                        ? 'bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white shadow-[0_2px_4px_rgba(40,116,240,0.35),inset_0_1px_0.5px_rgba(255,255,255,0.5)]'
-                        : `bg-gradient-to-b ${item.colorClass} shadow-[0_2px_4px_rgba(0,0,0,0.15),inset_0_1px_0.5px_rgba(255,255,255,0.6)]`
+                        ? 'bg-gradient-to-b from-blue-50 to-blue-100 text-[#2874f0] border-2 border-[#2874f0] shadow-[0_3px_8px_rgba(40,116,240,0.25),inset_0_1px_1px_rgba(255,255,255,0.9)]'
+                        : 'bg-gradient-to-b from-white via-slate-50 to-slate-100 text-slate-800 border border-slate-200/90 hover:border-blue-300 shadow-[0_2px_5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.9)]'
                     }`}
                   >
-                    <span className="drop-shadow-[0_1px_1px_rgba(0,0,0,0.25)] flex items-center justify-center">
-                      {item.icon}
-                    </span>
-                  </div>
-                  {/* Text Container - Zero Truncation so Hindi words are never cut */}
-                  <div className="flex-1 min-w-0">
-                    <span className="leading-tight break-words block">{item.label}</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                    {/* 3D Icon Capsule */}
+                    <div
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 border border-white/50 ${
+                        isActive
+                          ? 'bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white shadow-[0_2px_4px_rgba(40,116,240,0.35),inset_0_1px_0.5px_rgba(255,255,255,0.5)]'
+                          : `bg-gradient-to-b ${item.colorClass} shadow-[0_2px_4px_rgba(0,0,0,0.15),inset_0_1px_0.5px_rgba(255,255,255,0.6)]`
+                      }`}
+                    >
+                      <span className="drop-shadow-[0_1px_1px_rgba(0,0,0,0.25)] flex items-center justify-center">
+                        {item.icon}
+                      </span>
+                    </div>
+                    {/* Text Container - Zero Truncation so Hindi words are never cut */}
+                    <div className="flex-1 min-w-0">
+                      <span className="leading-tight break-words block">{item.label}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
 
-          {/* Direct Support Channels (Email & Telegram by default; WhatsApp only if enabled by Admin) */}
-          <div className="pt-2 border-t border-gray-200 grid grid-cols-2 gap-2">
-            {siteConfig.showWhatsAppSupport ? (
+            {/* Direct Support Channels (Email & Telegram by default; WhatsApp only if enabled by Admin) */}
+            <div className="pt-2 border-t border-gray-200 grid grid-cols-2 gap-2">
+              {siteConfig.showWhatsAppSupport ? (
+                <a
+                  href={`https://api.whatsapp.com/send?phone=${cleanWhatsApp}&text=Namaste%20ACC%20Support%2C%20mujhe%20Achievers%20Club%20Community%20ke%20bare%20me%20jankari%20chahiye.`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="py-2.5 px-3 bg-gradient-to-b from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-[0_3px_8px_rgba(16,185,129,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)] active:translate-y-0.5 border border-emerald-400/40"
+                >
+                  <div className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center shrink-0">
+                    <MessageCircle className="w-3.5 h-3.5 text-white" />
+                  </div>
+                  <span className="whitespace-nowrap">WhatsApp</span>
+                </a>
+              ) : (
+                <a
+                  href={`mailto:${siteConfig.officialEmail || 'newuserhelpline@gmail.com'}?subject=ACC%20Support`}
+                  className="py-2.5 px-3 bg-gradient-to-b from-[#2874f0] to-[#1258c7] hover:from-[#1e63d8] hover:to-[#0f4bb0] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-[0_3px_8px_rgba(40,116,240,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)] active:translate-y-0.5 border border-blue-400/40"
+                >
+                  <div className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center shrink-0">
+                    <Mail className="w-3.5 h-3.5 text-white" />
+                  </div>
+                  <span className="whitespace-nowrap">ईमेल हेल्प</span>
+                </a>
+              )}
               <a
-                href={`https://api.whatsapp.com/send?phone=${cleanWhatsApp}&text=Namaste%20ACC%20Support%2C%20mujhe%20Achievers%20Club%20Community%20ke%20bare%20me%20jankari%20chahiye.`}
+                href={siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE'}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="py-2.5 px-3 bg-gradient-to-b from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-[0_3px_8px_rgba(16,185,129,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)] active:translate-y-0.5 border border-emerald-400/40"
+                className="py-2.5 px-3 bg-gradient-to-b from-[#229ED9] to-[#177db0] hover:from-[#2ab2f3] hover:to-[#229ED9] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-[0_3px_8px_rgba(34,158,217,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)] active:translate-y-0.5 border border-cyan-300/40"
               >
                 <div className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center shrink-0">
-                  <MessageCircle className="w-3.5 h-3.5 text-white" />
+                  <Send className="w-3.5 h-3.5 text-white" />
                 </div>
-                <span className="whitespace-nowrap">WhatsApp</span>
+                <span className="whitespace-nowrap">Telegram</span>
               </a>
-            ) : (
-              <a
-                href={`mailto:${siteConfig.officialEmail || 'newuserhelpline@gmail.com'}?subject=ACC%20Support`}
-                className="py-2.5 px-3 bg-gradient-to-b from-[#2874f0] to-[#1258c7] hover:from-[#1e63d8] hover:to-[#0f4bb0] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-[0_3px_8px_rgba(40,116,240,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)] active:translate-y-0.5 border border-blue-400/40"
+            </div>
+
+            {/* Dedicated Bottom Bar: 100% Clear of any bottom lock bars */}
+            <div className="pt-2 border-t border-gray-200 flex items-center justify-between gap-2">
+              <span className="text-[10.5px] text-slate-500 font-bold">
+                ACC 24x7 सेवा डेस्क
+              </span>
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-md active:translate-y-0.5 cursor-pointer"
               >
-                <div className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center shrink-0">
-                  <Mail className="w-3.5 h-3.5 text-white" />
-                </div>
-                <span className="whitespace-nowrap">ईमेल हेल्प</span>
-              </a>
-            )}
-            <a
-              href={siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE'}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="py-2.5 px-3 bg-gradient-to-b from-[#229ED9] to-[#177db0] hover:from-[#2ab2f3] hover:to-[#229ED9] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-[0_3px_8px_rgba(34,158,217,0.35),inset_0_1px_1px_rgba(255,255,255,0.4)] active:translate-y-0.5 border border-cyan-300/40"
-            >
-              <div className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center shrink-0">
-                <Send className="w-3.5 h-3.5 text-white" />
-              </div>
-              <span className="whitespace-nowrap">Telegram</span>
-            </a>
+                <X className="w-3.5 h-3.5 text-yellow-300" />
+                <span>मेनू बंद करें</span>
+              </button>
+            </div>
+
+            {/* Extra breathing buffer space so items are never covered by any device frame or footer */}
+            <div className="h-8 w-full" />
           </div>
-        </div>
+        </>
       )}
 
       {/* ========================================================================= */}

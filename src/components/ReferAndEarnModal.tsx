@@ -19,6 +19,7 @@ import {
   TrendingUp,
   ShieldCheck,
   ExternalLink,
+  UserPlus,
 } from 'lucide-react';
 import { Member, SiteConfig } from '../types';
 import { StorageService } from '../services/storage';
@@ -28,6 +29,7 @@ interface ReferAndEarnModalProps {
   onClose?: () => void;
   onGoToPromotions?: () => void;
   onGoToIdCard?: () => void;
+  onGoToAddMember?: () => void;
 }
 
 export const ReferAndEarnModal: React.FC<ReferAndEarnModalProps> = ({
@@ -35,6 +37,7 @@ export const ReferAndEarnModal: React.FC<ReferAndEarnModalProps> = ({
   onClose,
   onGoToPromotions,
   onGoToIdCard,
+  onGoToAddMember,
 }) => {
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
@@ -343,6 +346,28 @@ ${referralLink}
             </button>
           )}
         </div>
+
+        {/* Direct Downline Enrollment Option for Sponsor */}
+        {onGoToAddMember && (
+          <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2 bg-orange-50/60 p-3 rounded-xl border border-orange-200/60 mt-2">
+            <div>
+              <span className="text-xs font-black text-slate-900 block">
+                💡 क्या आप खुद अपने हाथ से नए छात्र को अपने नीचे जोड़ना चाहते हैं?
+              </span>
+              <span className="text-[10.5px] text-slate-500 block">
+                सुरक्षित पासवर्ड प्रणाली: नया छात्र पहली बार लॉगिन करते ही अपना गुप्त पासवर्ड खुद सेट करेगा
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={onGoToAddMember}
+              className="py-2 px-3.5 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md transition active:translate-y-0.5 cursor-pointer"
+            >
+              <UserPlus className="w-3.5 h-3.5 text-yellow-200" />
+              <span>➕ अपने नीचे नया सदस्य जोड़ें (₹150 पेआउट)</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ------------------------------------------------------------- */}

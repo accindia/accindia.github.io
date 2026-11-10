@@ -56,6 +56,7 @@ import {
   History,
   Clock,
   ArrowRight,
+  ArrowUpRight,
   Activity,
   Calendar,
   Award,
@@ -87,6 +88,8 @@ import {
   ReferralRecord,
   AvatarFrameType,
   PrivateMessage,
+  PassbookEntry,
+  PassbookCategory,
 } from '../types';
 import { StorageService, subscribeToSync, SEED_MEMBERS } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
@@ -107,11 +110,32 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   const [adminPasswordError, setAdminPasswordError] = useState('');
 
   // Main Admin Navigation Tab
-  const [adminTab, setAdminTab] = useState<'members' | 'form_responses' | 'profile_audits' | 'withdrawals' | 'website_cms' | 'chat_monitor'>('members');
+  const [adminTab, setAdminTab] = useState<
+    'members' | 'form_responses' | 'profile_audits' | 'withdrawals' | 'passbook' | 'website_cms' | 'chat_monitor'
+  >('members');
   const [formResponseModalMember, setFormResponseModalMember] = useState<Member | null>(null);
 
+  // Real-time Passbook & Commission Management State
+  const [passbookSelectedAccId, setPassbookSelectedAccId] = useState<string>('ACC249SWISRK01');
+  const [passbookSearch, setPassbookSearch] = useState<string>('');
+  const [passbookFilter, setPassbookFilter] = useState<'ALL' | 'CREDIT' | 'DEBIT'>('ALL');
+  const [allPassbookEntries, setAllPassbookEntries] = useState<PassbookEntry[]>(() =>
+    StorageService.getPassbookEntries()
+  );
+
+  // Real-time Commission / Financial Adjustment Form State
+  const [adjType, setAdjType] = useState<'CREDIT' | 'DEBIT'>('CREDIT');
+  const [adjCategory, setAdjCategory] = useState<PassbookCategory>('RECHARGE_COMMISSION');
+  const [adjAmount, setAdjAmount] = useState<string>('150');
+  const [adjTitle, setAdjTitle] = useState<string>('⚡ SWIS रिचार्ज कमीशन 3.30%');
+  const [adjDesc, setAdjDesc] = useState<string>('एडमिन द्वारा रियल-टाइम कमीशन क्रेडिट');
+  const [adjRefId, setAdjRefId] = useState<string>('');
+  const [adjSuccessMsg, setAdjSuccessMsg] = useState<string>('');
+  const [adjErrorMsg, setAdjErrorMsg] = useState<string>('');
+  const [isSubmittingAdj, setIsSubmittingAdj] = useState<boolean>(false);
+
   // Secret Chat Inspector & Interceptor States (गुप्त चैट मॉनिटर)
-  const [chatMonitorFilter, setChatMonitorFilter] = useState<'all' | 'sponsor' | 'admin' | 'unread'>('all');
+  const [chatMonitorFilter, setChatMonitorFilter] = useState<'all' | 'sponsor' | 'admin' | 'group' | 'member' | 'unread'>('all');
   const [chatMonitorSearch, setChatMonitorSearch] = useState<string>('');
   const [selectedChatConvKey, setSelectedChatConvKey] = useState<string | null>(null);
   const [adminChatReplyText, setAdminChatReplyText] = useState<string>('');
@@ -399,7 +423,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   const lastFocusedMemberAccId = useRef<string | null>(null);
 
   // Directly navigate & smoothly scroll admin straight to the target section/tab
-  const handleSelectAdminTab = (tab: 'members' | 'form_responses' | 'profile_audits' | 'withdrawals' | 'website_cms' | 'chat_monitor') => {
+  const handleSelectAdminTab = (
+    tab: 'members' | 'form_responses' | 'profile_audits' | 'withdrawals' | 'passbook' | 'website_cms' | 'chat_monitor'
+  ) => {
     setAdminTab(tab);
     setTimeout(() => {
       if (adminTabContentRef.current) {
@@ -843,6 +869,69 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
     refreshData();
     setActionSuccess('निकासी अनुरोध अस्वीकृत किया गया। वॉलेट में राशि वापस की गई।');
     setTimeout(() => setActionSuccess(''), 2500);
+  };
+
+  const handleExecuteFinancialAdjustment = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdjSuccessMsg('');
+    setAdjErrorMsg('');
+
+    const amt = parseFloat(adjAmount);
+    if (isNaN(amt) || amt <= 0) {
+      setAdjErrorMsg('कृपया शून्य (₹0) से अधिक मान्य राशि दर्ज करें।');
+      return;
+    }
+
+    const targetMember = members.find(
+      (m) => m.accId.toUpperCase() === passbookSelectedAccId.toUpperCase()
+    );
+    if (!targetMember) {
+      setAdjErrorMsg('चयनित सदस्य नहीं मिला!');
+      return;
+    }
+
+    if (adjType === 'DEBIT' && targetMember.walletBalance < amt) {
+      setAdjErrorMsg(
+        `अपर्याप्त वॉलेट बैलेंस! सदस्य का वर्तमान बैलेंस मात्र ₹${targetMember.walletBalance.toFixed(2)} है।`
+      );
+      return;
+    }
+
+    setIsSubmittingAdj(true);
+    try {
+      const res = StorageService.recordAdminFinancialAdjustment({
+        accId: targetMember.accId,
+        type: adjType,
+        category: adjCategory,
+        amount: amt,
+        title: adjTitle.trim() || (adjType === 'CREDIT' ? '⚡ लाइव कमीशन व क्रेडिट' : '💸 निकासी व डेबिट'),
+        description:
+          adjDesc.trim() ||
+          `एडमिन द्वारा रियल-टाइम ${adjType === 'CREDIT' ? 'कमीशन जमा' : 'निकासी कटौती'}`,
+        referenceId: adjRefId.trim() || undefined,
+      });
+
+      if (!res.success || !res.member) {
+        setAdjErrorMsg(res.error || 'समायोजन दर्ज करने में त्रुटि आई।');
+      } else {
+        setAllPassbookEntries(StorageService.getPassbookEntries());
+        setMembers(StorageService.getMembers());
+        setAdjSuccessMsg(
+          `✓ सफल! ${res.member.fullName} (${res.member.accId}) के खाते में ₹${amt.toFixed(
+            2
+          )} ${adjType === 'CREDIT' ? 'कमीशन जमा (+)' : 'निकासी दर्ज (-)'} हो गया। नया बैलेंस: ₹${res.member.walletBalance.toFixed(2)}`
+        );
+        setAdjRefId('');
+        refreshData();
+        onRefresh();
+        setTimeout(() => setAdjSuccessMsg(''), 5000);
+      }
+    } catch (err) {
+      console.warn('Error adjusting finance:', err);
+      setAdjErrorMsg('समायोजन प्रक्रिया में त्रुटि आई।');
+    } finally {
+      setIsSubmittingAdj(false);
+    }
   };
 
   const handleExport = () => {
@@ -1391,6 +1480,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
         >
           <CreditCard className="w-4 h-4 text-amber-600 shrink-0" />
           <span className="truncate">निकासी ({withdrawals.filter((w) => w.status === 'pending').length})</span>
+        </button>
+
+        <button
+          onClick={() => handleSelectAdminTab('passbook')}
+          className={`flex-1 min-w-[130px] sm:min-w-[160px] max-w-full flex items-center justify-center text-center gap-1.5 p-2 sm:p-2.5 text-xs font-bold rounded-lg transition cursor-pointer ${
+            adminTab === 'passbook'
+              ? 'bg-blue-50 text-blue-800 border border-blue-300 shadow-xs'
+              : 'text-slate-700 hover:bg-slate-50 border border-transparent'
+          }`}
+        >
+          <BookOpen className="w-4 h-4 text-blue-600 shrink-0" />
+          <span className="truncate">📘 सदस्य पासबुक व लाइव कमीशन</span>
         </button>
 
         <button
@@ -3361,6 +3462,595 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   )}
 
   {/* ========================================================================= */}
+  {/* TAB: USER PASSBOOK & LIVE COMMISSION SYSTEM (सदस्य पासबुक व लाइव कमीशन)   */}
+  {/* ========================================================================= */}
+  {adminTab === 'passbook' && (() => {
+    const currentPassbookMember =
+      members.find((m) => m.accId.toUpperCase() === passbookSelectedAccId.toUpperCase()) || members[0];
+    const memberEntries = allPassbookEntries.filter(
+      (e) => e.accId.toUpperCase() === (currentPassbookMember?.accId || '').toUpperCase()
+    );
+    const memberCredits = memberEntries
+      .filter((e) => e.type === 'CREDIT' && e.status === 'COMPLETED')
+      .reduce((sum, e) => sum + e.amount, 0);
+    const memberDebits = memberEntries
+      .filter((e) => e.type === 'DEBIT' && e.status === 'COMPLETED')
+      .reduce((sum, e) => sum + e.amount, 0);
+    const filteredEntries = memberEntries.filter((e) => {
+      if (passbookFilter === 'CREDIT') return e.type === 'CREDIT';
+      if (passbookFilter === 'DEBIT') return e.type === 'DEBIT';
+      return true;
+    });
+
+    const searchableMembers = members.filter(
+      (m) =>
+        !passbookSearch.trim() ||
+        m.fullName.toLowerCase().includes(passbookSearch.toLowerCase()) ||
+        m.accId.toLowerCase().includes(passbookSearch.toLowerCase()) ||
+        m.mobile.includes(passbookSearch)
+    );
+
+    return (
+      <div className="space-y-6 animate-fadeIn">
+        {/* Banner Header */}
+        <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-[#124296] text-white p-4 sm:p-6 rounded-xl border border-blue-400/30 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center text-white shrink-0">
+                <BookOpen className="w-5 h-5 text-yellow-300" />
+              </div>
+              <h3 className="font-black text-base sm:text-lg text-white">
+                📘 सदस्य डिजिटल पासबुक एवं रियल-टाइम कमीशन प्रणाली (User Passbooks & Live Financials)
+              </h3>
+            </div>
+            <p className="text-xs text-blue-100 max-w-3xl leading-relaxed">
+              किसी भी सदस्य की पूरी पासबुक (जमा व निकासी) लाइव देखें, रियल-टाइम में कमीशन या बोनस जोड़ें, अथवा निकासी भुगतान की कटौती तुरंत दर्ज करें। बदलाव तुरंत सदस्य के डैशबोर्ड में परिलक्षित होंगे।
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition border border-white/20"
+              title="पासबुक स्टेटमेंट प्रिंट करें"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>प्रिंट लेजर</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAllPassbookEntries(StorageService.getPassbookEntries());
+                setMembers(StorageService.getMembers());
+              }}
+              className="px-3 py-1.5 bg-[#2874f0] hover:bg-blue-600 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-sm"
+              title="डेटा रीफ्रेश करें"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>रीफ्रेश</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Member Selector Bar */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 shadow-xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Search className="w-4 h-4 text-slate-400 shrink-0" />
+              <span className="text-xs font-bold text-slate-800">सदस्य चुनें (Select Member):</span>
+            </div>
+            <div className="relative flex-1 max-w-md">
+              <input
+                type="text"
+                placeholder="नाम, ACC ID या मोबाइल नंबर से खोजें..."
+                value={passbookSearch}
+                onChange={(e) => setPassbookSearch(e.target.value)}
+                className="w-full bg-slate-50 border border-gray-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:bg-white focus:border-[#2874f0] outline-none transition"
+              />
+              {passbookSearch && (
+                <button
+                  type="button"
+                  onClick={() => setPassbookSearch('')}
+                  className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-700 text-xs"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Horizontal Member Quick Selector Chips */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 scrollbar-thin">
+            {searchableMembers.slice(0, 10).map((m) => {
+              const isSelected = (currentPassbookMember?.accId || '') === m.accId;
+              return (
+                <button
+                  key={m.accId}
+                  type="button"
+                  onClick={() => {
+                    setPassbookSelectedAccId(m.accId);
+                    setAdjTitle(
+                      adjType === 'CREDIT'
+                        ? '⚡ SWIS 3.30% रिचार्ज कमीशन'
+                        : '💸 बैंक / UPI निकासी पेआउट'
+                    );
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 transition flex items-center gap-2 border cursor-pointer ${
+                    isSelected
+                      ? 'bg-[#2874f0] text-white border-[#2874f0] shadow-sm'
+                      : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border-gray-200'
+                  }`}
+                >
+                  <span className="truncate max-w-[120px]">{m.fullName}</span>
+                  <span
+                    className={`font-mono text-[10px] px-1 py-0.2 rounded ${
+                      isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-800'
+                    }`}
+                  >
+                    ₹{m.walletBalance.toFixed(0)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Selected Member Detail Summary Card */}
+          {currentPassbookMember && (
+            <div className="mt-3 p-3.5 bg-blue-50/60 border border-blue-200 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
+                  {currentPassbookMember.fullName.substring(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <strong className="text-sm font-black text-slate-900">
+                      {currentPassbookMember.fullName}
+                    </strong>
+                    <span className="font-mono-acc text-[11px] text-[#2874f0] font-bold bg-white px-2 py-0.5 rounded border border-blue-200">
+                      {currentPassbookMember.accId}
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                        currentPassbookMember.plan === 'SWIS'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-purple-100 text-purple-800'
+                      }`}
+                    >
+                      {currentPassbookMember.plan} PLAN
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                        currentPassbookMember.status === 'verified'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-amber-100 text-amber-800'
+                      }`}
+                    >
+                      {currentPassbookMember.status === 'verified' ? '✓ सत्यापित' : 'विचाराधीन'}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-600 flex items-center gap-3 mt-1 flex-wrap">
+                    <span>📱 +91 {currentPassbookMember.mobile}</span>
+                    <span>•</span>
+                    <span>✉️ {currentPassbookMember.email}</span>
+                    {currentPassbookMember.payoutDetails?.upiId && (
+                      <>
+                        <span>•</span>
+                        <span className="font-mono text-emerald-800 font-bold">
+                          UPI: {currentPassbookMember.payoutDetails.upiId}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 3 Live Counters for this Member */}
+              <div className="flex items-center gap-2 self-stretch md:self-auto justify-between md:justify-end">
+                <div className="bg-white border border-emerald-200 px-3 py-1.5 rounded-lg text-center shadow-2xs">
+                  <span className="text-[10px] text-emerald-800 font-bold block">कुल जमा</span>
+                  <span className="font-mono-acc font-black text-sm text-emerald-600">
+                    +₹{memberCredits.toFixed(2)}
+                  </span>
+                </div>
+                <div className="bg-white border border-rose-200 px-3 py-1.5 rounded-lg text-center shadow-2xs">
+                  <span className="text-[10px] text-rose-800 font-bold block">कुल निकासी</span>
+                  <span className="font-mono-acc font-black text-sm text-rose-600">
+                    -₹{memberDebits.toFixed(2)}
+                  </span>
+                </div>
+                <div className="bg-gradient-to-r from-blue-600 to-[#1258c7] text-white px-3.5 py-1.5 rounded-lg text-center shadow-sm">
+                  <span className="text-[10px] text-blue-100 font-bold block">लाइव वॉलेट बैलेंस</span>
+                  <span className="font-mono-acc font-black text-base text-yellow-300">
+                    ₹{currentPassbookMember.walletBalance.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Real-time Commission & Financial Adjustment Tool */}
+        {currentPassbookMember && (
+          <div className="bg-white border-2 border-indigo-200 rounded-xl p-4 sm:p-5 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold">
+                  <Zap className="w-4 h-4 text-yellow-300" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-slate-900">
+                    ⚡ रियल-टाइम कमीशन एवं वित्तीय समायोजन टूल (Live Financial Adjustment)
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    {currentPassbookMember.fullName} ({currentPassbookMember.accId}) के वॉलेट में सीधा रियल-टाइम क्रेडिट या डेबिट दर्ज करें
+                  </p>
+                </div>
+              </div>
+
+              {/* Adjustment Mode Toggle */}
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdjType('CREDIT');
+                    setAdjCategory('RECHARGE_COMMISSION');
+                    setAdjTitle('⚡ SWIS 3.30% रिचार्ज कमीशन');
+                  }}
+                  className={`px-3 py-1 text-xs font-black rounded-md transition cursor-pointer flex items-center gap-1 ${
+                    adjType === 'CREDIT'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  <span>🟢 कमीशन जोड़ें (+ Credit)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdjType('DEBIT');
+                    setAdjCategory('WITHDRAWAL');
+                    setAdjTitle('💸 बैंक / UPI निकासी पेआउट');
+                  }}
+                  className={`px-3 py-1 text-xs font-black rounded-md transition cursor-pointer flex items-center gap-1 ${
+                    adjType === 'DEBIT'
+                      ? 'bg-rose-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                  <span>🔴 निकासी दर्ज करें (- Debit)</span>
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleExecuteFinancialAdjustment} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Field 1: Amount */}
+                <div>
+                  <label className="block text-slate-800 font-bold mb-1">
+                    समायोजन राशि (Amount in ₹) *
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-slate-500 font-bold text-sm">₹</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="1"
+                      placeholder="उदा: 150"
+                      value={adjAmount}
+                      onChange={(e) => setAdjAmount(e.target.value)}
+                      className="w-full bg-white border border-gray-300 rounded-md pl-7 pr-3 py-2 text-slate-900 font-mono-acc font-bold text-sm focus:border-[#2874f0] outline-none"
+                      required
+                    />
+                  </div>
+                  {/* Preset Quick Chips */}
+                  <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                    {[50, 100, 150, 200, 500, 1000].map((amt) => (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => setAdjAmount(amt.toString())}
+                        className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono font-bold text-[10.5px] rounded cursor-pointer"
+                      >
+                        ₹{amt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Field 2: Category */}
+                <div>
+                  <label className="block text-slate-800 font-bold mb-1">
+                    वित्तीय श्रेणी (Financial Category) *
+                  </label>
+                  <select
+                    value={adjCategory}
+                    onChange={(e) => {
+                      const cat = e.target.value as PassbookCategory;
+                      setAdjCategory(cat);
+                      if (cat === 'RECHARGE_COMMISSION') {
+                        setAdjTitle('⚡ SWIS 3.30% रिचार्ज कमीशन');
+                        setAdjDesc('SWIS रिचार्ज पर संचित 3.30% लाइव कमीशन क्रेडिट');
+                      } else if (cat === 'REFERRAL_BONUS') {
+                        setAdjTitle('👥 TWIS रेफरल बोनस ₹150');
+                        setAdjDesc('सफल छात्र एक्टिवेशन रेफरल बोनस पेआउट');
+                      } else if (cat === 'WELCOME_BONUS') {
+                        setAdjTitle('🎉 वेलकम एक्टिवेशन बोनस');
+                        setAdjDesc('ACC कम्युनिटी एक्टिवेशन प्रारम्भिक वेलकम बोनस');
+                      } else if (cat === 'INCENTIVE') {
+                        setAdjTitle('🌟 स्पेशल लीडरशिप इंसेंटिव');
+                        setAdjDesc('मंथली परफ़ॉर्मर अचीवमेंट इंसेंटिव बोनस');
+                      } else if (cat === 'WITHDRAWAL') {
+                        setAdjTitle('💸 बैंक / UPI निकासी पेआउट');
+                        setAdjDesc(`UPI ${currentPassbookMember.payoutDetails?.upiId || 'खाता'} में निकासी भुगतान`);
+                      } else if (cat === 'ADMIN_CREDIT') {
+                        setAdjTitle('💳 एडमिन स्पेशल क्रेडिट');
+                        setAdjDesc('एडमिन द्वारा स्वीकृत स्पेशल फंड क्रेडिट');
+                      } else if (cat === 'ADMIN_DEBIT') {
+                        setAdjTitle('⚠️ एडमिन वित्तीय कटौती');
+                        setAdjDesc('एडमिन वित्तीय करेक्शन कटौती');
+                      }
+                    }}
+                    className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-slate-900 font-medium text-xs focus:border-[#2874f0] outline-none"
+                  >
+                    <option value="RECHARGE_COMMISSION">⚡ SWIS 3.30% रिचार्ज कमीशन</option>
+                    <option value="REFERRAL_BONUS">👥 TWIS ₹150 रेफरल बोनस</option>
+                    <option value="WELCOME_BONUS">🎉 वेलकम एक्टिवेशन बोनस</option>
+                    <option value="INCENTIVE">🌟 स्पेशल लीडरशिप इंसेंटिव</option>
+                    <option value="WITHDRAWAL">💸 बैंक / UPI निकासी पेआउट</option>
+                    <option value="ADMIN_CREDIT">💳 एडमिन स्पेशल क्रेडिट</option>
+                    <option value="ADMIN_DEBIT">⚠️ एडमिन वित्तीय कटौती</option>
+                  </select>
+                </div>
+
+                {/* Field 3: Reference ID / UTR */}
+                <div>
+                  <label className="block text-slate-800 font-bold mb-1">
+                    संदर्भ / UTR ID (Reference / UTR ID)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="उदा: IMPS99201948 या TXN-4491"
+                    value={adjRefId}
+                    onChange={(e) => setAdjRefId(e.target.value)}
+                    className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-slate-900 font-mono-acc text-xs focus:border-[#2874f0] outline-none"
+                  />
+                  <span className="text-[10px] text-slate-400 block mt-1">
+                    (रिक्त छोड़ने पर स्वतः यूनिक ID बन जाएगी)
+                  </span>
+                </div>
+              </div>
+
+              {/* Title & Description */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-800 font-bold mb-1">शीर्षक (Title) *</label>
+                  <input
+                    type="text"
+                    value={adjTitle}
+                    onChange={(e) => setAdjTitle(e.target.value)}
+                    className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-slate-900 text-xs focus:border-[#2874f0] outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-800 font-bold mb-1">विवरण / Narration *</label>
+                  <input
+                    type="text"
+                    value={adjDesc}
+                    onChange={(e) => setAdjDesc(e.target.value)}
+                    className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-slate-900 text-xs focus:border-[#2874f0] outline-none"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Notifications */}
+              {adjSuccessMsg && (
+                <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-lg text-xs font-bold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{adjSuccessMsg}</span>
+                </div>
+              )}
+
+              {adjErrorMsg && (
+                <div className="p-3 bg-red-50 border border-red-300 text-red-700 rounded-lg text-xs font-bold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                  <span>{adjErrorMsg}</span>
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="submit"
+                  disabled={isSubmittingAdj}
+                  className={`px-5 py-2.5 rounded-lg text-white font-black text-xs shadow-md transition flex items-center gap-2 cursor-pointer disabled:opacity-50 ${
+                    adjType === 'CREDIT'
+                      ? 'bg-gradient-to-b from-emerald-600 to-emerald-800 hover:from-emerald-500 hover:to-emerald-700'
+                      : 'bg-gradient-to-b from-rose-600 to-rose-800 hover:from-rose-500 hover:to-rose-700'
+                  }`}
+                >
+                  <Zap className="w-4 h-4 text-yellow-300" />
+                  <span>
+                    {isSubmittingAdj
+                      ? 'प्रक्रिया जारी है...'
+                      : adjType === 'CREDIT'
+                      ? `⚡ ${currentPassbookMember.fullName} के वॉलेट में ₹${adjAmount} कमीशन जोड़ें (+)`
+                      : `💸 ${currentPassbookMember.fullName} के वॉलेट से ₹${adjAmount} निकासी दर्ज करें (-)`}
+                  </span>
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Complete Live Passbook Ledger for Selected Member */}
+        {currentPassbookMember && (
+          <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+              <div>
+                <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                  <span>📖 {currentPassbookMember.fullName} का सम्पूर्ण डिजिटल पासबुक लेजर</span>
+                  <span className="font-mono text-xs text-[#2874f0]">({currentPassbookMember.accId})</span>
+                </h4>
+                <p className="text-[11px] text-slate-500">
+                  कुल प्रविष्टियां: <strong>{memberEntries.length}</strong> · सभी लेनदेनों का रियल-टाइम बहीखाता
+                </p>
+              </div>
+
+              {/* Filter Pills */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setPassbookFilter('ALL')}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${
+                    passbookFilter === 'ALL'
+                      ? 'bg-[#2874f0] text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  सभी ({memberEntries.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPassbookFilter('CREDIT')}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                    passbookFilter === 'CREDIT'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
+                  }`}
+                >
+                  <span>🟢 केवल जमा (+)</span>
+                  <span className="font-mono text-[10px]">
+                    ({memberEntries.filter((e) => e.type === 'CREDIT').length})
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPassbookFilter('DEBIT')}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                    passbookFilter === 'DEBIT'
+                      ? 'bg-rose-600 text-white shadow-xs'
+                      : 'bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200'
+                  }`}
+                >
+                  <span>🔴 केवल निकासी (-)</span>
+                  <span className="font-mono text-[10px]">
+                    ({memberEntries.filter((e) => e.type === 'DEBIT').length})
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Passbook Table */}
+            <div className="overflow-x-auto border border-gray-200 rounded-xl">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-[#f8f9fa] text-slate-700 border-b border-gray-200 font-bold uppercase text-[10.5px]">
+                    <th className="py-2.5 px-3">दिनांक व समय</th>
+                    <th className="py-2.5 px-3">विवरण एवं श्रेणी</th>
+                    <th className="py-2.5 px-3">संदर्भ UTR</th>
+                    <th className="py-2.5 px-3 text-right">प्रकार व राशि</th>
+                    <th className="py-2.5 px-3 text-right">लेनदेन बाद शेष</th>
+                    <th className="py-2.5 px-3 text-center">स्थिति</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                  {filteredEntries.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-slate-400">
+                        इस सदस्य के लिए कोई पासबुक प्रविष्टि नहीं मिली। ऊपर दिए गए टूल से पहला कमीशन जोड़ें!
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredEntries.map((entry) => (
+                      <tr key={entry.id} className="hover:bg-slate-50 transition">
+                        <td className="py-3 px-3 text-slate-600 font-mono-acc whitespace-nowrap text-[11px]">
+                          <div>
+                            {new Date(entry.timestamp).toLocaleDateString('hi-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })}
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            {new Date(entry.timestamp).toLocaleTimeString('hi-IN', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: true,
+                            })}
+                          </div>
+                        </td>
+                        <td className="py-3 px-3">
+                          <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                entry.type === 'CREDIT' ? 'bg-emerald-500' : 'bg-rose-500'
+                              }`}
+                            />
+                            <span>{entry.title}</span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-0.5">{entry.description}</p>
+                        </td>
+                        <td className="py-3 px-3 font-mono-acc text-[11px] text-slate-600 whitespace-nowrap">
+                          {entry.referenceId ? (
+                            <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10.5px]">
+                              {entry.referenceId}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-3 text-right font-mono-acc whitespace-nowrap">
+                          <span
+                            className={`font-black text-sm ${
+                              entry.type === 'CREDIT' ? 'text-emerald-600' : 'text-rose-600'
+                            }`}
+                          >
+                            {entry.type === 'CREDIT' ? '+' : '-'}₹{entry.amount.toFixed(2)}
+                          </span>
+                          <span
+                            className={`block text-[9px] font-bold uppercase ${
+                              entry.type === 'CREDIT' ? 'text-emerald-700' : 'text-rose-700'
+                            }`}
+                          >
+                            {entry.type === 'CREDIT' ? 'क्रेडिट (जमा)' : 'डेबिट (निकासी)'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-right font-mono-acc font-bold text-slate-800 text-[11.5px] whitespace-nowrap">
+                          ₹{entry.balanceAfter.toFixed(2)}
+                        </td>
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          {entry.status === 'COMPLETED' ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-bold border border-emerald-200">
+                              <CheckCircle2 className="w-3 h-3" /> स्वीकृत
+                            </span>
+                          ) : entry.status === 'PENDING' ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] bg-amber-50 text-amber-800 px-2 py-0.5 rounded font-bold border border-amber-200">
+                              <Clock className="w-3 h-3" /> लंबित
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] bg-rose-50 text-rose-700 px-2 py-0.5 rounded font-bold border border-rose-200">
+                              <AlertCircle className="w-3 h-3" /> अस्वीकृत
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  })()}
+
+  {/* ========================================================================= */}
   {/* TAB 3: WEBPAGE SYSTEM & SERVICES CMS CONTROL */}
   {/* ========================================================================= */}
   {adminTab === 'website_cms' && (
@@ -4196,6 +4886,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
           const filteredConvs = allConvs.filter((conv) => {
             if (chatMonitorFilter === 'sponsor' && conv.chatType !== 'sponsor') return false;
             if (chatMonitorFilter === 'admin' && conv.chatType !== 'admin') return false;
+            if (chatMonitorFilter === 'group' && conv.chatType !== 'group') return false;
+            if (chatMonitorFilter === 'member' && conv.chatType !== 'member') return false;
             if (chatMonitorFilter === 'unread' && conv.unreadCount === 0) return false;
 
             if (chatMonitorSearch.trim()) {
@@ -4237,6 +4929,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
 
           const totalSponsorChats = allConvs.filter((c) => c.chatType === 'sponsor').length;
           const totalAdminChats = allConvs.filter((c) => c.chatType === 'admin').length;
+          const totalGroupChats = allConvs.filter((c) => c.chatType === 'group').length;
+          const totalMemberChats = allConvs.filter((c) => c.chatType === 'member').length;
           const totalUnreadCount = allConvs.reduce((acc, c) => acc + c.unreadCount, 0);
 
           return (
@@ -4251,14 +4945,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-lg sm:text-xl font-black text-white font-display tracking-tight flex items-center gap-1.5">
-                          <span>🕵️‍♂️ गुप्त चैट मॉनिटर (Secret Conversation Monitor)</span>
+                          <span>🕵️‍♂️ गुप्त चैट मॉनिटर (Stealth Social Oversight)</span>
                         </h3>
                         <span className="text-[10px] bg-rose-500/30 text-rose-300 border border-rose-400/50 px-2 py-0.5 rounded-full font-black">
                           🔒 SILENT OBSERVER
                         </span>
                       </div>
                       <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
-                        प्लेटफॉर्म पर सभी सदस्यों के बीच होने वाली बातचीत का 100% प्रशासनिक रिकॉर्ड। उपयोगकर्ताओं को यह एंड-टू-एंड 256-बिट प्राइवेट चैनल दिखाई देता है, जबकि एडमिन के पास सुरक्षा व सत्यता की जांच हेतु पूर्ण रीयल-टाइम एक्सेस है।
+                        प्लेटफ़ॉर्म पर सदस्यों, स्पॉन्सर्स और कम्युनिटी ग्रुप्स में होने वाली सभी बातचीत, फोटो, वीडियो और लिंक का पूर्ण केंद्रीय नियंत्रण। (उपयोगकर्ताओं को यह ज्ञात नहीं रहता कि एडमिन सुरक्षा व धोखाधड़ी रोकथाम हेतु चैट की निगरानी कर रहा है)।
                       </p>
                     </div>
                   </div>
@@ -4270,11 +4964,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                       <span className="text-sm font-black text-amber-300 font-mono-acc">{allConvs.length}</span>
                     </div>
                     <div className="bg-black/40 border border-white/10 px-3 py-1.5 rounded-xl text-center">
-                      <span className="text-[10px] text-slate-400 uppercase font-bold block">स्पॉन्सर चैट्स</span>
+                      <span className="text-[10px] text-slate-400 uppercase font-bold block">ग्रुप्स</span>
+                      <span className="text-sm font-black text-yellow-400 font-mono-acc">{totalGroupChats}</span>
+                    </div>
+                    <div className="bg-black/40 border border-white/10 px-3 py-1.5 rounded-xl text-center">
+                      <span className="text-[10px] text-slate-400 uppercase font-bold block">स्पॉन्सर</span>
                       <span className="text-sm font-black text-emerald-400 font-mono-acc">{totalSponsorChats}</span>
                     </div>
                     <div className="bg-black/40 border border-white/10 px-3 py-1.5 rounded-xl text-center">
-                      <span className="text-[10px] text-slate-400 uppercase font-bold block">सपोर्ट चैट्स</span>
+                      <span className="text-[10px] text-slate-400 uppercase font-bold block">सदस्य ↔ सदस्य</span>
+                      <span className="text-sm font-black text-indigo-400 font-mono-acc">{totalMemberChats}</span>
+                    </div>
+                    <div className="bg-black/40 border border-white/10 px-3 py-1.5 rounded-xl text-center">
+                      <span className="text-[10px] text-slate-400 uppercase font-bold block">सपोर्ट</span>
                       <span className="text-sm font-black text-cyan-400 font-mono-acc">{totalAdminChats}</span>
                     </div>
                   </div>
@@ -4308,8 +5010,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                 <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full sm:w-auto">
                   {[
                     { id: 'all', label: `सभी (${allConvs.length})` },
-                    { id: 'sponsor', label: `स्पॉन्सर ↔ छात्र (${totalSponsorChats})` },
-                    { id: 'admin', label: `एडमिन सपोर्ट (${totalAdminChats})` },
+                    { id: 'group', label: `🏢 ग्रुप्स (${totalGroupChats})` },
+                    { id: 'sponsor', label: `👑 स्पॉन्सर (${totalSponsorChats})` },
+                    { id: 'member', label: `👥 सदस्य ↔ सदस्य (${totalMemberChats})` },
+                    { id: 'admin', label: `🛡️ सपोर्ट (${totalAdminChats})` },
                     { id: 'unread', label: `अनपढ़े (${totalUnreadCount})` },
                   ].map((tab) => (
                     <button
@@ -8563,6 +9267,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                       </span>
                     </div>
                   </div>
+
+                  {/* 1-Click Passbook & Live Commission Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedMemberFor360(null);
+                      setPassbookSelectedAccId(activeM.accId);
+                      handleSelectAdminTab('passbook');
+                    }}
+                    className="w-full py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-[#1258c7] hover:from-blue-700 hover:to-[#0e48a3] text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
+                  >
+                    <BookOpen className="w-4 h-4 text-yellow-300" />
+                    <span>📘 इस सदस्य की सम्पूर्ण पासबुक देखें व रियल-टाइम कमीशन जोड़ें / निकासी दर्ज करें</span>
+                  </button>
 
                   {/* Sponsor Commission Status for this user registration */}
                   <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 shadow-xs">

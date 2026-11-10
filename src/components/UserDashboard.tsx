@@ -63,6 +63,9 @@ import {
   Crown,
   Gem,
   Bell,
+  Target,
+  CheckCheck,
+  UserPlus,
 } from 'lucide-react';
 import {
   Member,
@@ -73,6 +76,8 @@ import {
   ProfileEditAuditLog,
   AvatarFrameType,
   PrivateMessage,
+  PassbookEntry,
+  PassbookCategory,
 } from '../types';
 import { StorageService, subscribeToSync } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
@@ -83,16 +88,34 @@ import { AvatarWith3DFrame, AVATAR_FRAMES } from './AvatarWith3DFrame';
 import { AccLogo } from '../assets/logo';
 import { PrivateChatBox } from './PrivateChatBox';
 import { ReferralTrendChart } from './ReferralTrendChart';
+import { SponsorRegisterMemberModal } from './SponsorRegisterMemberModal';
+
+export type UserDashboardTab =
+  | 'applink'
+  | 'twis'
+  | 'swis'
+  | 'idcard'
+  | 'kit'
+  | 'courses'
+  | 'profile'
+  | 'support_chat'
+  | 'passbook';
 
 interface UserDashboardProps {
   currentUser: Member;
   onUpdateUser: (updated: Member) => void;
   onNavigateToPromotions?: () => void;
+  onNavigateToChat?: (targetAccId?: string) => void;
 }
 
-export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpdateUser, onNavigateToPromotions }) => {
-  const [activeTab, setActiveTab] = useState<'applink' | 'twis' | 'swis' | 'idcard' | 'kit' | 'courses' | 'profile' | 'support_chat'>('applink');
-  const [popupTabModal, setPopupTabModal] = useState<'applink' | 'twis' | 'swis' | 'idcard' | 'kit' | 'courses' | 'profile' | 'support_chat' | null>(null);
+export const UserDashboard: React.FC<UserDashboardProps> = ({
+  currentUser,
+  onUpdateUser,
+  onNavigateToPromotions,
+  onNavigateToChat,
+}) => {
+  const [activeTab, setActiveTab] = useState<UserDashboardTab>('applink');
+  const [popupTabModal, setPopupTabModal] = useState<UserDashboardTab | null>(null);
   const tabContentRef = useRef<HTMLDivElement>(null);
 
   // 3D Avatar Frame Selection Modal State
@@ -101,6 +124,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
   const [frameCategory, setFrameCategory] = useState<'all' | 'acc' | 'elements' | 'vip'>('all');
   const [isSavingFrame, setIsSavingFrame] = useState<boolean>(false);
   const [frameSuccessMsg, setFrameSuccessMsg] = useState<string>('');
+  const [showAddMemberModal, setShowAddMemberModal] = useState<boolean>(false);
 
   const handleSelectAndSaveFrame = async (newFrame: AvatarFrameType) => {
     setFramePreview(newFrame);
@@ -128,7 +152,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
   };
 
   // Directly navigate, pop open modal window & smoothly scroll user straight to target section/tab
-  const handleSelectTab = (tab: 'applink' | 'twis' | 'swis' | 'idcard' | 'kit' | 'courses' | 'profile' | 'support_chat', openAsPopup: boolean = true) => {
+  const handleSelectTab = (tab: UserDashboardTab, openAsPopup: boolean = true) => {
     setActiveTab(tab);
     if (openAsPopup) {
       setPopupTabModal(tab);
@@ -154,6 +178,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
 
   useEffect(() => {
     setUserMessages(StorageService.getPrivateMessages(currentUser.accId));
+    setPassbookEntries(StorageService.getPassbookEntries(currentUser.accId));
     const unsubscribeMessages = FirestoreService.subscribeToPrivateMessages(currentUser.accId, (cloudMsgs) => {
       if (cloudMsgs && cloudMsgs.length > 0) {
         setUserMessages(cloudMsgs);
@@ -161,6 +186,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
     });
     const unsubscribeSync = subscribeToSync(() => {
       setUserMessages(StorageService.getPrivateMessages(currentUser.accId));
+      setPassbookEntries(StorageService.getPassbookEntries(currentUser.accId));
     });
     return () => {
       unsubscribeMessages();
@@ -541,12 +567,76 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ currentUser, onUpd
     }
   };
 
-  // Withdrawal Modal State
+  // Passbook & Withdrawal Modal State
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [withdrawModalTab, setWithdrawModalTab] = useState<'passbook' | 'request'>('passbook');
+  const [passbookFilter, setPassbookFilter] = useState<'ALL' | 'CREDIT' | 'DEBIT'>('ALL');
+  const [passbookEntries, setPassbookEntries] = useState<PassbookEntry[]>(() =>
+    StorageService.getPassbookEntries(currentUser.accId)
+  );
   const [withdrawAmount, setWithdrawAmount] = useState<number>(Math.min(currentUser.walletBalance, 500));
   const [withdrawUpi, setWithdrawUpi] = useState('');
   const [withdrawMsg, setWithdrawMsg] = useState('');
   const [withdrawError, setWithdrawError] = useState('');
+
+  // Passbook ledger summary calculations
+  const totalAddedAmount = passbookEntries
+    .filter((e) => e.type === 'CREDIT' && e.status === 'COMPLETED')
+    .reduce((sum, e) => sum + e.amount, 0);
+
+  const totalWithdrawnAmount = passbookEntries
+    .filter((e) => e.type === 'DEBIT' && e.status === 'COMPLETED')
+    .reduce((sum, e) => sum + e.amount, 0);
+
+  const filteredPassbookEntries = passbookEntries.filter((e) => {
+    if (passbookFilter === 'CREDIT') return e.type === 'CREDIT';
+    if (passbookFilter === 'DEBIT') return e.type === 'DEBIT';
+    return true;
+  });
+
+  // SWIS Income Milestone Calculations
+  const swisMilestones = [
+    { target: 50, label: 'स्टार्टर सेवर', badge: 'Tier 1' },
+    { target: 150, label: 'सिल्वर सेवर', badge: 'Tier 2' },
+    { target: 300, label: 'गोल्ड अचीवर', badge: 'Tier 3' },
+    { target: 500, label: 'प्लैटिनम क्लब', badge: 'Tier 4' },
+    { target: 1000, label: 'डायमंड क्लब', badge: 'Tier 5' },
+    { target: 2500, label: 'क्राउन मास्टर', badge: 'Tier 6' },
+  ];
+  const currentSwisEarnings = Number(currentUser.swisEarnings || 0);
+  const nextSwisMilestone = swisMilestones.find((m) => m.target > currentSwisEarnings) || swisMilestones[swisMilestones.length - 1];
+  const prevSwisTarget = swisMilestones[swisMilestones.indexOf(nextSwisMilestone) - 1]?.target || 0;
+  const swisProgressPercent = Math.min(
+    100,
+    Math.max(
+      currentSwisEarnings > 0 ? 5 : 0,
+      Math.round(((currentSwisEarnings - prevSwisTarget) / (nextSwisMilestone.target - prevSwisTarget)) * 100)
+    )
+  );
+  const swisRemaining = Math.max(0, Number((nextSwisMilestone.target - currentSwisEarnings).toFixed(2)));
+
+  // TWIS Income Milestone Calculations
+  const twisMilestones = [
+    { count: 2, earnings: 300, label: 'लागत वसूल हीरो (Break-even)', badge: 'Level 1', perk: 'फीस पूरी वापस + ₹51 शुद्ध लाभ' },
+    { count: 5, earnings: 750, label: 'स्टार प्रमोटर', badge: 'Level 2', perk: '₹750 डायरेक्ट पेआउट' },
+    { count: 10, earnings: 1500, label: 'ब्रॉन्ज लीडर', badge: 'Level 3', perk: '₹1,500 डायरेक्ट पेआउट' },
+    { count: 25, earnings: 3750, label: 'सिल्वर मेंटर', badge: 'Level 4', perk: '₹3,750 डायरेक्ट पेआउट' },
+    { count: 50, earnings: 7500, label: 'गोल्ड एम्बेसडर', badge: 'Level 5', perk: '₹7,500 डायरेक्ट पेआउट' },
+    { count: 100, earnings: 15000, label: 'क्राउन डायरेक्टर', badge: 'Level 6', perk: '₹15,000 डायरेक्ट पेआउट' },
+  ];
+  const currentTwisCount = Number(currentUser.referralsCount || 0);
+  const currentTwisEarnings = Number(currentUser.twisEarnings || (currentTwisCount * 150));
+  const nextTwisMilestone = twisMilestones.find((m) => m.count > currentTwisCount) || twisMilestones[twisMilestones.length - 1];
+  const prevTwisCount = twisMilestones[twisMilestones.indexOf(nextTwisMilestone) - 1]?.count || 0;
+  const twisProgressPercent = Math.min(
+    100,
+    Math.max(
+      currentTwisCount > 0 ? 5 : 0,
+      Math.round(((currentTwisCount - prevTwisCount) / (nextTwisMilestone.count - prevTwisCount)) * 100)
+    )
+  );
+  const twisRemainingCount = Math.max(0, nextTwisMilestone.count - currentTwisCount);
+  const twisRemainingEarnings = twisRemainingCount * 150;
 
   // Referrals & Masked Privacy Modal State
   const [showReferralsPrivacyModal, setShowReferralsPrivacyModal] = useState(false);
@@ -879,14 +969,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
     if ('error' in res) {
       setWithdrawError(res.error);
     } else {
-      setWithdrawMsg('निकासी अनुरोध सफलतापूर्वक सबमिट हो गया! एडमिन द्वारा जल्द ही स्वीकृत किया जाएगा।');
+      setWithdrawMsg('✓ निकासी अनुरोध सफलतापूर्वक सबमिट हो गया! राशि पासबुक लेजर में दर्ज हो गई है।');
       const updated = StorageService.getMembers().find((m) => m.accId === currentUser.accId);
       if (updated) onUpdateUser(updated);
 
+      setPassbookEntries(StorageService.getPassbookEntries(currentUser.accId));
+
       setTimeout(() => {
-        setShowWithdrawModal(false);
+        setWithdrawModalTab('passbook');
         setWithdrawMsg('');
-      }, 2000);
+      }, 1500);
     }
   };
 
@@ -1248,15 +1340,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                   <span>ऑनलाइन • ACC INDIA Profile</span>
                 </span>
                 <span className="text-[10px] font-mono-acc text-sky-200 bg-[#2481cc]/30 border border-[#2481cc]/40 px-2 py-0.5 rounded-full">
-                  @{currentUser.telegram ? currentUser.telegram.replace('@', '') : currentUser.fullName.toLowerCase().replace(/\s+/g, '_')}
+                  @{currentUser.username || (currentUser.telegram ? currentUser.telegram.replace('@', '') : currentUser.fullName.toLowerCase().replace(/\s+/g, '_'))}
+                </span>
+                <span className="text-[10px] text-amber-300 bg-amber-950/80 border border-amber-500/50 px-2 py-0.5 rounded-full flex items-center gap-1 font-bold shadow-xs">
+                  <span>👁️ {currentUser.profileViews || 0} व्यूज</span>
                 </span>
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-xl sm:text-2xl md:text-3xl font-black tracking-wide truncate text-gold-solid drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-black tracking-wide text-gold-solid drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] break-words">
                   {currentUser.fullName}
                 </h2>
-                <span className="text-[10px] sm:text-xs text-sky-200 bg-[#2481cc]/25 px-2 py-0.5 rounded font-bold border border-[#2481cc]/40 truncate">
+                <span className="text-[10px] sm:text-xs text-sky-200 bg-[#2481cc]/25 px-2 py-0.5 rounded font-bold border border-[#2481cc]/40 break-words leading-tight">
                   {currentUser.qualification || 'छात्र सदस्य'}
                 </span>
               </div>
@@ -1292,7 +1387,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                 </div>
                 <div className="min-w-0">
                   <span className="text-[10px] text-sky-200 uppercase font-bold tracking-wider block">Real App स्थिति</span>
-                  <span className="text-xs font-bold text-emerald-300 truncate block">
+                  <span className="text-xs font-bold text-emerald-300 break-words block leading-tight">
                     सक्रिय (Verified ✓)
                   </span>
                 </div>
@@ -1306,18 +1401,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
               </button>
             </div>
 
-            {/* Quick 3D Action Buttons Bar with English Labels & Live Count */}
-            <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Quick 3D Action Buttons Bar with English Labels & Live Count - Clean 2x2 Grid on Mobile */}
+            <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 w-full">
               {/* 3D Notification Alert Button with Exact Message Count */}
               <button
                 type="button"
                 onClick={() => setShowNotificationModal(true)}
-                className="relative flex-1 sm:flex-none px-3.5 py-1.5 bg-gradient-to-b from-[#e11d48] via-[#be123c] to-[#9f1239] hover:from-[#f43f5e] hover:to-[#be123c] text-white rounded-lg text-[11px] font-black shadow-[0_2.5px_0_#4c0519] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap border border-white/20"
+                className="relative flex-1 sm:flex-none px-2.5 sm:px-3.5 py-1.5 bg-gradient-to-b from-[#e11d48] via-[#be123c] to-[#9f1239] hover:from-[#f43f5e] hover:to-[#be123c] text-white rounded-lg text-[10.5px] sm:text-[11px] font-black shadow-[0_2.5px_0_#4c0519] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1 sm:gap-1.5 transition cursor-pointer whitespace-nowrap border border-white/20"
                 title="Admin Messages & Live Notifications"
               >
                 <Bell className={`w-3.5 h-3.5 ${unreadAdminCount > 0 ? 'animate-bounce text-amber-300' : 'text-white'}`} />
                 <span>Notifications</span>
-                <span className={`font-black text-[10px] px-2 py-0.2 rounded-full shadow-xs ${
+                <span className={`font-black text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.2 rounded-full shadow-xs ${
                   unreadAdminCount > 0
                     ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-300 animate-pulse'
                     : 'bg-emerald-950/80 text-emerald-300 border border-emerald-400/50'
@@ -1332,7 +1427,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                   setFramePreview(currentUser.avatarFrame || 'acc_dancing_circle');
                   setShowFrameModal(true);
                 }}
-                className="flex-1 sm:flex-none px-3 py-1.5 bg-gradient-to-b from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-lg text-[11px] font-black shadow-[0_2.5px_0_#9a3412] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1 transition cursor-pointer whitespace-nowrap border border-white/20"
+                className="flex-1 sm:flex-none px-2.5 sm:px-3 py-1.5 bg-gradient-to-b from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-lg text-[10.5px] sm:text-[11px] font-black shadow-[0_2.5px_0_#9a3412] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1 transition cursor-pointer whitespace-nowrap border border-white/20"
                 title="Customize 3D Live Profile Frame"
               >
                 <Sparkles className="w-3.5 h-3.5 text-slate-950" />
@@ -1341,25 +1436,27 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 
               <button
                 type="button"
-                onClick={() => handleSelectTab('support_chat')}
-                className="flex-1 sm:flex-none px-3 py-1.5 bg-gradient-to-b from-[#229ed9] to-[#0088cc] hover:from-[#2eb0ee] hover:to-[#0077b3] text-white rounded-lg text-[11px] font-black shadow-[0_2.5px_0_#005580] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap border border-white/20"
-                title="Admin Support Chat Desk"
+                onClick={() => {
+                  if (onNavigateToChat) {
+                    onNavigateToChat();
+                  } else {
+                    handleSelectTab('support_chat');
+                  }
+                }}
+                className="flex-1 sm:flex-none px-2.5 sm:px-3 py-1.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:brightness-110 text-slate-950 rounded-lg text-[10.5px] sm:text-[11px] font-black shadow-[0_2.5px_0_#9a3412] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1 sm:gap-1.5 transition cursor-pointer whitespace-nowrap border border-yellow-200"
+                title="ACC MEMBER CHAT सोशल एवं सहायता केंद्र"
               >
-                <MessageCircle className="w-3.5 h-3.5" />
-                <span>Support Chat</span>
-                <span className={`font-black text-[10px] px-1.5 py-0.2 rounded-full shadow-xs ${
-                  unreadAdminCount > 0
-                    ? 'bg-amber-300 text-slate-950 ring-2 ring-amber-400 animate-pulse'
-                    : 'bg-sky-950/80 text-sky-200 border border-sky-400/50'
-                }`}>
-                  {unreadAdminCount}
+                <MessageCircle className="w-3.5 h-3.5 text-slate-950" />
+                <span>ACC MEMBER CHAT</span>
+                <span className="font-black text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0.2 rounded-full bg-slate-950 text-amber-300 shadow-xs">
+                  लाइव
                 </span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleSelectTab('idcard')}
-                className="flex-1 sm:flex-none px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-[11px] font-bold border border-white/20 shadow-[0_2px_0_#1e293b] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1 transition cursor-pointer whitespace-nowrap"
+                className="flex-1 sm:flex-none px-2.5 sm:px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-[10.5px] sm:text-[11px] font-bold border border-white/20 shadow-[0_2px_0_#1e293b] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1 transition cursor-pointer whitespace-nowrap"
                 title="View & Download Digital ID Card"
               >
                 <CreditCard className="w-3.5 h-3.5 text-amber-400" />
@@ -1370,18 +1467,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
         </div>
       </div>
 
-      {/* 4 Clean White High-Visibility Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* 4 Clean High-Visibility Metric Cards - 2 Columns on Mobile for Clean Compact Look */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
         {/* Card 1: Activation Status */}
-        <div className="bg-white border border-gray-200 rounded-xl p-3.5 sm:p-4 shadow-xs flex flex-col justify-between">
+        <div className="bg-white border border-gray-200 rounded-xl p-2.5 sm:p-4 shadow-xs flex flex-col justify-between">
           <div>
-            <span className="text-[11px] text-slate-500 block font-bold uppercase tracking-wider">🆔 एक्टिवेशन स्थिति</span>
-            <span className="font-bold text-sm text-emerald-700 flex items-center gap-1 mt-1">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" /> ₹249 ONE-TIME PAID
+            <span className="text-[10px] sm:text-[11px] text-slate-500 block font-bold uppercase tracking-wider">🆔 एक्टिवेशन स्थिति</span>
+            <span className="font-bold text-xs sm:text-sm text-emerald-700 flex items-center gap-1 mt-1 break-words">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> ₹249 PAID ✓
             </span>
           </div>
-          <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between text-[10px] text-slate-500 font-mono-acc">
-            <span className="truncate">UTR: {currentUser.utrNumber || 'N/A'}</span>
+          <div className="mt-2 pt-1.5 border-t border-gray-100 flex items-center justify-between text-[9.5px] sm:text-[10px] text-slate-500 font-mono-acc">
+            <span className="break-all">UTR: {currentUser.utrNumber ? currentUser.utrNumber.slice(-8) : 'N/A'}</span>
             {currentUser.utrNumber && (
               <button
                 type="button"
@@ -1398,42 +1495,57 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
           </div>
         </div>
 
-        {/* Card 2: Wallet Balance */}
-        <div className="bg-white border border-gray-200 rounded-xl p-3.5 sm:p-4 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">👛 वॉलेट बैलेंस</span>
-            <button
-              type="button"
-              onClick={() => setShowWithdrawModal(true)}
-              className="text-[11px] font-bold text-[#2874f0] hover:bg-blue-50 px-2 py-0.5 rounded border border-blue-200 flex items-center gap-1 transition cursor-pointer"
-            >
-              <span>निकासी</span>
-              <ArrowUpRight className="w-3 h-3" />
-            </button>
+        {/* Card 2: Wallet Balance & Passbook */}
+        <div className="bg-white border border-gray-200 rounded-xl p-2.5 sm:p-4 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] sm:text-[11px] text-slate-500 font-bold uppercase tracking-wider">👛 वॉलेट बैलेंस</span>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setWithdrawModalTab('passbook');
+                  setShowWithdrawModal(true);
+                }}
+                className="text-[9.5px] sm:text-[10px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-300 flex items-center gap-0.5 transition cursor-pointer"
+                title="डिजिटल पासबुक देखें"
+              >
+                <BookOpen className="w-2.5 h-2.5 text-emerald-700" />
+                <span>पासबुक</span>
+              </button>
+            </div>
           </div>
-          <span className="font-mono-acc font-black text-2xl text-emerald-600 block mt-1 tabular-nums">
+          <span className="font-mono-acc font-black text-xl sm:text-2xl text-emerald-600 block mt-1 tabular-nums break-words">
             ₹{currentUser.walletBalance.toFixed(2)}
           </span>
-          <span className="text-[10px] text-slate-500 block mt-1">UPI / बैंक खाते में तुरंत निकासी योग्य</span>
+          <div className="flex items-center justify-between text-[9.5px] sm:text-[10px] text-slate-500 mt-1 pt-1.5 border-t border-gray-100">
+            <span>निकासी योग्य शेष</span>
+            <button
+              type="button"
+              onClick={() => {
+                setWithdrawModalTab('request');
+                setShowWithdrawModal(true);
+              }}
+              className="text-[#2874f0] font-black hover:underline shrink-0 flex items-center"
+            >
+              निकासी →
+            </button>
+          </div>
         </div>
 
         {/* Card 3: TWIS Referral Income */}
-        <div className="bg-white border border-gray-200 rounded-xl p-3.5 sm:p-4 shadow-xs flex flex-col justify-between">
+        <div className="bg-white border border-gray-200 rounded-xl p-2.5 sm:p-4 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between gap-1">
-              <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider truncate">👥 TWIS रेफरल (₹150)</span>
-              <div className="flex items-center gap-1">
+              <span className="text-[10px] sm:text-[11px] text-slate-500 font-bold uppercase tracking-wider">👥 TWIS रेफरल</span>
+              <div className="flex items-center gap-1 shrink-0">
                 <button
                   type="button"
-                  onClick={() => {
-                    setReferralModalTab('chart');
-                    setShowReferralsPrivacyModal(true);
-                  }}
-                  className="text-[10px] font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded border border-amber-200 transition shadow-xs cursor-pointer shrink-0"
-                  title="30 दिन का रेफरल ट्रेंड चार्ट देखें"
+                  onClick={() => setShowAddMemberModal(true)}
+                  className="text-[9.5px] sm:text-[10px] font-bold text-white flex items-center gap-0.5 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 px-1.5 py-0.5 rounded shadow-xs transition cursor-pointer"
+                  title="अपने नीचे नया सदस्य जोड़ें"
                 >
-                  <TrendingUp className="w-3 h-3 text-amber-600" />
-                  <span>30D चार्ट</span>
+                  <UserPlus className="w-2.5 h-2.5" />
+                  <span>➕ जोड़ें</span>
                 </button>
                 <button
                   type="button"
@@ -1441,55 +1553,250 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                     setReferralModalTab('members');
                     setShowReferralsPrivacyModal(true);
                   }}
-                  className="text-[10px] font-bold text-[#2874f0] hover:text-[#1258c7] flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-1.5 py-0.5 rounded border border-blue-200 transition shadow-xs cursor-pointer shrink-0"
-                  title="रेफरल सदस्य देखें (मास्क्ड प्राइवेसी के साथ)"
+                  className="text-[9.5px] sm:text-[10px] font-bold text-[#2874f0] hover:text-[#1258c7] flex items-center gap-0.5 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 transition cursor-pointer"
+                  title="रेफरल सदस्य देखें"
                 >
+                  <Eye className="w-2.5 h-2.5" />
                   <span>सदस्य</span>
-                  <Eye className="w-3 h-3" />
                 </button>
               </div>
             </div>
-            <span className="font-mono-acc font-black text-2xl text-[#2874f0] block mt-1 tabular-nums">
-              ₹{currentUser.twisEarnings.toFixed(2)}
+            <span className="font-mono-acc font-black text-xl sm:text-2xl text-[#2874f0] block mt-1 tabular-nums break-words">
+              ₹{currentTwisEarnings.toFixed(2)}
             </span>
           </div>
 
-          <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100 text-[10px]">
-            <span className="text-slate-600 font-medium">{currentUser.referralsCount} सक्रिय छात्र</span>
+          <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-gray-100 text-[9.5px] sm:text-[10px]">
+            <span className="text-slate-600 font-medium">{currentTwisCount} सक्रिय छात्र</span>
             <button
               type="button"
               onClick={() => {
                 setReferralModalTab('privacy');
                 setShowReferralsPrivacyModal(true);
               }}
-              className="text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200 transition cursor-pointer"
-              title="पब्लिक / प्राइवेट सेटिंग्स चुनें"
+              className="text-emerald-700 font-bold flex items-center gap-0.5 shrink-0"
+              title="प्राइवेसी सेटिंग्स"
             >
-              <ShieldCheck className="w-3 h-3 text-emerald-600" />
-              <span>प्राइवेसी ⚙️</span>
+              <span>⚙️ प्राइवेसी</span>
             </button>
           </div>
         </div>
 
         {/* Card 4: Sponsor Info with Rainbow Glow */}
-        <div className="bg-white border-2 border-amber-200/80 rounded-xl p-3.5 sm:p-4 shadow-sm flex flex-col justify-between">
+        <div className="bg-white border-2 border-amber-200/80 rounded-xl p-2.5 sm:p-4 shadow-sm flex flex-col justify-between">
           <div>
-            <span className="text-[11px] text-slate-600 block font-bold uppercase tracking-wider">🤝 Sponsor विवरण</span>
-            <span className="font-black text-sm block mt-1 truncate text-slate-900 font-display">
+            <span className="text-[10px] sm:text-[11px] text-slate-600 block font-bold uppercase tracking-wider">🤝 Sponsor विवरण</span>
+            <span className="font-black text-xs sm:text-sm block mt-1 text-slate-900 font-display break-words">
               {currentUser.sponsorName || 'ACC Core Team'}
             </span>
           </div>
-          <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between text-[10px]">
-            <span className="font-mono-acc font-black text-xs px-2.5 py-0.5 rounded id-badge-rainbow text-gold-solid tracking-wider truncate">
+          <div className="mt-2 pt-1.5 border-t border-gray-100 flex items-center justify-between text-[9.5px] sm:text-[10px] gap-1">
+            <span className="font-mono-acc font-black text-[10.5px] px-1.5 py-0.2 rounded id-badge-rainbow text-gold-solid tracking-wider break-all">
               {currentUser.sponsorId || 'ACC-ADMIN'}
             </span>
             <button
               type="button"
               onClick={() => handleSelectTab('twis')}
-              className="text-[#2874f0] hover:text-[#1258c7] font-bold hover:underline"
+              className="text-[#2874f0] hover:text-[#1258c7] font-bold hover:underline shrink-0"
             >
-              नेटवर्क देखें →
+              नेटवर्क →
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* SWIS & TWIS LIVE ACTIVATION STATUS & ANIMATED INCOME MILESTONES HUB       */}
+      {/* Clean, Attractive & Zero-Cutoff on Every Mobile Screen Size              */}
+      {/* ========================================================================= */}
+      <div className="bg-gradient-to-r from-slate-950 via-[#101c2e] to-slate-950 border-2 border-blue-400/40 rounded-2xl p-3 sm:p-5 shadow-xl text-white space-y-3 relative overflow-hidden select-none">
+        {/* Subtle Watermark */}
+        <div className="absolute right-0 -bottom-8 w-40 h-40 opacity-5 pointer-events-none">
+          <AccLogo watermark size="custom" className="w-full h-full" />
+        </div>
+
+        {/* Top Header with Live System Status Badges */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-2.5 relative z-10">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-tr from-amber-400 to-amber-500 text-slate-950 flex items-center justify-center font-black shadow-md shrink-0">
+              <Award className="w-4 h-4 text-slate-950" />
+            </div>
+            <div>
+              <h3 className="text-xs sm:text-sm md:text-base font-black text-white flex items-center gap-1.5 flex-wrap">
+                <span>SWIS व TWIS एक्टिवेशन व लाइव माइलस्टोन प्रगति</span>
+                <span className="text-[9px] sm:text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 px-1.5 py-0.2 rounded-full font-bold">
+                  ● Live Active
+                </span>
+              </h3>
+              <p className="text-[10px] sm:text-[11px] text-slate-300">
+                अगली आय उपलब्धि (Next Milestone) व कमीशन स्तर अनलॉक करने का रियल-टाइम ट्रैकर
+              </p>
+            </div>
+          </div>
+
+          {/* Dual Live Activation Status Badges */}
+          <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+            <div className="flex items-center gap-1 bg-emerald-950/80 border border-emerald-400/50 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-lg shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
+              <span>SWIS: <strong>सक्रिय ✓</strong> (3.30%)</span>
+            </div>
+            <div className="flex items-center gap-1 bg-indigo-950/80 border border-indigo-400/50 text-indigo-300 text-[10px] font-bold px-2 py-0.5 rounded-lg shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping shrink-0" />
+              <span>TWIS: <strong>सक्रिय ✓</strong> (₹150)</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 2-Column Responsive Milestone Progress Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 relative z-10">
+          {/* Card 1: SWIS 3.30% Cashback Animated Milestone */}
+          <div className="bg-slate-900/90 rounded-xl p-3 sm:p-3.5 border border-emerald-500/40 shadow-inner flex flex-col justify-between space-y-2.5 animate-pulse-glow-swis">
+            <div className="flex items-start justify-between gap-1.5">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-400 flex items-center justify-center shrink-0">
+                  <Zap className="w-3.5 h-3.5 fill-emerald-400" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <span className="font-bold text-xs text-white">SWIS रिचार्ज कैशबैक</span>
+                    <span className="text-[9px] bg-emerald-500 text-slate-950 font-black px-1.5 py-0.2 rounded">
+                      3.30% फिक्स
+                    </span>
+                  </div>
+                  <span className="text-[9.5px] text-emerald-200 block break-words leading-tight">
+                    Self Work Income System • मोबाइल & DTH रिचार्ज
+                  </span>
+                </div>
+              </div>
+              <span className="text-[9.5px] font-black bg-emerald-950 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.5 rounded-md shrink-0">
+                {nextSwisMilestone.badge}
+              </span>
+            </div>
+
+            {/* Income Progress Stats */}
+            <div className="space-y-1">
+              <div className="flex items-baseline justify-between text-[10.5px] sm:text-[11px] gap-1 flex-wrap">
+                <span className="text-slate-300">
+                  वर्तमान: <strong className="text-emerald-400 font-mono-acc font-black text-xs">₹{currentSwisEarnings.toFixed(2)}</strong> ({currentUser.rechargesCount || 0} रिचार्ज)
+                </span>
+                <span className="text-amber-300 font-bold">
+                  लक्ष्य: ₹{nextSwisMilestone.target} ({nextSwisMilestone.label})
+                </span>
+              </div>
+
+              {/* Animated Glowing Progress Bar with Continuous Shimmer */}
+              <div className="relative w-full h-3.5 sm:h-4 bg-slate-950 rounded-full p-0.5 border border-emerald-500/30 overflow-hidden shadow-inner">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 transition-all duration-1000 ease-out relative overflow-hidden shadow-[0_0_10px_rgba(16,185,129,0.8)]"
+                  style={{ width: `${Math.max(5, swisProgressPercent)}%` }}
+                >
+                  {/* Moving shimmer highlight */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent w-full h-full animate-progress-shimmer" />
+                </div>
+              </div>
+
+              {/* Progress Detail Footer */}
+              <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5 gap-1 flex-wrap">
+                <span className="text-emerald-300 font-bold">
+                  {swisProgressPercent}% पूर्ण
+                </span>
+                <span className="text-amber-200">
+                  अगले स्तर हेतु <strong>₹{swisRemaining.toFixed(2)} शेष</strong>
+                </span>
+              </div>
+            </div>
+
+            {/* Action to Boost SWIS */}
+            <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-1.5">
+              <span className="text-[9.5px] text-slate-400">
+                ⚡ 3.30% वॉलेट में तुरंत जमा
+              </span>
+              <button
+                type="button"
+                onClick={() => handleSelectTab('swis')}
+                className="px-2.5 py-1 bg-gradient-to-b from-emerald-500 to-teal-700 hover:from-emerald-400 hover:to-teal-600 text-white font-black text-[10.5px] rounded-lg shadow-sm active:translate-y-0.5 transition cursor-pointer flex items-center gap-1 shrink-0"
+              >
+                <span>रिचार्ज करें</span>
+                <ArrowUpRight className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+
+          {/* Card 2: TWIS ₹150 Referral Animated Milestone */}
+          <div className="bg-slate-900/90 rounded-xl p-3 sm:p-3.5 border border-indigo-500/40 shadow-inner flex flex-col justify-between space-y-2.5 animate-pulse-glow-twis">
+            <div className="flex items-start justify-between gap-1.5">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-400/40 text-indigo-400 flex items-center justify-center shrink-0">
+                  <Users className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <span className="font-bold text-xs text-white">TWIS टीम रेफरल अर्निंग</span>
+                    <span className="text-[9px] bg-indigo-500 text-white font-black px-1.5 py-0.2 rounded">
+                      ₹150 प्रति छात्र
+                    </span>
+                  </div>
+                  <span className="text-[9.5px] text-indigo-200 block break-words leading-tight">
+                    Team Work Income System • 2 पर ₹300 (फीस वापस)
+                  </span>
+                </div>
+              </div>
+              <span className="text-[9.5px] font-black bg-indigo-950 text-indigo-300 border border-indigo-500/40 px-1.5 py-0.5 rounded-md shrink-0">
+                {nextTwisMilestone.badge}
+              </span>
+            </div>
+
+            {/* Income Progress Stats */}
+            <div className="space-y-1">
+              <div className="flex items-baseline justify-between text-[10.5px] sm:text-[11px] gap-1 flex-wrap">
+                <span className="text-slate-300">
+                  अर्निंग: <strong className="text-indigo-400 font-mono-acc font-black text-xs">₹{currentTwisEarnings.toFixed(2)}</strong> ({currentTwisCount} छात्र)
+                </span>
+                <span className="text-yellow-300 font-bold">
+                  लक्ष्य: {nextTwisMilestone.count} छात्र (₹{nextTwisMilestone.earnings})
+                </span>
+              </div>
+
+              {/* Animated Glowing Progress Bar with Continuous Shimmer */}
+              <div className="relative w-full h-3.5 sm:h-4 bg-slate-950 rounded-full p-0.5 border border-indigo-500/30 overflow-hidden shadow-inner">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 transition-all duration-1000 ease-out relative overflow-hidden shadow-[0_0_10px_rgba(99,102,241,0.8)]"
+                  style={{ width: `${Math.max(5, twisProgressPercent)}%` }}
+                >
+                  {/* Moving shimmer highlight */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent w-full h-full animate-progress-shimmer" />
+                </div>
+              </div>
+
+              {/* Progress Detail Footer */}
+              <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5 gap-1 flex-wrap">
+                <span className="text-indigo-300 font-bold">
+                  {twisProgressPercent}% • {nextTwisMilestone.label}
+                </span>
+                <span className="text-yellow-200">
+                  {twisRemainingCount > 0 ? (
+                    <>सिर्फ <strong>{twisRemainingCount} रेफरल शेष</strong> (+₹{twisRemainingEarnings})</>
+                  ) : (
+                    <strong className="text-emerald-400">उपलब्धि पूर्ण ✓</strong>
+                  )}
+                </span>
+              </div>
+            </div>
+
+            {/* Action to Boost TWIS */}
+            <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-1.5">
+              <span className="text-[9.5px] text-slate-400">
+                👥 ₹150 सीधा आपके बैंक/UPI खाते में
+              </span>
+              <button
+                type="button"
+                onClick={() => handleSelectTab('twis')}
+                className="px-2.5 py-1 bg-gradient-to-b from-indigo-600 to-blue-700 hover:from-indigo-500 hover:to-blue-600 text-white font-black text-[10.5px] rounded-lg shadow-sm active:translate-y-0.5 transition cursor-pointer flex items-center gap-1 shrink-0"
+              >
+                <span>रेफर करें</span>
+                <ArrowUpRight className="w-3 h-3" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1505,6 +1812,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
           </div>
           <span className="text-[10px] sm:text-[11px] text-[#2874f0] font-bold bg-blue-50 px-2 sm:px-2.5 py-0.5 rounded-full border border-blue-200">
             {activeTab === 'applink' && '📱 Official App (APK)'}
+            {activeTab === 'passbook' && '📘 Digital Passbook'}
             {activeTab === 'kit' && '📚 Training Kit'}
             {activeTab === 'twis' && '👥 TWIS Referral (₹150)'}
             {activeTab === 'swis' && '⚡ SWIS Recharge (3.3%)'}
@@ -1515,133 +1823,150 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
           </span>
         </div>
 
-        {/* 8 Complete 3D Tactile Buttons Grid with English Names & Live Message Count */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 bg-slate-100/80 p-2 rounded-xl w-full max-w-full">
+        {/* 9 Complete 3D Tactile Buttons Grid with English Names & Live Message Count */}
+        <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-1.5 sm:gap-2 bg-slate-100/80 p-1.5 sm:p-2 rounded-xl w-full max-w-full">
           {/* Button 1: Official App */}
           <button
             type="button"
             onClick={() => handleSelectTab('applink')}
-            className={`min-h-[46px] flex items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
+            className={`min-h-[46px] p-1.5 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'applink'
                 ? 'bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white shadow-[0_3px_0_#093b8f] ring-2 ring-[#2874f0]/50 translate-y-0.5'
                 : 'bg-white text-slate-800 hover:text-[#2874f0] hover:bg-blue-50 border border-blue-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
             title="Official App Delivery Portal (Pop-up Window)"
           >
-            <Smartphone className={`w-4 h-4 shrink-0 ${activeTab === 'applink' ? 'text-white' : 'text-[#2874f0]'}`} />
-            <span className="truncate">Official App</span>
+            <Smartphone className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${activeTab === 'applink' ? 'text-white' : 'text-[#2874f0]'}`} />
+            <span className="text-[10px] sm:text-xs font-black leading-tight text-center break-words max-w-full">Official App</span>
           </button>
 
           {/* Button 2: TWIS */}
           <button
             type="button"
             onClick={() => handleSelectTab('twis')}
-            className={`min-h-[46px] flex items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
+            className={`min-h-[46px] p-1.5 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'twis'
                 ? 'bg-gradient-to-b from-indigo-600 to-indigo-800 text-white shadow-[0_3px_0_#312e81] ring-2 ring-indigo-500/50 translate-y-0.5'
                 : 'bg-white text-slate-800 hover:text-indigo-600 hover:bg-indigo-50 border border-indigo-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
             title="TWIS Referral System ₹150 (Pop-up Window)"
           >
-            <Users className={`w-4 h-4 shrink-0 ${activeTab === 'twis' ? 'text-white' : 'text-indigo-600'}`} />
-            <span className="truncate">TWIS (₹150)</span>
+            <Users className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${activeTab === 'twis' ? 'text-white' : 'text-indigo-600'}`} />
+            <span className="text-[10px] sm:text-xs font-black leading-tight text-center break-words max-w-full">TWIS (₹150)</span>
           </button>
 
           {/* Button 3: SWIS */}
           <button
             type="button"
             onClick={() => handleSelectTab('swis')}
-            className={`min-h-[46px] flex items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
+            className={`min-h-[46px] p-1.5 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'swis'
                 ? 'bg-gradient-to-b from-emerald-600 to-emerald-800 text-white shadow-[0_3px_0_#064e3b] ring-2 ring-emerald-500/50 translate-y-0.5'
                 : 'bg-white text-slate-800 hover:text-emerald-700 hover:bg-emerald-50 border border-emerald-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
             title="SWIS Recharge Cashback 3.3% (Pop-up Window)"
           >
-            <Zap className={`w-4 h-4 shrink-0 ${activeTab === 'swis' ? 'text-white' : 'text-emerald-600'}`} />
-            <span className="truncate">SWIS (3.3%)</span>
+            <Zap className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${activeTab === 'swis' ? 'text-white' : 'text-emerald-600'}`} />
+            <span className="text-[10px] sm:text-xs font-black leading-tight text-center break-words max-w-full">SWIS (3.3%)</span>
           </button>
 
-          {/* Button 4: Digital ID */}
+          {/* Button 4: Passbook */}
+          <button
+            type="button"
+            onClick={() => handleSelectTab('passbook')}
+            className={`min-h-[46px] p-1.5 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
+              activeTab === 'passbook'
+                ? 'bg-gradient-to-b from-blue-600 to-blue-800 text-white shadow-[0_3px_0_#1e3a8a] ring-2 ring-blue-500/50 translate-y-0.5'
+                : 'bg-white text-slate-800 hover:text-blue-700 hover:bg-blue-50 border border-blue-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
+            }`}
+            title="Digital Passbook & Payment History (Pop-up Window)"
+          >
+            <BookOpen className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${activeTab === 'passbook' ? 'text-white' : 'text-blue-600'}`} />
+            <span className="text-[10px] sm:text-xs font-black leading-tight text-center break-words max-w-full">Passbook</span>
+          </button>
+
+          {/* Button 5: Digital ID */}
           <button
             type="button"
             onClick={() => handleSelectTab('idcard')}
-            className={`min-h-[46px] flex items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
+            className={`min-h-[46px] p-1.5 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'idcard'
                 ? 'bg-gradient-to-b from-amber-500 to-amber-700 text-slate-950 shadow-[0_3px_0_#78350f] ring-2 ring-amber-400/50 translate-y-0.5'
                 : 'bg-white text-slate-800 hover:text-amber-800 hover:bg-amber-50 border border-amber-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
             title="Digital ID Card (Pop-up Window)"
           >
-            <CreditCard className={`w-4 h-4 shrink-0 ${activeTab === 'idcard' ? 'text-slate-950' : 'text-amber-600'}`} />
-            <span className="truncate">Digital ID</span>
+            <CreditCard className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${activeTab === 'idcard' ? 'text-slate-950' : 'text-amber-600'}`} />
+            <span className="text-[10px] sm:text-xs font-black leading-tight text-center break-words max-w-full">Digital ID</span>
           </button>
 
-          {/* Button 5: Edit Profile */}
+          {/* Button 6: Edit Profile */}
           <button
             type="button"
             onClick={() => handleSelectTab('profile')}
-            className={`min-h-[46px] flex items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
+            className={`min-h-[46px] p-1.5 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'profile'
                 ? 'bg-gradient-to-b from-[#fb641b] to-[#c2410c] text-white shadow-[0_3px_0_#7c2d12] ring-2 ring-[#fb641b]/50 translate-y-0.5'
                 : 'bg-white text-slate-800 hover:text-[#fb641b] hover:bg-orange-50 border border-orange-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
             title="Edit Profile & Account Settings (Pop-up Window)"
           >
-            <Edit3 className={`w-4 h-4 shrink-0 ${activeTab === 'profile' ? 'text-white' : 'text-[#fb641b]'}`} />
-            <span className="truncate">Edit Profile</span>
+            <Edit3 className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${activeTab === 'profile' ? 'text-white' : 'text-[#fb641b]'}`} />
+            <span className="text-[10px] sm:text-xs font-black leading-tight text-center break-words max-w-full">Edit Profile</span>
           </button>
 
-          {/* Button 6: Support Chat with Live Message Count */}
+          {/* Button 7: Support Chat with Live Message Count */}
           <button
             type="button"
             onClick={() => handleSelectTab('support_chat')}
-            className={`min-h-[46px] flex items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
+            className={`min-h-[46px] p-1.5 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'support_chat'
                 ? 'bg-gradient-to-b from-[#229ed9] to-[#0077b3] text-white shadow-[0_3px_0_#004d73] ring-2 ring-[#229ed9]/50 translate-y-0.5'
                 : 'bg-white text-slate-800 hover:text-[#229ed9] hover:bg-sky-50 border border-sky-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
             title="Admin Support Chat Desk (Pop-up Window)"
           >
-            <MessageCircle className={`w-4 h-4 shrink-0 ${activeTab === 'support_chat' ? 'text-white' : 'text-[#229ed9]'}`} />
-            <span className="truncate">Support Chat</span>
-            <span className={`ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-black shadow-xs ${
-              unreadAdminCount > 0
-                ? 'bg-rose-500 text-white ring-1 ring-white/50 animate-pulse'
-                : 'bg-slate-200 text-slate-700'
-            }`}>
-              {unreadAdminCount}
-            </span>
+            <div className="flex items-center gap-1">
+              <MessageCircle className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${activeTab === 'support_chat' ? 'text-white' : 'text-[#229ed9]'}`} />
+              <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-black shadow-xs ${
+                unreadAdminCount > 0
+                  ? 'bg-rose-500 text-white ring-1 ring-white/50 animate-pulse'
+                  : 'bg-slate-200 text-slate-700'
+              }`}>
+                {unreadAdminCount}
+              </span>
+            </div>
+            <span className="text-[10px] sm:text-xs font-black leading-tight text-center break-words max-w-full">Support Chat</span>
           </button>
 
-          {/* Button 7: Training Kit */}
+          {/* Button 8: Training Kit */}
           <button
             type="button"
             onClick={() => handleSelectTab('kit')}
-            className={`min-h-[46px] flex items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
+            className={`min-h-[46px] p-1.5 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'kit'
                 ? 'bg-gradient-to-b from-teal-600 to-teal-800 text-white shadow-[0_3px_0_#134e4a] ring-2 ring-teal-500/50 translate-y-0.5'
                 : 'bg-white text-slate-800 hover:text-teal-700 hover:bg-teal-50 border border-teal-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
             title="Training Kit & Materials (Pop-up Window)"
           >
-            <BookOpen className={`w-4 h-4 shrink-0 ${activeTab === 'kit' ? 'text-white' : 'text-teal-600'}`} />
-            <span className="truncate">Training Kit</span>
+            <BookOpen className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${activeTab === 'kit' ? 'text-white' : 'text-teal-600'}`} />
+            <span className="text-[10px] sm:text-xs font-black leading-tight text-center break-words max-w-full">Training Kit</span>
           </button>
 
-          {/* Button 8: Student Academy */}
+          {/* Button 9: Student Academy */}
           <button
             type="button"
             onClick={() => handleSelectTab('courses')}
-            className={`min-h-[46px] flex items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
+            className={`min-h-[46px] p-1.5 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-xs font-black rounded-lg transition-all cursor-pointer text-center ${
               activeTab === 'courses'
                 ? 'bg-gradient-to-b from-purple-600 to-purple-800 text-white shadow-[0_3px_0_#581c87] ring-2 ring-purple-500/50 translate-y-0.5'
                 : 'bg-white text-slate-800 hover:text-purple-700 hover:bg-purple-50 border border-purple-200/80 shadow-[0_3px_0_#cbd5e1] active:translate-y-0.5 active:shadow-none'
             }`}
             title="Student Academy & Certification (Pop-up Window)"
           >
-            <GraduationCap className={`w-4 h-4 shrink-0 ${activeTab === 'courses' ? 'text-white' : 'text-purple-600'}`} />
-            <span className="truncate">Student Academy</span>
+            <GraduationCap className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${activeTab === 'courses' ? 'text-white' : 'text-purple-600'}`} />
+            <span className="text-[10px] sm:text-xs font-black leading-tight text-center break-words max-w-full">Student Academy</span>
           </button>
         </div>
       </div>
@@ -2037,7 +2362,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
             {/* Invite Links Bar */}
             <div className="mt-5 pt-4 border-t border-blue-400/30 flex flex-col sm:flex-row items-center gap-3">
               <div className="w-full bg-white text-slate-800 border border-gray-200 rounded-sm px-3 py-2 flex items-center justify-between text-xs">
-                <span className="text-slate-600 truncate mr-2 font-mono-acc">
+                <span className="text-slate-600 break-all mr-2 font-mono-acc">
                   {window.location.origin}/?sponsor={currentUser.accId}
                 </span>
                 <button
@@ -2047,6 +2372,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                   {copiedLink ? 'कॉपी हो गया!' : 'Copy Link'}
                 </button>
               </div>
+
+              <button
+                type="button"
+                onClick={() => setShowAddMemberModal(true)}
+                className="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-black text-xs rounded-sm shrink-0 flex items-center justify-center gap-2 transition shadow-md cursor-pointer"
+              >
+                <UserPlus className="w-4 h-4 text-yellow-200" />
+                <span>➕ अपने नीचे नया सदस्य जोड़ें</span>
+              </button>
 
               <button
                 onClick={handleShareWhatsApp}
@@ -2090,9 +2424,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                     key={r.id}
                     className="bg-slate-50 border border-gray-200 rounded-lg p-3.5 text-xs space-y-1.5"
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-900 truncate">{r.referredName}</span>
-                      <span className="text-emerald-700 font-bold font-mono-acc">+₹{r.bonusAmount}</span>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-slate-900 break-words leading-tight">{r.referredName}</span>
+                      <span className="text-emerald-700 font-bold font-mono-acc shrink-0">+₹{r.bonusAmount}</span>
                     </div>
                     <p className="font-mono-acc text-[#2874f0] text-[11px] font-semibold">{r.referredAccId}</p>
                     <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-gray-200">
@@ -2995,10 +3329,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
           {/* REAL AD-FREE VIDEO PLAYER WINDOW */}
           <div className="bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl space-y-0">
             {/* Player Top Meta Bar */}
-            <div className="bg-slate-900/90 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between text-xs text-slate-300">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="font-bold text-white text-[12px] truncate max-w-xs sm:max-w-md">
+            <div className="bg-slate-900/90 px-3 sm:px-4 py-2 sm:py-2.5 border-b border-slate-800 flex items-center justify-between gap-2 text-xs text-slate-300">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <span className="font-bold text-white text-[11px] sm:text-[12px] break-words leading-tight">
                   {currentLessonIdx === 0
                     ? 'क्लास 1: SWIS 3.30% मोबाइल रिचार्ज एवं बचत मास्टरक्लास'
                     : currentLessonIdx === 1
@@ -3389,131 +3723,926 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
           />
         </div>
       )}
+
+      {/* TAB 9: PASSBOOK & FINANCIAL STATEMENT (डिजिटल पासबुक) */}
+      {activeTab === 'passbook' && (
+        <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-5 shadow-sm space-y-4 sm:space-y-5 animate-fadeIn">
+          {/* Bank-Grade Official Certified Passbook Certificate Header */}
+          <div className="relative overflow-hidden rounded-xl border-2 border-blue-600 bg-gradient-to-br from-[#0c2340] via-[#123962] to-[#1c52b8] text-white p-3.5 sm:p-5 shadow-md">
+            {/* Background Bank Seal Watermark */}
+            <div className="absolute -right-8 -bottom-8 opacity-10 pointer-events-none text-white select-none">
+              <BookOpen className="w-48 h-48" />
+            </div>
+
+            <div className="relative z-10 space-y-3">
+              {/* Top Row: Bank Identity & Seal */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/15 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-lg bg-white/15 border border-white/30 flex items-center justify-center shrink-0 shadow-inner">
+                    <BookOpen className="w-5 h-5 text-yellow-300" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] font-black tracking-widest text-yellow-300 uppercase">
+                        ACHIEVERS CLUB INDIA DIGITAL CORE
+                      </span>
+                      <span className="text-[9px] bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 px-1.5 py-0.2 rounded font-bold">
+                        ✓ 100% वास्तविक लेजर
+                      </span>
+                    </div>
+                    <h3 className="text-sm sm:text-base font-black text-white leading-tight">
+                      आधिकारिक सदस्य डिजिटल पासबुक (Official Passbook Statement)
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="px-2.5 py-1 bg-white/15 hover:bg-white/25 border border-white/20 text-white text-[11px] font-bold rounded-lg flex items-center gap-1 transition cursor-pointer"
+                    title="पासबुक स्टेटमेंट प्रिंट करें"
+                  >
+                    <Printer className="w-3 h-3 text-yellow-300" />
+                    <span>प्रिंट</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWithdrawModalTab('request');
+                      setShowWithdrawModal(true);
+                    }}
+                    className="px-3 py-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-[11px] font-black rounded-lg shadow-sm flex items-center gap-1 transition cursor-pointer"
+                  >
+                    <ArrowUpRight className="w-3 h-3" />
+                    <span>निकासी अनुरोध</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Passbook Front Leaf: Member Account Particulars */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 text-[11px]">
+                <div className="bg-white/10 rounded-lg p-2 border border-white/10">
+                  <span className="text-[9.5px] text-blue-200 block uppercase font-bold tracking-wider">
+                    खाताधारक नाम
+                  </span>
+                  <span className="font-bold text-white text-xs block break-words leading-tight mt-0.5" title={currentUser.fullName}>
+                    {currentUser.fullName}
+                  </span>
+                  <span className="text-[9px] text-slate-300 block">अधिकृत पंजीकृत सदस्य</span>
+                </div>
+
+                <div className="bg-white/10 rounded-lg p-2 border border-white/10">
+                  <span className="text-[9.5px] text-blue-200 block uppercase font-bold tracking-wider">
+                    खाता क्रमांक (ACC ID)
+                  </span>
+                  <span className="font-mono-acc font-black text-yellow-300 text-xs block mt-0.5">
+                    {currentUser.accId}
+                  </span>
+                  <span className="text-[9px] text-slate-300 block">IFSC: ACCB0000249</span>
+                </div>
+
+                <div className="bg-white/10 rounded-lg p-2 border border-white/10">
+                  <span className="text-[9.5px] text-blue-200 block uppercase font-bold tracking-wider">
+                    सक्रिय इनकम प्लान
+                  </span>
+                  <span className="font-bold text-emerald-300 text-xs block mt-0.5">
+                    {currentUser.plan} सिस्टम (SWIS / TWIS)
+                  </span>
+                  <span className="text-[9px] text-slate-300 block">लाइफटाइम वैलिडिटी</span>
+                </div>
+
+                <div className="bg-white/10 rounded-lg p-2 border border-white/10">
+                  <span className="text-[9.5px] text-blue-200 block uppercase font-bold tracking-wider">
+                    भुगतान UPI / खाता
+                  </span>
+                  <span className="font-mono-acc font-bold text-white text-[10px] sm:text-[10.5px] block break-all leading-tight mt-0.5" title={currentUser.payoutDetails?.upiId || 'विवरण जोड़े'}>
+                    {currentUser.payoutDetails?.upiId || 'अपडेट नहीं'}
+                  </span>
+                  <span className="text-[9px] text-emerald-300 block">✓ सत्यापित निकासी माध्यम</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 3 Real-time Financial Ledger Metric Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+            {/* Total Credits */}
+            <div className="bg-gradient-to-br from-emerald-50 to-green-100/60 border border-emerald-200 rounded-xl p-3 sm:p-3.5 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10.5px] font-black text-emerald-900 uppercase tracking-wider">
+                  🟢 कुल जमा (Total Added)
+                </span>
+                <div className="w-6 h-6 rounded-md bg-emerald-600 text-white flex items-center justify-center shadow-2xs">
+                  <TrendingUp className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <span className="font-mono-acc font-black text-xl sm:text-2xl text-emerald-700 block mt-1.5 tabular-nums">
+                +₹{totalAddedAmount.toFixed(2)}
+              </span>
+              <span className="text-[10px] text-emerald-800 font-medium block mt-0.5">
+                SWIS 3.30% रिचार्ज कमीशन व TWIS ₹150 रेफरल बोनस
+              </span>
+            </div>
+
+            {/* Total Debits */}
+            <div className="bg-gradient-to-br from-rose-50 to-red-100/60 border border-rose-200 rounded-xl p-3 sm:p-3.5 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10.5px] font-black text-rose-900 uppercase tracking-wider">
+                  🔴 कुल निकासी (Total Withdrawn)
+                </span>
+                <div className="w-6 h-6 rounded-md bg-rose-600 text-white flex items-center justify-center shadow-2xs">
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <span className="font-mono-acc font-black text-xl sm:text-2xl text-rose-700 block mt-1.5 tabular-nums">
+                -₹{totalWithdrawnAmount.toFixed(2)}
+              </span>
+              <span className="text-[10px] text-rose-800 font-medium block mt-0.5">
+                स्वीकृत एवं बैंक/UPI में प्रेषित कुल निकासी
+              </span>
+            </div>
+
+            {/* Live Wallet Balance */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-100/60 border border-blue-200 rounded-xl p-3 sm:p-3.5 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10.5px] font-black text-blue-900 uppercase tracking-wider">
+                  💳 वर्तमान शुद्ध शेष (Live Balance)
+                </span>
+                <div className="w-6 h-6 rounded-md bg-[#2874f0] text-white flex items-center justify-center shadow-2xs">
+                  <Wallet className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <span className="font-mono-acc font-black text-xl sm:text-2xl text-[#2874f0] block mt-1.5 tabular-nums">
+                ₹{currentUser.walletBalance.toFixed(2)}
+              </span>
+              <span className="text-[10px] text-blue-800 font-medium block mt-0.5">
+                तत्काल निकासी योग्य शुद्ध उपलब्ध राशि
+              </span>
+            </div>
+          </div>
+
+          {/* Filter Pills */}
+          <div className="flex items-center justify-between gap-2 flex-wrap border-b border-gray-100 pb-2.5">
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setPassbookFilter('ALL')}
+                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition cursor-pointer ${
+                  passbookFilter === 'ALL'
+                    ? 'bg-[#2874f0] text-white shadow-2xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                सभी प्रविष्टियां ({passbookEntries.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPassbookFilter('CREDIT')}
+                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                  passbookFilter === 'CREDIT'
+                    ? 'bg-emerald-600 text-white shadow-2xs'
+                    : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
+                }`}
+              >
+                <span>🟢 जमा (+)</span>
+                <span className="text-[10px] opacity-90 font-mono">
+                  ({passbookEntries.filter((e) => e.type === 'CREDIT').length})
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPassbookFilter('DEBIT')}
+                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                  passbookFilter === 'DEBIT'
+                    ? 'bg-rose-600 text-white shadow-2xs'
+                    : 'bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200'
+                }`}
+              >
+                <span>🔴 निकासी (-)</span>
+                <span className="text-[10px] opacity-90 font-mono">
+                  ({passbookEntries.filter((e) => e.type === 'DEBIT').length})
+                </span>
+              </button>
+            </div>
+
+            <span className="text-[10.5px] text-slate-500 font-mono-acc">
+              दिखाई गई प्रविष्टियां: <strong className="text-slate-800">{filteredPassbookEntries.length}</strong>
+            </span>
+          </div>
+
+          {/* Real Passbook Entries: Responsive Mobile Cards + Desktop Table */}
+          {filteredPassbookEntries.length === 0 ? (
+            /* Authentic Zero Fake Empty State */
+            <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl p-5 text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-blue-100 text-[#2874f0] flex items-center justify-center mx-auto shadow-inner">
+                <ShieldCheck className="w-6 h-6 text-[#2874f0]" />
+              </div>
+              <div className="max-w-md mx-auto space-y-1">
+                <h4 className="font-bold text-slate-900 text-sm">
+                  खाता सक्रिय है • अभी तक कोई लेनदेन दर्ज नहीं हुआ है
+                </h4>
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  यह एक <strong>100% वास्तविक लेजर पासबुक</strong> है जिसमें कोई भी कृत्रिम या फ़ेक एंट्री नहीं दिखाई जाती। जैसे ही आप पहला मोबाइल/DTH रिचार्ज करेंगे या किसी नए साथी को रेफर करेंगे, कमीशन रियल-टाइम में यहाँ स्वतः दर्ज हो जाएगा।
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('swis')}
+                  className="px-3.5 py-1.5 bg-[#2874f0] hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Zap className="w-3.5 h-3.5 text-yellow-300" />
+                  <span>⚡ SWIS रिचार्ज करें (3.30% कमीशन)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('twis')}
+                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>👥 TWIS रेफर करें (₹150 बोनस)</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Mobile Card View (< md) for crystal-clear readability without horizontal overflow */}
+              <div className="block md:hidden space-y-2.5">
+                {filteredPassbookEntries.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs space-y-2 hover:border-blue-300 transition"
+                  >
+                    <div className="flex items-start justify-between gap-2 border-b border-gray-100 pb-2">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`w-2 h-2 rounded-full shrink-0 ${
+                              entry.type === 'CREDIT' ? 'bg-emerald-500' : 'bg-rose-500'
+                            }`}
+                          />
+                          <span className="font-bold text-xs text-slate-900 leading-snug">{entry.title}</span>
+                        </div>
+                        <p className="text-[10px] text-slate-500">{entry.description}</p>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <span
+                          className={`font-mono-acc font-black text-sm block ${
+                            entry.type === 'CREDIT' ? 'text-emerald-600' : 'text-rose-600'
+                          }`}
+                        >
+                          {entry.type === 'CREDIT' ? '+' : '-'}₹{entry.amount.toFixed(2)}
+                        </span>
+                        <span
+                          className={`text-[9px] font-bold uppercase ${
+                            entry.type === 'CREDIT' ? 'text-emerald-700' : 'text-rose-700'
+                          }`}
+                        >
+                          {entry.type === 'CREDIT' ? 'जमा (Credit)' : 'निकासी (Debit)'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono-acc">
+                          {new Date(entry.timestamp).toLocaleDateString('hi-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                          })}{' '}
+                          •{' '}
+                          {new Date(entry.timestamp).toLocaleTimeString('hi-IN', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: true,
+                          })}
+                        </span>
+                        {entry.referenceId && (
+                          <span className="font-mono-acc bg-slate-100 px-1.5 py-0.2 rounded text-slate-600 border border-slate-200">
+                            {entry.referenceId}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono-acc font-bold text-slate-700 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
+                          शेष: ₹{entry.balanceAfter.toFixed(2)}
+                        </span>
+                        {entry.status === 'COMPLETED' ? (
+                          <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                            ✓ सफ़ल
+                          </span>
+                        ) : entry.status === 'PENDING' ? (
+                          <span className="text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                            ⏳ लंबित
+                          </span>
+                        ) : (
+                          <span className="text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                            ✕ अस्वीकृत
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table View (>= md) */}
+              <div className="hidden md:block overflow-x-auto border border-gray-200 rounded-xl shadow-2xs">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-[#f8f9fa] text-slate-700 border-b border-gray-200 font-bold uppercase tracking-wider text-[10.5px]">
+                      <th className="py-2.5 px-3">दिनांक व समय</th>
+                      <th className="py-2.5 px-3">विवरण एवं श्रेणी</th>
+                      <th className="py-2.5 px-3">संदर्भ / UTR ID</th>
+                      <th className="py-2.5 px-3 text-right">प्रकार व राशि</th>
+                      <th className="py-2.5 px-3 text-right">लेनदेन बाद शेष</th>
+                      <th className="py-2.5 px-3 text-center">स्थिति</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {filteredPassbookEntries.map((entry) => (
+                      <tr key={entry.id} className="hover:bg-slate-50 transition">
+                        <td className="py-2.5 px-3 text-slate-600 font-mono-acc whitespace-nowrap text-[11px]">
+                          <div>
+                            {new Date(entry.timestamp).toLocaleDateString('hi-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })}
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            {new Date(entry.timestamp).toLocaleTimeString('hi-IN', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: true,
+                            })}
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                entry.type === 'CREDIT' ? 'bg-emerald-500' : 'bg-rose-500'
+                              }`}
+                            />
+                            <span>{entry.title}</span>
+                          </div>
+                          <p className="text-[10.5px] text-slate-500 mt-0.5">{entry.description}</p>
+                        </td>
+                        <td className="py-2.5 px-3 font-mono-acc text-[11px] text-slate-600 whitespace-nowrap">
+                          {entry.referenceId ? (
+                            <div className="flex items-center gap-1">
+                              <span>{entry.referenceId}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(entry.referenceId!);
+                                  alert('रेफरेंस ID कॉपी हो गई: ' + entry.referenceId);
+                                }}
+                                className="text-slate-400 hover:text-[#2874f0] p-0.5"
+                                title="कॉपी करें"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono-acc whitespace-nowrap">
+                          <span
+                            className={`font-black text-sm ${
+                              entry.type === 'CREDIT' ? 'text-emerald-600' : 'text-rose-600'
+                            }`}
+                          >
+                            {entry.type === 'CREDIT' ? '+' : '-'}₹{entry.amount.toFixed(2)}
+                          </span>
+                          <span
+                            className={`block text-[9px] font-bold uppercase tracking-wider ${
+                              entry.type === 'CREDIT' ? 'text-emerald-700' : 'text-rose-700'
+                            }`}
+                          >
+                            {entry.type === 'CREDIT' ? 'जमा (Credit)' : 'निकासी (Debit)'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono-acc font-bold text-slate-800 text-[11.5px] whitespace-nowrap">
+                          ₹{entry.balanceAfter.toFixed(2)}
+                        </td>
+                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                          {entry.status === 'COMPLETED' ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-bold border border-emerald-200">
+                              <CheckCircle2 className="w-3 h-3" /> सफ़ल
+                            </span>
+                          ) : entry.status === 'PENDING' ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] bg-amber-50 text-amber-800 px-2 py-0.5 rounded font-bold border border-amber-200">
+                              <Clock className="w-3 h-3" /> लंबित
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] bg-rose-50 text-rose-700 px-2 py-0.5 rounded font-bold border border-rose-200">
+                              <AlertCircle className="w-3 h-3" /> अस्वीकृत
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
       </div>
 
-      {/* Withdrawal Modal - Flipkart Style */}
+      {/* ========================================================================= */}
+      {/* COMPLETE PASSBOOK & WITHDRAWAL HUB MODAL (डिजिटल पासबुक एवं निकासी केंद्र) */}
+      {/* ========================================================================= */}
       {showWithdrawModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
-          <div className="w-full max-w-md bg-white border border-gray-200 rounded-xl p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <div className="flex items-center gap-2">
-                <Wallet className="w-5 h-5 text-[#2874f0]" />
-                <h3 className="text-base font-bold text-slate-900">वॉलेट निकासी अनुरोध (UPI Payout)</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fadeIn overflow-y-auto">
+          <div className="w-full max-w-3xl bg-white border border-gray-200 rounded-2xl shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col animate-scaleUp text-slate-900">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-[#2874f0] via-[#1c52b8] to-[#124296] text-white p-4 sm:p-5 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center text-white shrink-0">
+                  <BookOpen className="w-5 h-5 text-yellow-300" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white leading-tight">
+                    डिजिटल पासबुक एवं वॉलेट निकासी (Digital Passbook)
+                  </h3>
+                  <p className="text-xs text-blue-100 flex items-center gap-1.5 mt-0.5">
+                    <span>खाता: {currentUser.fullName}</span>
+                    <span>•</span>
+                    <span className="font-mono">{currentUser.accId}</span>
+                  </p>
+                </div>
               </div>
+
               <button
+                type="button"
                 onClick={() => setShowWithdrawModal(false)}
-                className="text-slate-400 hover:text-slate-700 text-xs font-bold px-2 py-1 rounded"
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white text-base transition cursor-pointer"
+                title="बंद करें"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleRequestWithdrawal} className="space-y-4 text-xs">
-              <div className="bg-[#f1f2f4] p-3 rounded-lg border border-gray-200">
-                <span className="text-slate-600 block">उपलब्ध वॉलेट बैलेंस:</span>
-                <span className="font-mono-acc font-bold text-lg text-emerald-700 tabular-nums">
+            {/* Modal Subtabs Switcher */}
+            <div className="flex items-center border-b border-gray-200 bg-slate-50 px-4 pt-2 gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setWithdrawModalTab('passbook')}
+                className={`py-2 px-3 text-xs font-bold rounded-t-lg transition border-b-2 flex items-center gap-1.5 cursor-pointer ${
+                  withdrawModalTab === 'passbook'
+                    ? 'bg-white text-[#2874f0] border-[#2874f0] shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900 border-transparent'
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>📖 पासबुक लेजर ({passbookEntries.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setWithdrawModalTab('request')}
+                className={`py-2 px-3 text-xs font-bold rounded-t-lg transition border-b-2 flex items-center gap-1.5 cursor-pointer ${
+                  withdrawModalTab === 'request'
+                    ? 'bg-white text-[#2874f0] border-[#2874f0] shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900 border-transparent'
+                }`}
+              >
+                <ArrowUpRight className="w-3.5 h-3.5" />
+                <span>💸 नई निकासी का अनुरोध</span>
+                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold">
                   ₹{currentUser.walletBalance.toFixed(2)}
                 </span>
-                <span className="text-[10px] text-slate-500 block mt-0.5">न्यूनतम निकासी: ₹100</span>
-              </div>
+              </button>
+            </div>
 
-              {/* Registered Payout Account Badge */}
-              {currentUser.payoutDetails && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-emerald-950 flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>
-                        {currentUser.payoutDetails.holderRelation === 'Father'
-                          ? '👨 पंजीकृत खाता: पिताजी का खाता'
-                          : currentUser.payoutDetails.holderRelation === 'Mother'
-                          ? '👩 पंजीकृत खाता: माताजी का खाता'
-                          : currentUser.payoutDetails.holderRelation === 'Guardian'
-                          ? '🛡️ पंजीकृत खाता: अभिभावक का खाता'
-                          : '👦 पंजीकृत खाता: खुद का खाता'}
+            {/* Modal Scrollable Body */}
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-5 text-xs flex-1">
+              {/* TAB 1: PASSBOOK LEDGER */}
+              {withdrawModalTab === 'passbook' && (
+                <div className="space-y-3.5">
+                  {/* Mini Official Passbook Header */}
+                  <div className="rounded-xl border border-blue-600/60 bg-gradient-to-r from-[#0c2340] to-[#1a4a8d] text-white p-3 shadow-xs">
+                    <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-2">
+                      <div className="flex items-center gap-2">
+                        <BookOpen className="w-4 h-4 text-yellow-300 shrink-0" />
+                        <div>
+                          <span className="text-[9.5px] font-black tracking-wider text-yellow-300 uppercase block">
+                            ACC DIGITAL PASSBOOK • IFSC: ACCB0000249
+                          </span>
+                          <span className="text-xs font-bold text-white block">
+                            खाता: {currentUser.fullName} ({currentUser.accId})
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[9px] bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 px-1.5 py-0.2 rounded font-bold shrink-0">
+                        ✓ 100% वास्तविक लेजर
                       </span>
-                    </span>
-                    {currentUser.payoutDetails.upiId && withdrawUpi !== currentUser.payoutDetails.upiId && (
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[10px] pt-2">
+                      <div>
+                        <span className="text-blue-200 block">सक्रिय प्लान:</span>
+                        <strong className="text-emerald-300 font-bold">{currentUser.plan} सिस्टम</strong>
+                      </div>
+                      <div>
+                        <span className="text-blue-200 block">UPI / निकासी खाता:</span>
+                        <strong className="text-white font-mono-acc break-all leading-tight block">{currentUser.payoutDetails?.upiId || 'अपडेट नहीं'}</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Summary Metric Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 shadow-2xs">
+                      <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider block">
+                        🟢 कुल जमा (Credits)
+                      </span>
+                      <span className="font-mono-acc font-black text-lg text-emerald-700 block mt-0.5">
+                        +₹{totalAddedAmount.toFixed(2)}
+                      </span>
+                      <span className="text-[9px] text-emerald-800 block mt-0.5">रिचार्ज कमीशन व रेफरल बोनस</span>
+                    </div>
+
+                    <div className="bg-rose-50 border border-rose-200 rounded-xl p-2.5 shadow-2xs">
+                      <span className="text-[10px] font-black text-rose-800 uppercase tracking-wider block">
+                        🔴 कुल निकासी (Debits)
+                      </span>
+                      <span className="font-mono-acc font-black text-lg text-rose-700 block mt-0.5">
+                        -₹{totalWithdrawnAmount.toFixed(2)}
+                      </span>
+                      <span className="text-[9px] text-rose-800 block mt-0.5">स्वीकृत UPI/बैंक ट्रांसफर</span>
+                    </div>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-2.5 shadow-2xs">
+                      <span className="text-[10px] font-black text-blue-900 uppercase tracking-wider block">
+                        💳 वर्तमान शुद्ध बैलेंस
+                      </span>
+                      <span className="font-mono-acc font-black text-lg text-[#2874f0] block mt-0.5">
+                        ₹{currentUser.walletBalance.toFixed(2)}
+                      </span>
+                      <span className="text-[9px] text-blue-800 block mt-0.5">तुरंत निकासी योग्य शेष</span>
+                    </div>
+                  </div>
+
+                  {/* Filter pills & Print Button */}
+                  <div className="flex items-center justify-between gap-2 flex-wrap border-b border-gray-100 pb-2">
+                    <div className="flex items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => setWithdrawUpi(currentUser.payoutDetails!.upiId!)}
-                        className="text-[10px] bg-white border border-emerald-300 text-emerald-800 font-bold px-2 py-0.5 rounded shadow-xs"
+                        onClick={() => setPassbookFilter('ALL')}
+                        className={`px-2.5 py-1 text-[10.5px] font-bold rounded-lg transition cursor-pointer ${
+                          passbookFilter === 'ALL'
+                            ? 'bg-[#2874f0] text-white shadow-2xs'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        }`}
                       >
-                        पंजीकृत UPI भरें
+                        सभी ({passbookEntries.length})
                       </button>
-                    )}
+                      <button
+                        type="button"
+                        onClick={() => setPassbookFilter('CREDIT')}
+                        className={`px-2 py-1 text-[10.5px] font-bold rounded-lg transition cursor-pointer ${
+                          passbookFilter === 'CREDIT'
+                            ? 'bg-emerald-600 text-white shadow-2xs'
+                            : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                        }`}
+                      >
+                        🟢 जमा ({passbookEntries.filter((e) => e.type === 'CREDIT').length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPassbookFilter('DEBIT')}
+                        className={`px-2 py-1 text-[10.5px] font-bold rounded-lg transition cursor-pointer ${
+                          passbookFilter === 'DEBIT'
+                            ? 'bg-rose-600 text-white shadow-2xs'
+                            : 'bg-rose-50 text-rose-800 border border-rose-200'
+                        }`}
+                      >
+                        🔴 निकासी ({passbookEntries.filter((e) => e.type === 'DEBIT').length})
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => window.print()}
+                        className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-bold text-[10.5px] flex items-center gap-1 transition"
+                      >
+                        <Printer className="w-3 h-3" />
+                        <span>प्रिंट</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setWithdrawModalTab('request')}
+                        className="px-2.5 py-1 bg-[#2874f0] hover:bg-blue-700 text-white rounded-md font-bold text-[10.5px] flex items-center gap-1 transition shadow-xs"
+                      >
+                        <ArrowUpRight className="w-3 h-3" />
+                        <span>निकासी फॉर्म</span>
+                      </button>
+                    </div>
                   </div>
-                  <div className="text-[11px] text-slate-700">
-                    लाभार्थी: <strong>{currentUser.payoutDetails.holderName}</strong>
-                    {currentUser.payoutDetails.upiId && (
-                      <span className="font-mono-acc ml-1 text-emerald-800 font-semibold">
-                        ({currentUser.payoutDetails.upiId})
+
+                  {/* Real Entries or Authentic Zero Fake Empty State */}
+                  {filteredPassbookEntries.length === 0 ? (
+                    <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl p-4 text-center space-y-2.5">
+                      <div className="w-10 h-10 rounded-full bg-blue-100 text-[#2874f0] flex items-center justify-center mx-auto">
+                        <ShieldCheck className="w-5 h-5 text-[#2874f0]" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <strong className="text-slate-900 text-xs block">खाता सक्रिय है • कोई फ़ेक प्रविष्टि नहीं</strong>
+                        <p className="text-[10.5px] text-slate-500 leading-relaxed max-w-sm mx-auto">
+                          जैसे ही आप पहला SWIS रिचार्ज या TWIS रेफरल करेंगे, वह वास्तविक प्रविष्टि यहाँ तुरंत दर्ज होगी।
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowWithdrawModal(false);
+                            setActiveTab('swis');
+                          }}
+                          className="px-3 py-1 bg-[#2874f0] hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg shadow-2xs flex items-center gap-1 transition"
+                        >
+                          <Zap className="w-3 h-3 text-yellow-300" />
+                          <span>रिचार्ज करें (3.30%)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowWithdrawModal(false);
+                            setActiveTab('twis');
+                          }}
+                          className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg shadow-2xs flex items-center gap-1 transition"
+                        >
+                          <Users className="w-3 h-3" />
+                          <span>रेफर करें (₹150)</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Mobile Cards View */}
+                      <div className="block md:hidden space-y-2">
+                        {filteredPassbookEntries.map((e) => (
+                          <div
+                            key={e.id}
+                            className="bg-white border border-gray-200 rounded-lg p-2.5 shadow-2xs space-y-1.5"
+                          >
+                            <div className="flex items-start justify-between gap-1.5 border-b border-gray-100 pb-1.5">
+                              <div>
+                                <span className="font-bold text-slate-900 text-[11px] block">{e.title}</span>
+                                <span className="text-[9.5px] text-slate-500">{e.description}</span>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <span
+                                  className={`font-mono-acc font-black text-xs block ${
+                                    e.type === 'CREDIT' ? 'text-emerald-600' : 'text-rose-600'
+                                  }`}
+                                >
+                                  {e.type === 'CREDIT' ? '+' : '-'}₹{e.amount.toFixed(2)}
+                                </span>
+                                <span className="text-[8.5px] text-slate-400 font-bold uppercase">
+                                  {e.type === 'CREDIT' ? 'जमा' : 'निकासी'}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between text-[9.5px] text-slate-500">
+                              <span className="font-mono-acc">
+                                {new Date(e.timestamp).toLocaleDateString('hi-IN', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                })}{' '}
+                                • {e.referenceId || '-'}
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <span className="font-mono-acc font-bold text-slate-700 bg-slate-50 px-1 py-0.2 rounded border border-slate-200">
+                                  शेष: ₹{e.balanceAfter.toFixed(2)}
+                                </span>
+                                <span
+                                  className={`px-1 py-0.2 rounded font-bold ${
+                                    e.status === 'COMPLETED'
+                                      ? 'text-emerald-700 bg-emerald-50'
+                                      : e.status === 'PENDING'
+                                      ? 'text-amber-700 bg-amber-50'
+                                      : 'text-rose-700 bg-rose-50'
+                                  }`}
+                                >
+                                  {e.status === 'COMPLETED' ? '✓ सफ़ल' : e.status === 'PENDING' ? '⏳ लंबित' : '✕ अस्वीकृत'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Desktop Table View */}
+                      <div className="hidden md:block overflow-x-auto border border-gray-200 rounded-xl">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-[#f8f9fa] text-slate-700 border-b border-gray-200 font-bold uppercase text-[10px]">
+                              <th className="py-2 px-2.5">दिनांक</th>
+                              <th className="py-2 px-2.5">विवरण</th>
+                              <th className="py-2 px-2.5">रेफरेंस UTR</th>
+                              <th className="py-2 px-2.5 text-right">राशि</th>
+                              <th className="py-2 px-2.5 text-right">शेष राशि</th>
+                              <th className="py-2 px-2.5 text-center">स्थिति</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 bg-white">
+                            {filteredPassbookEntries.map((e) => (
+                              <tr key={e.id} className="hover:bg-slate-50">
+                                <td className="py-2 px-2.5 font-mono-acc text-[10.5px] whitespace-nowrap text-slate-600">
+                                  {new Date(e.timestamp).toLocaleDateString('hi-IN', {
+                                    day: 'numeric',
+                                    month: 'short',
+                                    year: 'numeric',
+                                  })}
+                                </td>
+                                <td className="py-2 px-2.5">
+                                  <strong className="text-slate-900 block text-[11px]">{e.title}</strong>
+                                  <span className="text-[10px] text-slate-500">{e.description}</span>
+                                </td>
+                                <td className="py-2 px-2.5 font-mono-acc text-[10px] text-slate-500 whitespace-nowrap">
+                                  {e.referenceId || '-'}
+                                </td>
+                                <td className="py-2 px-2.5 text-right font-mono-acc whitespace-nowrap">
+                                  <span
+                                    className={`font-black text-xs ${
+                                      e.type === 'CREDIT' ? 'text-emerald-600' : 'text-rose-600'
+                                    }`}
+                                  >
+                                    {e.type === 'CREDIT' ? '+' : '-'}₹{e.amount.toFixed(2)}
+                                  </span>
+                                </td>
+                                <td className="py-2 px-2.5 text-right font-mono-acc font-bold text-slate-800 text-[11px] whitespace-nowrap">
+                                  ₹{e.balanceAfter.toFixed(2)}
+                                </td>
+                                <td className="py-2 px-2.5 text-center whitespace-nowrap">
+                                  {e.status === 'COMPLETED' ? (
+                                    <span className="text-[9.5px] bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded font-bold border border-emerald-200">
+                                      सफ़ल
+                                    </span>
+                                  ) : e.status === 'PENDING' ? (
+                                    <span className="text-[9.5px] bg-amber-50 text-amber-800 px-1.5 py-0.2 rounded font-bold border border-amber-200">
+                                      लंबित
+                                    </span>
+                                  ) : (
+                                    <span className="text-[9.5px] bg-rose-50 text-rose-700 px-1.5 py-0.2 rounded font-bold border border-rose-200">
+                                      अस्वीकृत
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 2: REQUEST WITHDRAWAL FORM */}
+              {withdrawModalTab === 'request' && (
+                <form onSubmit={handleRequestWithdrawal} className="space-y-4">
+                  <div className="bg-[#f1f2f4] p-3 rounded-lg border border-gray-200 flex items-center justify-between">
+                    <div>
+                      <span className="text-slate-600 block text-[11px]">उपलब्ध निकासी बैलेंस:</span>
+                      <span className="font-mono-acc font-black text-2xl text-emerald-700 tabular-nums">
+                        ₹{currentUser.walletBalance.toFixed(2)}
                       </span>
-                    )}
+                    </div>
+                    <span className="text-[10.5px] bg-white border border-gray-200 text-slate-700 px-2 py-1 rounded font-bold">
+                      न्यूनतम निकासी: ₹100
+                    </span>
                   </div>
-                </div>
+
+                  {/* Registered Payout Account Badge */}
+                  {currentUser.payoutDetails && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-emerald-950 flex items-center gap-1">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>
+                            {currentUser.payoutDetails.holderRelation === 'Father'
+                              ? '👨 पंजीकृत खाता: पिताजी का खाता'
+                              : currentUser.payoutDetails.holderRelation === 'Mother'
+                              ? '👩 पंजीकृत खाता: माताजी का खाता'
+                              : currentUser.payoutDetails.holderRelation === 'Guardian'
+                              ? '🛡️ पंजीकृत खाता: अभिभावक का खाता'
+                              : '👦 पंजीकृत खाता: खुद का खाता'}
+                          </span>
+                        </span>
+                        {currentUser.payoutDetails.upiId && withdrawUpi !== currentUser.payoutDetails.upiId && (
+                          <button
+                            type="button"
+                            onClick={() => setWithdrawUpi(currentUser.payoutDetails!.upiId!)}
+                            className="text-[10px] bg-white border border-emerald-300 text-emerald-800 font-bold px-2 py-0.5 rounded shadow-xs"
+                          >
+                            पंजीकृत UPI भरें
+                          </button>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-700">
+                        लाभार्थी: <strong>{currentUser.payoutDetails.holderName}</strong>
+                        {currentUser.payoutDetails.upiId && (
+                          <span className="font-mono-acc ml-1 text-emerald-800 font-semibold">
+                            ({currentUser.payoutDetails.upiId})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-slate-800 font-semibold mb-1">
+                      निकासी राशि (₹) *
+                    </label>
+                    <input
+                      type="number"
+                      min="100"
+                      max={currentUser.walletBalance}
+                      value={withdrawAmount}
+                      onChange={(e) => setWithdrawAmount(Number(e.target.value))}
+                      className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-slate-900 font-mono-acc text-sm focus:border-[#2874f0] focus:ring-1 focus:ring-[#2874f0] outline-none"
+                      required
+                    />
+                    <div className="flex items-center gap-1.5 mt-2">
+                      {[100, 200, 500, 1000].map((amt) => (
+                        <button
+                          key={amt}
+                          type="button"
+                          onClick={() => setWithdrawAmount(Math.min(currentUser.walletBalance, amt))}
+                          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-mono-acc font-bold rounded"
+                        >
+                          ₹{amt}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setWithdrawAmount(currentUser.walletBalance)}
+                        className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-[#2874f0] text-[11px] font-mono-acc font-bold rounded"
+                      >
+                        पूरा बैलेंस (₹{currentUser.walletBalance.toFixed(0)})
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-800 font-semibold mb-1">
+                      आपकी UPI ID (जिसमें पैसे प्राप्त करने हैं) *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="उदा: 8877490845@paytm या yourname@oksbi"
+                      value={withdrawUpi}
+                      onChange={(e) => setWithdrawUpi(e.target.value)}
+                      className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-slate-900 font-mono-acc text-xs focus:border-[#2874f0] focus:ring-1 focus:ring-[#2874f0] outline-none"
+                      required
+                    />
+                  </div>
+
+                  {withdrawError && (
+                    <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{withdrawError}</span>
+                    </div>
+                  )}
+
+                  {withdrawMsg && (
+                    <div className="p-3 bg-green-50 border border-green-200 text-emerald-800 rounded-lg text-xs flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      <span>{withdrawMsg}</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setWithdrawModalTab('passbook')}
+                      className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition"
+                    >
+                      वापस पासबुक देखें
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={currentUser.walletBalance < 100}
+                      className="flex-1 py-2.5 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold rounded-lg transition disabled:opacity-50 shadow-sm"
+                    >
+                      निकासी सबमिट करें
+                    </button>
+                  </div>
+                </form>
               )}
-
-              <div>
-                <label className="block text-slate-800 font-semibold mb-1">
-                  निकासी राशि (₹) *
-                </label>
-                <input
-                  type="number"
-                  min="100"
-                  max={currentUser.walletBalance}
-                  value={withdrawAmount}
-                  onChange={(e) => setWithdrawAmount(Number(e.target.value))}
-                  className="w-full bg-white border border-gray-300 rounded-sm px-3 py-2 text-slate-900 font-mono-acc text-sm focus:border-[#2874f0] focus:ring-1 focus:ring-[#2874f0] outline-none"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-800 font-semibold mb-1">
-                  आपकी UPI ID (जिसमें पैसे प्राप्त करने हैं) *
-                </label>
-                <input
-                  type="text"
-                  placeholder="उदा: 8877490845@paytm या yourname@oksbi"
-                  value={withdrawUpi}
-                  onChange={(e) => setWithdrawUpi(e.target.value)}
-                  className="w-full bg-white border border-gray-300 rounded-sm px-3 py-2 text-slate-900 font-mono-acc text-xs focus:border-[#2874f0] focus:ring-1 focus:ring-[#2874f0] outline-none"
-                  required
-                />
-              </div>
-
-              {withdrawError && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-sm text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{withdrawError}</span>
-                </div>
-              )}
-
-              {withdrawMsg && (
-                <div className="p-3 bg-green-50 border border-green-200 text-emerald-800 rounded-sm text-xs flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  <span>{withdrawMsg}</span>
-                </div>
-              )}
-
-              <div className="flex items-center gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowWithdrawModal(false)}
-                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-sm transition"
-                >
-                  रद्द करें
-                </button>
-                <button
-                  type="submit"
-                  disabled={currentUser.walletBalance < 100}
-                  className="flex-1 py-2.5 bg-[#fb641b] hover:bg-[#e85a14] text-white font-bold rounded-sm transition disabled:opacity-50 shadow-sm"
-                >
-                  निकासी सबमिट करें
-                </button>
-              </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
@@ -4535,14 +5664,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                  <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2 flex-wrap">
                     <span>🎨 3D लाइव अवतार फ्रेम सिस्टम</span>
-                    <span className="text-[10px] bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 px-2 py-0.5 rounded-full font-black">
-                      ACC VIP
+                    <span className="text-[10.5px] bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 px-2.5 py-0.5 rounded-full font-black shadow-sm">
+                      {AVATAR_FRAMES.length}+ विशेष डिज़ाइन्स
                     </span>
                   </h3>
-                  <p className="text-xs text-amber-200/80">
-                    ACC 3D गोल्ड कॉइन मेडैलियन, 360° लाइव रोटेटिंग टेक्स्ट एवं अग्नि चक्र फ्रेम्स
+                  <p className="text-xs text-amber-200/90 leading-tight mt-0.5">
+                    ACC भारत रत्न, फीनिक्स विंग्स, 360° नाचता गोल्ड चक्र, तिरंगा योद्धा, सुपरनोवा एवं 24K मेडैलियन फ्रेम्स
                   </p>
                 </div>
               </div>
@@ -4550,7 +5679,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
               <button
                 type="button"
                 onClick={() => setShowFrameModal(false)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer"
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -4580,7 +5709,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
               </div>
 
               <div className="flex flex-col items-center gap-1">
-                <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5 flex-wrap justify-center">
                   <span className="text-slate-400">सक्रिय प्रीव्यू:</span>
                   <span className="text-white bg-amber-500/20 border border-amber-400/40 px-3 py-0.5 rounded-full font-black">
                     {AVATAR_FRAMES.find((f) => f.id === framePreview)?.name}
@@ -4595,10 +5724,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
             {/* Frame Category Filter Pills */}
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
               {[
-                { id: 'all', label: 'सभी फ्रेम (All)' },
-                { id: 'acc', label: '🎖️ ACC ऑफिशियल (Coin & Text)' },
-                { id: 'elements', label: '🔥 3D लाइव एलिमेंट्स' },
-                { id: 'vip', label: '👑 रॉयल वीआईपी' },
+                { id: 'all', label: `सभी फ्रेम (${AVATAR_FRAMES.length})` },
+                { id: 'acc', label: `🎖️ ACC स्पेशल (${AVATAR_FRAMES.filter((f) => f.category === 'acc').length})` },
+                { id: 'vip', label: `👑 रॉयल VIP (${AVATAR_FRAMES.filter((f) => f.category === 'vip').length})` },
+                { id: 'elements', label: `🔥 3D एलिमेंट्स (${AVATAR_FRAMES.filter((f) => f.category === 'elements').length})` },
+                { id: 'classic', label: `⚪ क्लासिक (${AVATAR_FRAMES.filter((f) => f.category === 'classic').length})` },
               ].map((cat) => (
                 <button
                   key={cat.id}
@@ -4819,6 +5949,34 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                 <span>लाइव चैट बॉक्स खोलें</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* SPONSOR DIRECT ENROLLMENT MODAL */}
+      {showAddMemberModal && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-3 bg-black/75 backdrop-blur-xs animate-fadeIn overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl my-auto max-h-[90vh] overflow-y-auto">
+            <div className="p-3 bg-slate-900 flex justify-between items-center text-white px-5">
+              <span className="text-xs font-bold flex items-center gap-2 text-amber-300">
+                <UserPlus className="w-4 h-4" />
+                <span>अपने नीचे नया सदस्य जोड़ें (Sponsor: {currentUser.accId})</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowAddMemberModal(false)}
+                className="text-slate-400 hover:text-white text-xs p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <SponsorRegisterMemberModal
+              currentUser={currentUser}
+              onSuccess={() => {
+                const updated = StorageService.getMembers().find((m) => m.accId === currentUser.accId);
+                if (updated) onUpdateUser(updated);
+              }}
+              onClose={() => setShowAddMemberModal(false)}
+            />
           </div>
         </div>
       )}

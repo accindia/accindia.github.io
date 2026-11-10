@@ -55,6 +55,20 @@ export type AvatarFrameType =
   | 'neon_cyber'
   | 'water'
   | 'work_hard'
+  | 'acc_bharat_ratna'
+  | 'acc_golden_phoenix'
+  | 'acc_galaxy_supernova'
+  | 'acc_tricolor_warrior'
+  | 'acc_emerald_dragon'
+  | 'acc_ruby_emperor'
+  | 'acc_cyber_matrix'
+  | 'acc_solar_flare'
+  | 'acc_kohinoor_diamond'
+  | 'acc_shivaji_bhagwa'
+  | 'acc_quantum_vortex'
+  | 'acc_maharaja_peacock'
+  | 'acc_crypto_gold_blockchain'
+  | 'acc_thunder_lord'
   | 'none';
 
 export interface OriginalRegistrationData {
@@ -81,13 +95,15 @@ export interface OriginalRegistrationData {
 
 export interface PrivateMessage {
   id: string;
-  userAccId: string; // Conversation identifier (the student's ACC ID or channel key)
-  recipientAccId?: string; // Target recipient (Sponsor ID, Member ID or 'ADMIN')
+  userAccId: string; // Conversation identifier (the student's ACC ID, channel key, or group_ID)
+  recipientAccId?: string; // Target recipient (Sponsor ID, Member ID, group ID or 'ADMIN')
   recipientName?: string;
-  chatType?: 'admin' | 'sponsor' | 'member'; // 'admin' = Helpdesk, 'sponsor' = Direct Sponsor-Member chat
+  chatType?: 'admin' | 'sponsor' | 'member' | 'group'; // 'admin' = Helpdesk, 'sponsor' = Direct Sponsor, 'member' = Direct Member, 'group' = Group
+  groupId?: string;
   senderRole: 'admin' | 'user';
   senderAccId: string;
   senderName: string;
+  senderAvatar?: string;
   text: string;
   mediaType?: 'text' | 'image' | 'video' | 'link';
   mediaUrl?: string;
@@ -96,8 +112,57 @@ export interface PrivateMessage {
   attachmentUrl?: string;
   linkUrl?: string;
   linkTitle?: string;
+  videoUrl?: string;
   timestamp: string;
   isRead?: boolean;
+}
+
+export interface Friendship {
+  id: string;
+  user1AccId: string;
+  user2AccId: string;
+  status: 'pending' | 'accepted' | 'declined';
+  requesterAccId: string;
+  createdAt: string;
+  acceptedAt?: string;
+}
+
+export interface ChatGroup {
+  id: string;
+  name: string;
+  description?: string;
+  avatarUrl?: string;
+  creatorAccId: string;
+  creatorName: string;
+  members: Array<{ accId: string; name: string; role: 'admin' | 'member'; joinedAt: string }>;
+  createdAt: string;
+  lastMessageAt?: string;
+  lastMessageText?: string;
+  isLocked?: boolean;
+}
+
+export interface ProfileVisitorRecord {
+  visitorAccId: string;
+  visitorName: string;
+  visitorAvatar?: string;
+  visitedAt: string;
+}
+
+export interface SocialNotification {
+  id: string;
+  recipientAccId: string;
+  senderAccId: string;
+  senderName: string;
+  senderAvatar?: string;
+  type: 'message' | 'friend_request' | 'friend_accept' | 'profile_view' | 'group_invite';
+  title: string;
+  body: string;
+  timestamp: string;
+  isRead: boolean;
+  linkAction?: {
+    type: 'open_chat' | 'view_profile' | 'open_group';
+    targetId: string;
+  };
 }
 
 export interface Member {
@@ -153,6 +218,20 @@ export interface Member {
   avatarFrameActive?: boolean;
   telegramUsername?: string;
   originalFormData?: OriginalRegistrationData;
+  mustUpdatePassword?: boolean; // When registered by sponsor, must change password on first login
+  isRegisteredBySponsor?: boolean; // Whether downline was enrolled directly by sponsor
+  registeredBySponsorId?: string; // The sponsor who registered this user
+  registeredBySponsorName?: string;
+  passwordUpdatedAt?: string;
+  username?: string; // @username for ACC CHAT & HELP profile lookup
+  activeSessionId?: string; // Multi-device protection session identifier
+  lastLoginAt?: string;
+  lastLoginDevice?: string;
+  profileViews?: number; // Total number of times profile was viewed
+  profileVisitors?: ProfileVisitorRecord[]; // Recent visitors
+  bio?: string; // Custom user bio/status
+  coverPhotoUrl?: string; // Profile header cover
+  chatMuted?: boolean; // Whether chat is muted
 }
 
 export type ServiceType = 
@@ -209,6 +288,32 @@ export interface WithdrawalRequest {
   notes?: string;
 }
 
+export type PassbookCategory =
+  | 'RECHARGE_COMMISSION'
+  | 'REFERRAL_BONUS'
+  | 'WITHDRAWAL'
+  | 'ADMIN_CREDIT'
+  | 'ADMIN_DEBIT'
+  | 'WELCOME_BONUS'
+  | 'INCENTIVE'
+  | 'REFUND';
+
+export interface PassbookEntry {
+  id: string;
+  accId: string;
+  memberName: string;
+  type: 'CREDIT' | 'DEBIT';
+  category: PassbookCategory;
+  title: string;
+  description: string;
+  amount: number;
+  balanceAfter: number;
+  timestamp: string;
+  status: 'COMPLETED' | 'PENDING' | 'REJECTED';
+  referenceId?: string;
+  payoutMethod?: string;
+}
+
 export interface CourseLesson {
   id: string;
   title: string;
@@ -237,7 +342,10 @@ export type ActiveWindow =
   | 'contact'
   | 'faq'
   | 'guidelines'
-  | 'refer';
+  | 'refer'
+  | 'add-member'
+  | 'chat'
+  | 'profile';
 
 export interface AppServiceItem {
   id: string;

@@ -125,7 +125,7 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
   if (asModal) {
     return (
       <div
-        className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 md:p-6 pt-3 pb-24 bg-slate-950/75 backdrop-blur-xs animate-fadeIn overflow-y-auto"
+        className="fixed inset-0 z-[80] flex items-start sm:items-center justify-center p-2 sm:p-4 md:p-6 pt-3 sm:pt-6 pb-24 bg-slate-950/80 backdrop-blur-sm animate-fadeIn overflow-y-auto"
         onClick={onClose}
       >
         {frameContent}

@@ -247,7 +247,7 @@ export const WelcomeWindow: React.FC<WelcomeWindowProps> = ({
                   🇮🇳 INDIA
                 </span>
               </div>
-              <span className="text-[10.5px] text-amber-300 font-bold block truncate">
+              <span className="text-[10.5px] text-amber-300 font-bold block break-words leading-tight">
                 🌟 स्वागतम विंडो • Official Welcome Window (हिंदी & English)
               </span>
             </div>

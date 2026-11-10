@@ -92,6 +92,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         }
       }
 
+      // Multi-device active session creation: invalidates any previously active device
+      const sessionId = StorageService.createSessionForUser(member);
+      member.activeSessionId = sessionId;
+
       StorageService.setCurrentUser(member);
       onLoginSuccess(member);
     } catch (err) {
@@ -232,7 +236,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   <div className="w-7 h-7 rounded-lg bg-white/20 border border-white/30 flex items-center justify-center shadow-inner shrink-0 text-cyan-200">
                     <LogIn className="w-4 h-4 drop-shadow-sm" />
                   </div>
-                  <span className="truncate drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.6)] font-black">
+                  <span className="break-words leading-tight drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.6)] font-black">
                     पोर्टल में प्रवेश करें (Secure Login)
                   </span>
                   <ArrowRight className="w-4 h-4 ml-0.5 drop-shadow-sm shrink-0" />

@@ -33,6 +33,7 @@ import {
   Coffee,
   HelpCircle,
   CheckCircle,
+  UserPlus,
 } from 'lucide-react';
 import { ActiveWindow, Member, SiteConfig, AppServiceItem, PromotionalPoster } from '../types';
 import { StorageService, subscribeToSync } from '../services/storage';
@@ -305,18 +306,274 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const cleanWhatsApp = (siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '');
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      {/* Hero Showcase Section - Flipkart Royal Blue & Yellow Style */}
-      <div className="relative rounded-xl overflow-hidden bg-gradient-to-r from-[#2874f0] via-[#1c52b8] to-[#124296] text-white p-4 sm:p-7 md:p-10 shadow-sm border border-blue-400/20">
-        <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-6 sm:gap-8">
-          {/* Left Hero Text */}
-          <div className="space-y-3.5 sm:space-y-4 max-w-2xl text-center lg:text-left">
-            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#ffe500] bg-blue-900/50 px-2.5 py-1 rounded-sm border border-blue-400/30">
-              <Zap className="w-3.5 h-3.5 fill-[#ffe500] text-[#ffe500]" />
-              <span className="text-[11px] sm:text-xs">SPECIAL STUDENT & YOUTH EARNING PROGRAM · ACC ASSURED ✓</span>
+    <div className="space-y-5 sm:space-y-6 max-w-7xl mx-auto px-1 sm:px-0">
+      {/* ========================================================================= */}
+      {/* 5 TO 10 SECOND INSTANT GATEWAY: ACC क्या है और आपको आगे क्या करना है? */}
+      {/* ========================================================================= */}
+      <section 
+        aria-label="5 से 10 सेकंड क्विक ओरिएंटेशन गेटवे"
+        className="rounded-2xl bg-white border border-blue-200/90 shadow-md p-3.5 sm:p-5 md:p-6 space-y-4"
+      >
+        {/* Header Strip: Quick Identity */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-gray-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-amber-500 text-white flex items-center justify-center font-black shadow-md shrink-0">
+              <Sparkles className="w-5 h-5 text-yellow-300" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs sm:text-sm font-black text-slate-900 tracking-tight">
+                  ⚡ 5 से 10 सेकंड में समझें — ACC क्या है और आगे क्या करना है?
+                </span>
+                <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-md">
+                  100% वेरिफाइड डिजिटल मंच ✓
+                </span>
+              </div>
+              <p className="text-[11px] sm:text-xs text-slate-600 mt-0.5">
+                भारत का #1 छात्र व युवा डिजिटल स्वावलंबन नेटवर्क • कॉलेज व पढ़ाई के साथ सुरक्षित पॉकेट मनी
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto text-[11px] text-slate-500 font-semibold bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg shrink-0">
+            <Clock className="w-3.5 h-3.5 text-blue-600" />
+            <span>त्वरित मार्गदर्शन (Quick Tour)</span>
+          </div>
+        </div>
+
+        {/* 3 Clear Visual Pillars: What ACC is */}
+        <div>
+          <div className="text-[11px] font-black text-blue-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <span>📌</span>
+            <span>वेबसाइट किस बारे में है? (3 मुख्य स्तंभ)</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+            {/* Pillar 1: SWIS */}
+            <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200/90 hover:border-emerald-400 transition-all shadow-xs">
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                  <Smartphone className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-xs font-black text-emerald-900 leading-tight">1. SWIS (रिचार्ज बचत)</h2>
+                  <span className="text-[10px] text-emerald-700 font-semibold">Self Work Income System</span>
+                </div>
+              </div>
+              <p className="text-[11.5px] text-slate-700 leading-relaxed">
+                सभी मोबाइल व DTH रिचार्ज पर <strong className="text-emerald-800">3.30% फिक्स्ड कमीशन</strong> सीधा आपके वॉलेट में लाइफटाइम बचत। कोई फीस नहीं।
+              </p>
             </div>
 
-            <h1 className="font-display font-black text-2xl sm:text-4xl lg:text-5xl text-white tracking-tight leading-snug sm:leading-tight">
+            {/* Pillar 2: TWIS */}
+            <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200/90 hover:border-blue-400 transition-all shadow-xs">
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="w-7 h-7 rounded-lg bg-[#2874f0] text-white flex items-center justify-center text-xs font-bold shrink-0">
+                  <Users className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-xs font-black text-blue-950 leading-tight">2. TWIS (टीम वर्क अर्निंग)</h2>
+                  <span className="text-[10px] text-blue-700 font-semibold">Team Work Income System</span>
+                </div>
+              </div>
+              <p className="text-[11.5px] text-slate-700 leading-relaxed">
+                कॉलेज व हॉस्टल के दोस्तों को रेफर करने पर <strong className="text-blue-900">₹150 प्रति सदस्य</strong> सीधा आपके बैंक / UPI खाते में तत्काल ट्रांसफर।
+              </p>
+            </div>
+
+            {/* Pillar 3: Lifetime ID */}
+            <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200/90 hover:border-amber-400 transition-all shadow-xs">
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="w-7 h-7 rounded-lg bg-amber-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                  <CreditCard className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-xs font-black text-amber-950 leading-tight">3. लाइफटाइम 🆔 कार्ड</h2>
+                  <span className="text-[10px] text-amber-700 font-semibold">केवल ₹{siteConfig.activationFee || 249} एक बार</span>
+                </div>
+              </div>
+              <p className="text-[11.5px] text-slate-700 leading-relaxed">
+                वन-टाइम सक्रियण में लाइफटाइम स्टूडेंट 🆔, रियल APK ऐप, ACC MEMBER CHAT और 24x7 एडमिन सपोर्ट।
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Pathways: What Should the Visitor Do Next? */}
+        <div className="pt-2 border-t border-gray-100">
+          <div className="text-[11px] font-black text-slate-800 uppercase tracking-wider mb-2 flex items-center justify-between flex-wrap gap-1">
+            <span className="flex items-center gap-1.5">
+              <span>👉</span>
+              <span>आपको आगे क्या करना है? (अपनी पसंद अनुसार चयन करें):</span>
+            </span>
+            {currentUser && (
+              <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded font-bold">
+                लॉगिन सदस्य: {currentUser.fullName.split(' ')[0]} ({currentUser.accId})
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+            {currentUser ? (
+              <>
+                {/* Logged in action 1: Dashboard */}
+                <button
+                  type="button"
+                  onClick={() => onNavigate('dashboard')}
+                  className="p-2.5 rounded-xl bg-gradient-to-b from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white text-left shadow-sm active:translate-y-0.5 transition cursor-pointer flex items-center gap-2.5 group"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-white/20 text-white flex items-center justify-center shrink-0">
+                    <LayoutDashboard className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-black block truncate">1. डैशबोर्ड खोलें</span>
+                    <span className="text-[10.5px] text-blue-100 block truncate">कमाई, टीम व वॉलेट देखें</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-blue-200 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                </button>
+
+                {/* Logged in action 2: Add Member */}
+                <button
+                  type="button"
+                  onClick={() => onNavigate('add-member')}
+                  className="p-2.5 rounded-xl bg-gradient-to-b from-orange-500 to-amber-600 hover:from-orange-400 hover:to-amber-500 text-white text-left shadow-sm active:translate-y-0.5 transition cursor-pointer flex items-center gap-2.5 group"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-yellow-300 text-slate-950 flex items-center justify-center shrink-0">
+                    <UserPlus className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-black block truncate">2. नया सदस्य जोड़ें</span>
+                    <span className="text-[10.5px] text-amber-100 block truncate">₹150 पेआउट तुरंत पाएं</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-amber-200 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                </button>
+
+                {/* Logged in action 3: ACC MEMBER CHAT */}
+                <button
+                  type="button"
+                  onClick={() => onNavigate('chat')}
+                  className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-left shadow-sm active:translate-y-0.5 transition cursor-pointer flex items-center gap-2.5 group border border-slate-700"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-400 to-orange-500 text-slate-950 flex items-center justify-center shrink-0">
+                    <MessageCircle className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-black block truncate">3. ACC MEMBER CHAT</span>
+                    <span className="text-[10.5px] text-slate-300 block truncate">साथी व ग्रुप्स से संवाद</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                </button>
+
+                {/* Logged in action 4: ID Card */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onNavigateToIdCard) {
+                      onNavigateToIdCard();
+                    } else {
+                      onNavigate('idcard');
+                    }
+                  }}
+                  className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-900 text-left border border-slate-300 active:translate-y-0.5 transition cursor-pointer flex items-center gap-2.5 group"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-slate-800 text-yellow-300 flex items-center justify-center shrink-0">
+                    <CreditCard className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-black block truncate">4. डिजिटल 🆔 कार्ड</span>
+                    <span className="text-[10.5px] text-slate-600 block truncate">सत्यापित पहचान पत्र</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                </button>
+              </>
+            ) : (
+              <>
+                {/* New visitor action 1: Register */}
+                <button
+                  type="button"
+                  onClick={() => onNavigate('register')}
+                  className="p-2.5 rounded-xl bg-gradient-to-b from-[#fb641b] via-[#ea580c] to-[#c2410c] hover:brightness-110 text-white text-left shadow-sm active:translate-y-0.5 transition cursor-pointer flex items-center gap-2.5 group border border-amber-300/40"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-yellow-300 text-slate-950 flex items-center justify-center shrink-0 font-bold">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-black block truncate">1. नया रजिस्ट्रेशन (₹{siteConfig.activationFee || 249})</span>
+                    <span className="text-[10.5px] text-amber-100 block truncate">सीधा फॉर्म भरें व ID पाएं</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-amber-200 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                </button>
+
+                {/* New visitor action 2: Watch Video */}
+                <button
+                  type="button"
+                  onClick={() => onNavigate('video')}
+                  className="p-2.5 rounded-xl bg-gradient-to-b from-rose-600 to-rose-700 hover:brightness-110 text-white text-left shadow-sm active:translate-y-0.5 transition cursor-pointer flex items-center gap-2.5 group"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-white/20 text-white flex items-center justify-center shrink-0">
+                    <Play className="w-4 h-4 fill-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-black block truncate">2. 2-मिनट प्लान वीडियो</span>
+                    <span className="text-[10.5px] text-rose-100 block truncate">कमाई का लाइव प्रोसेस देखें</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-rose-200 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                </button>
+
+                {/* New visitor action 3: Sponsor ID Verification */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onNavigateToIdCard) {
+                      onNavigateToIdCard();
+                    } else {
+                      onNavigate('idcard');
+                    }
+                  }}
+                  className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-left shadow-sm active:translate-y-0.5 transition cursor-pointer flex items-center gap-2.5 group border border-slate-700"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-blue-500 text-white flex items-center justify-center shrink-0">
+                    <ShieldCheck className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-black block truncate">3. स्पॉन्सर 🆔 सत्यापन</span>
+                    <span className="text-[10.5px] text-slate-300 block truncate">मेंटर की प्रोफाइल जांचें</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                </button>
+
+                {/* New visitor action 4: FAQ & Guidelines */}
+                <button
+                  type="button"
+                  onClick={() => onNavigate('faq')}
+                  className="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-900 text-left border border-slate-200 active:translate-y-0.5 transition cursor-pointer flex items-center gap-2.5 group"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                    <HelpCircle className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-black block truncate">4. FAQ व नियम समझें</span>
+                    <span className="text-[10.5px] text-slate-600 block truncate">सुरक्षा व विथड्रॉल जानकारी</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Hero Showcase Section - Flipkart Royal Blue & Yellow Style - 100% Fluid Auto-Adjusting for Mobile */}
+      <div className="relative rounded-xl overflow-hidden bg-gradient-to-r from-[#2874f0] via-[#1c52b8] to-[#124296] text-white p-3.5 xs:p-4 sm:p-7 md:p-10 shadow-sm border border-blue-400/20 w-full">
+        <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-5 sm:gap-8 w-full">
+          {/* Left Hero Text - Targeted Selector 1 - Zero Cutoff, Fluid Typography */}
+          <div className="space-y-3 sm:space-y-4 max-w-2xl text-center lg:text-left w-full">
+            <div className="inline-flex items-center gap-1.5 text-[10px] xs:text-xs font-bold text-[#ffe500] bg-blue-900/60 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-sm border border-blue-400/30 max-w-full flex-wrap justify-center lg:justify-start leading-tight">
+              <Zap className="w-3 h-3 xs:w-3.5 xs:h-3.5 fill-[#ffe500] text-[#ffe500] shrink-0" />
+              <span className="break-words">SPECIAL STUDENT & YOUTH EARNING PROGRAM · ACC ASSURED ✓</span>
+            </div>
+
+            <h1 className="font-display font-black text-xl xs:text-2xl sm:text-4xl lg:text-5xl text-white tracking-tight leading-snug sm:leading-tight break-words">
               कॉलेज व पढ़ाई के साथ{' '}
               <span className="text-[#ffe500]">
                 पॉकेट मनी व पक्की कमाई
@@ -327,103 +584,117 @@ export const HomeView: React.FC<HomeViewProps> = ({
               </span>
             </h1>
 
-            <p className="text-sm sm:text-base text-blue-100 leading-relaxed font-normal">
+            <p className="text-xs xs:text-sm sm:text-base text-blue-100 leading-relaxed font-normal break-words">
               अक्सर लोग <strong className="text-yellow-300 font-black">₹{siteConfig.activationFee || 249}</strong> यहाँ-वहाँ पिज़्ज़ा, बर्गर, कोल्डड्रिंक और फ़ालतू खर्चों में उड़ा देते हैं, जिसका कोई रिटर्न नहीं मिलता। लेकिन <strong>अचीवर्स क्लब कम्युनिटी (ACC)</strong> में केवल ₹{siteConfig.activationFee || 249} की वन-टाइम सदस्यता से आपको मिलता है: 
               <span className="text-white font-black"> लाइफटाइम डिजिटल 🆔, SWIS (Self Work Income System) में 3.30% फिक्स्ड रिचार्ज कमीशन, TWIS (Team Work Income System) में ₹150 प्रति रेफरल अर्निंग, Real App APK और 24x7 तत्काल UPI विथड्रॉल!</span>
             </p>
 
             {/* Smart Value Comparison Box */}
-            <div className="bg-gradient-to-r from-blue-950/90 via-slate-900/90 to-blue-950/90 border border-yellow-400/40 rounded-xl p-3 text-left space-y-1.5 shadow-md">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <span className="text-xs font-black text-yellow-300 flex items-center gap-1.5">
+            <div className="bg-gradient-to-r from-blue-950/95 via-slate-900/95 to-blue-950/95 border border-yellow-400/40 rounded-xl p-2.5 sm:p-3 text-left space-y-1.5 shadow-md w-full">
+              <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                <span className="text-[11px] xs:text-xs font-black text-yellow-300 flex items-center gap-1">
                   <span>💡 ₹249 लगाने की सबसे बड़ी वजह:</span>
                 </span>
-                <span className="bg-emerald-500/30 text-emerald-300 border border-emerald-400/50 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                <span className="bg-emerald-500/30 text-emerald-300 border border-emerald-400/50 px-2 py-0.2 rounded-full text-[9px] xs:text-[10px] font-bold shrink-0">
                   ✓ 100% रिस्क-फ्री छात्र अवसर
                 </span>
               </div>
-              <p className="text-xs text-slate-200 leading-snug">
+              <p className="text-[11px] xs:text-xs text-slate-200 leading-snug break-words">
                 यदि आप कॉलेज के सिर्फ <strong className="text-yellow-300">2 दोस्तों</strong> को अपने TWIS लिंक से रेफर करते हैं, तो आपको तुरंत <strong className="text-emerald-300">₹300</strong> मिलते हैं—यानी आपकी ₹249 की पूरी फीस पहले ही दिन वापस और <strong>₹51 का तुरंत शुद्ध लाभ</strong>!
               </p>
             </div>
 
             {/* 3D Action Buttons with Symbolic 3D Logo Capsules & Zero Text Cutoff */}
-            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2.5 sm:gap-3.5 pt-2">
+            <div className="flex flex-col xs:flex-row flex-wrap items-stretch xs:items-center justify-center lg:justify-start gap-2 sm:gap-3 pt-1.5 w-full">
               {currentUser ? (
-                <button
-                  type="button"
-                  onClick={() => onNavigate('dashboard')}
-                  className="px-4 sm:px-6 py-2.5 sm:py-3.5 bg-gradient-to-b from-white via-slate-50 to-slate-100 hover:from-white hover:to-slate-200 text-[#2874f0] font-black rounded-xl text-xs sm:text-sm shadow-[0_4px_12px_rgba(0,0,0,0.25),inset_0_1.5px_1px_rgba(255,255,255,1)] border border-slate-200/90 flex items-center gap-2 active:translate-y-0.5 transition cursor-pointer group"
-                >
-                  <div className="w-6 h-6 rounded-lg bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white flex items-center justify-center shadow-[0_2px_4px_rgba(40,116,240,0.35),inset_0_1px_0.5px_rgba(255,255,255,0.6)] shrink-0">
-                    <LayoutDashboard className="w-3.5 h-3.5" />
-                  </div>
-                  <span className="leading-tight">मेरा डैशबोर्ड खोलें ({currentUser.fullName.split(' ')[0]})</span>
-                  <ArrowRight className="w-4 h-4 ml-0.5 group-hover:translate-x-0.5 transition-transform" />
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('dashboard')}
+                    className="w-full xs:w-auto justify-center px-4 sm:px-6 py-2.5 sm:py-3.5 bg-gradient-to-b from-white via-slate-50 to-slate-100 hover:from-white hover:to-slate-200 text-[#2874f0] font-black rounded-xl text-xs sm:text-sm shadow-[0_4px_12px_rgba(0,0,0,0.25),inset_0_1.5px_1px_rgba(255,255,255,1)] border border-slate-200/90 flex items-center gap-2 active:translate-y-0.5 transition cursor-pointer group"
+                  >
+                    <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white flex items-center justify-center shadow-[0_2px_4px_rgba(40,116,240,0.35),inset_0_1px_0.5px_rgba(255,255,255,0.6)] shrink-0">
+                      <LayoutDashboard className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    </div>
+                    <span className="leading-tight break-words">मेरा डैशबोर्ड खोलें ({currentUser.fullName.split(' ')[0]})</span>
+                    <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-0.5 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('add-member')}
+                    className="w-full xs:w-auto justify-center px-4 sm:px-6 py-2.5 sm:py-3.5 bg-gradient-to-b from-[#fb641b] via-[#ea580c] to-[#c2410c] hover:from-[#ea580c] hover:to-[#9a3412] text-white font-black rounded-xl text-xs sm:text-sm shadow-[0_4px_14px_rgba(251,100,27,0.4),inset_0_1.5px_1px_rgba(255,255,255,0.5)] border border-amber-300/40 flex items-center gap-2 active:translate-y-0.5 transition cursor-pointer group"
+                  >
+                    <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-gradient-to-b from-yellow-300 to-amber-400 text-slate-950 flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.25),inset_0_1px_0.5px_rgba(255,255,255,0.8)] shrink-0">
+                      <UserPlus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    </div>
+                    <span className="leading-tight break-words">अपने नीचे नया सदस्य जोड़ें (₹150 पेआउट)</span>
+                    <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-0.5 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                  </button>
+                </>
               ) : (
                 <button
                   type="button"
                   onClick={() => onNavigate('register')}
-                  className="px-4 sm:px-6 py-2.5 sm:py-3.5 bg-gradient-to-b from-[#fb641b] via-[#ea580c] to-[#c2410c] hover:from-[#ea580c] hover:to-[#9a3412] text-white font-black rounded-xl text-xs sm:text-sm shadow-[0_4px_14px_rgba(251,100,27,0.4),inset_0_1.5px_1px_rgba(255,255,255,0.5)] border border-amber-300/40 flex items-center gap-2 active:translate-y-0.5 transition cursor-pointer group"
+                  className="w-full xs:w-auto justify-center px-4 sm:px-6 py-2.5 sm:py-3.5 bg-gradient-to-b from-[#fb641b] via-[#ea580c] to-[#c2410c] hover:from-[#ea580c] hover:to-[#9a3412] text-white font-black rounded-xl text-xs sm:text-sm shadow-[0_4px_14px_rgba(251,100,27,0.4),inset_0_1.5px_1px_rgba(255,255,255,0.5)] border border-amber-300/40 flex items-center gap-2 active:translate-y-0.5 transition cursor-pointer group"
                 >
-                  <div className="w-6 h-6 rounded-lg bg-gradient-to-b from-yellow-300 to-amber-400 text-slate-950 flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.25),inset_0_1px_0.5px_rgba(255,255,255,0.8)] shrink-0">
-                    <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                  <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-gradient-to-b from-yellow-300 to-amber-400 text-slate-950 flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.25),inset_0_1px_0.5px_rgba(255,255,255,0.8)] shrink-0">
+                    <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-pulse" />
                   </div>
-                  <span className="leading-tight">विद्यार्थी रजिस्ट्रेशन (₹{siteConfig.activationFee || 249})</span>
-                  <ArrowRight className="w-4 h-4 ml-0.5 group-hover:translate-x-0.5 transition-transform" />
+                  <span className="leading-tight break-words">विद्यार्थी रजिस्ट्रेशन (₹{siteConfig.activationFee || 249})</span>
+                  <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-0.5 group-hover:translate-x-0.5 transition-transform shrink-0" />
                 </button>
               )}
 
               <button
                 type="button"
                 onClick={() => onNavigate('video')}
-                className="px-4 sm:px-5 py-2.5 sm:py-3.5 bg-gradient-to-b from-white/20 via-white/10 to-white/5 hover:bg-white/25 text-white font-bold rounded-xl text-xs sm:text-sm border border-white/40 shadow-[0_3px_8px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.3)] flex items-center gap-2 active:translate-y-0.5 transition cursor-pointer"
+                className="w-full xs:w-auto justify-center px-4 sm:px-5 py-2.5 sm:py-3.5 bg-gradient-to-b from-white/20 via-white/10 to-white/5 hover:bg-white/25 text-white font-bold rounded-xl text-xs sm:text-sm border border-white/40 shadow-[0_3px_8px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.3)] flex items-center gap-2 active:translate-y-0.5 transition cursor-pointer"
               >
-                <div className="w-6 h-6 rounded-lg bg-gradient-to-b from-rose-500 to-rose-700 text-white flex items-center justify-center shadow-[0_2px_4px_rgba(244,63,94,0.35),inset_0_1px_0.5px_rgba(255,255,255,0.5)] shrink-0">
-                  <Play className="w-3.5 h-3.5 fill-white text-white" />
+                <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-gradient-to-b from-rose-500 to-rose-700 text-white flex items-center justify-center shadow-[0_2px_4px_rgba(244,63,94,0.35),inset_0_1px_0.5px_rgba(255,255,255,0.5)] shrink-0">
+                  <Play className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-white text-white" />
                 </div>
-                <span className="leading-tight">ट्रेनिंग वीडियो देखें</span>
+                <span className="leading-tight break-words">ट्रेनिंग वीडियो देखें</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => onNavigate(currentUser ? 'idcard' : 'dashboard')}
-                className="px-3.5 sm:px-4 py-2.5 sm:py-3.5 bg-gradient-to-b from-[#1c52b8] to-[#124296] hover:from-[#17469e] hover:to-[#0f3475] text-white font-bold rounded-xl text-xs sm:text-sm border border-blue-300/40 shadow-[0_3px_8px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.3)] flex items-center gap-2 active:translate-y-0.5 transition cursor-pointer"
+                className="w-full xs:w-auto justify-center px-3.5 sm:px-4 py-2.5 sm:py-3.5 bg-gradient-to-b from-[#1c52b8] to-[#124296] hover:from-[#17469e] hover:to-[#0f3475] text-white font-bold rounded-xl text-xs sm:text-sm border border-blue-300/40 shadow-[0_3px_8px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.3)] flex items-center gap-2 active:translate-y-0.5 transition cursor-pointer"
               >
-                <div className="w-6 h-6 rounded-lg bg-gradient-to-b from-yellow-300 to-amber-500 text-slate-900 flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.25),inset_0_1px_0.5px_rgba(255,255,255,0.8)] shrink-0">
+                <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-gradient-to-b from-yellow-300 to-amber-500 text-slate-900 flex items-center justify-center shadow-[0_2px_4px_rgba(0,0,0,0.25),inset_0_1px_0.5px_rgba(255,255,255,0.8)] shrink-0">
                   {currentUser ? (
-                    <CreditCard className="w-3.5 h-3.5 text-slate-950" />
+                    <CreditCard className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-950" />
                   ) : (
-                    <GraduationCap className="w-3.5 h-3.5 text-slate-950" />
+                    <GraduationCap className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-950" />
                   )}
                 </div>
-                <span className="leading-tight">{currentUser ? 'मेरा डिजिटल 🆔 कार्ड' : 'विद्यार्थी पोर्टल'}</span>
+                <span className="leading-tight break-words">{currentUser ? 'मेरा डिजिटल 🆔 कार्ड' : 'विद्यार्थी पोर्टल'}</span>
               </button>
             </div>
           </div>
 
           {/* Right Floating Card - Flipkart White Card Style */}
           <div className="shrink-0 w-full max-w-sm">
-            <div className="bg-white text-slate-900 border border-gray-200 rounded-xl p-5 shadow-lg relative overflow-hidden">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-3">
-                <div className="flex items-center gap-2.5">
-                  <AccLogo size="custom" className="w-10 h-10" />
+            <div className="bg-white text-slate-900 border border-gray-200 rounded-xl p-3.5 sm:p-5 shadow-lg relative overflow-hidden">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-2.5 mb-2.5">
+                <div className="flex items-center gap-2">
+                  <AccLogo size="custom" className="w-8 h-8 sm:w-10 sm:h-10" />
                   <div>
                     <span className="text-xs font-bold text-slate-900 block leading-tight">ACHIEVERS CLUB</span>
                     <span className="text-[10px] text-[#2874f0] font-semibold italic">Community Assured ✓</span>
                   </div>
                 </div>
-                <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-bold">
+                <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-bold shrink-0">
                   ✓ VERIFIED 🆔
                 </span>
               </div>
 
-              {/* SELECTOR 1: Complete ₹249 Value, SWIS & TWIS Breakdown Card */}
-              <div className="bg-gradient-to-b from-[#f8fafc] to-[#f1f5f9] p-3.5 rounded-xl border-2 border-blue-200 space-y-2.5 text-xs mb-3 shadow-xs">
+              {/* Complete ₹249 Value, SWIS & TWIS Breakdown Card */}
+              <div className="bg-gradient-to-b from-[#f8fafc] to-[#f1f5f9] p-3 rounded-xl border-2 border-blue-200 space-y-2.5 text-xs mb-3 shadow-xs">
                 {/* Live Festival Slide Ticker */}
-                <div className="flex items-center justify-between gap-1 text-[10px] bg-amber-50 text-amber-900 border border-amber-300 px-2.5 py-1 rounded-lg">
-                  <span className="font-bold flex items-center gap-1 truncate">
+                <div className="flex items-center justify-between gap-1 text-[10px] bg-amber-50 text-amber-900 border border-amber-300 px-2 py-1 rounded-lg">
+                  <span className="font-bold flex items-center gap-1 break-words leading-tight">
                     <span>{FESTIVE_ARTICLE_SLIDES[currentSlideIndex].iconEmoji}</span>
                     <span>{FESTIVE_ARTICLE_SLIDES[currentSlideIndex].festivalName}</span>
                   </span>
@@ -652,14 +923,41 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   </p>
                 </div>
 
-                <div className="shrink-0 flex flex-col items-center justify-center p-3 bg-black/40 backdrop-blur-xs rounded-xl border border-white/20 text-center min-w-[130px] self-stretch lg:self-auto">
-                  <span className="text-3xl mb-1">{slide.iconEmoji}</span>
-                  <span className="text-[10px] text-amber-200 font-bold uppercase tracking-wider block">
-                    ACC Assured
-                  </span>
-                  <span className="text-xs font-black text-white block mt-0.5">
-                    ₹{siteConfig.activationFee || 249} वन-टाइम
-                  </span>
+                {/* Official ACC India Logo & Name Emblem Card */}
+                <div className="shrink-0 flex flex-col items-center justify-center p-3 sm:p-4 bg-gradient-to-b from-slate-950/85 via-blue-950/90 to-slate-950/90 backdrop-blur-md rounded-2xl border-2 border-amber-400/60 shadow-[0_8px_24px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.2)] text-center min-w-[150px] sm:min-w-[175px] self-stretch lg:self-auto space-y-2 select-none group">
+                  {/* 3D ACC Official Vector Emblem Logo */}
+                  <div className="relative">
+                    <AccLogo size="custom" className="w-13 h-13 sm:w-15 sm:h-15 drop-shadow-[0_4px_12px_rgba(245,158,11,0.45)] group-hover:scale-105 transition-transform" />
+                    <span className="absolute -top-1 -right-1 text-sm">{slide.iconEmoji}</span>
+                  </div>
+
+                  {/* Brand Name & Indian Tiranga Badge */}
+                  <div className="flex flex-col items-center">
+                    <span className="font-display font-black text-xs sm:text-sm text-white tracking-tight leading-tight block drop-shadow-[0_1.5px_2px_rgba(0,0,0,0.8)]">
+                      Achievers Club
+                    </span>
+                    <div className="inline-flex items-center gap-0.5 bg-gradient-to-r from-orange-500 via-white to-emerald-600 text-slate-950 font-black text-[8px] sm:text-[8.5px] px-1.5 py-0.2 rounded-full uppercase tracking-wider shadow-sm border border-white/80 mt-0.5">
+                      <span className="text-[8.5px]">🇮🇳</span> INDIA
+                    </div>
+                    <span className="text-[9px] sm:text-[10px] text-amber-300 font-bold block leading-none mt-1">
+                      Community (ACC)
+                    </span>
+                    <span className="text-[8.5px] text-blue-200 font-semibold block leading-tight">
+                      Start Young
+                    </span>
+                  </div>
+
+                  {/* Verified & Lifetime ₹249 Badge */}
+                  <div className="w-full pt-1 border-t border-white/15 space-y-1">
+                    <div className="w-full bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 font-black text-[9.5px] sm:text-[10px] py-1 px-1.5 rounded-lg shadow-sm flex items-center justify-center gap-1">
+                      <Sparkles className="w-2.5 h-2.5 fill-slate-950 text-slate-950 shrink-0" />
+                      <span className="break-words leading-tight">₹{siteConfig.activationFee || 249} लाइफटाइम 🆔</span>
+                    </div>
+                    <div className="text-[8.5px] text-emerald-300 font-bold bg-emerald-950/60 border border-emerald-400/30 px-1.5 py-0.5 rounded flex items-center justify-center gap-0.5">
+                      <CheckCircle2 className="w-2.5 h-2.5 text-emerald-300 shrink-0" />
+                      <span>ACC Assured ✓</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -678,11 +976,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => onNavigate(slide.ctaTarget)}
+                    onClick={() => onNavigate(currentUser ? 'add-member' : slide.ctaTarget)}
                     className="px-5 py-2.5 bg-gradient-to-b from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-[0_3px_0_#9a3412] active:translate-y-0.5 active:shadow-none inline-flex items-center gap-2 transition cursor-pointer"
                   >
                     <Sparkles className="w-4 h-4 text-slate-950 animate-pulse" />
-                    <span>{slide.ctaText}</span>
+                    <span>{currentUser ? `नया सदस्य जोड़ें (₹${siteConfig.activationFee || 249})` : slide.ctaText}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
 
@@ -993,11 +1291,22 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
                   <div className="pt-4 flex items-center justify-between relative z-10">
                     <button
-                      onClick={() => onNavigate((poster.ctaLink as any) || 'register')}
+                      onClick={() => {
+                        const target = (poster.ctaLink as any) || 'register';
+                        if (currentUser && (target === 'register' || target === 'login')) {
+                          onNavigate('add-member');
+                        } else {
+                          onNavigate(target);
+                        }
+                      }}
                       className="px-4 py-2 bg-white hover:bg-slate-100 text-orange-700 font-black text-xs rounded-sm shadow-md flex items-center gap-1.5 transition cursor-pointer"
                     >
                       <Sparkles className="w-3.5 h-3.5 text-orange-600" />
-                      <span>{poster.ctaText || 'अभी देखें'}</span>
+                      <span>
+                        {currentUser && (!poster.ctaLink || poster.ctaLink === 'register')
+                          ? `नया सदस्य जोड़ें (₹${siteConfig.activationFee || 249})`
+                          : (poster.ctaText || 'अभी देखें')}
+                      </span>
                     </button>
                     <span className="text-[11px] text-amber-100 font-bold">
                       Start Young, Retire Young ✓
@@ -1070,10 +1379,21 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
                 <div className="pt-4 mt-3 border-t border-gray-200/60 flex items-center justify-between">
                   <button
-                    onClick={() => onNavigate((svc.actionLink as any) || 'register')}
+                    onClick={() => {
+                      const link = (svc.actionLink as any) || 'register';
+                      if (currentUser && link === 'register') {
+                        onNavigate('add-member');
+                      } else {
+                        onNavigate(link);
+                      }
+                    }}
                     className="relative inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-b from-[#2874f0] via-[#1a65dc] to-[#0f4eb8] hover:from-[#367ff5] hover:to-[#1258c7] text-white font-black text-xs rounded-lg shadow-[0_3px_0_#0a3782,0_6px_12px_rgba(40,116,240,0.3)] active:translate-y-0.5 active:shadow-[0_1px_0_#0a3782] transition-all cursor-pointer whitespace-nowrap"
                   >
-                    <span>{svc.actionText}</span>
+                    <span>
+                      {currentUser && (svc.actionLink === 'register' || svc.actionText.includes('जॉइन') || svc.actionText.includes('रजिस्टर'))
+                        ? `नया सदस्य जोड़ें (₹${siteConfig.activationFee || 249})`
+                        : svc.actionText}
+                    </span>
                     <div className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center shadow-inner">
                       <ArrowRight className="w-3 h-3 text-white" />
                     </div>
@@ -1176,13 +1496,15 @@ export const HomeView: React.FC<HomeViewProps> = ({
             </p>
             <button
               type="button"
-              onClick={() => onNavigate('register')}
+              onClick={() => onNavigate(currentUser ? 'add-member' : 'register')}
               className="w-full mt-2 py-2.5 px-3 bg-gradient-to-b from-[#2874f0] via-[#1a65dc] to-[#0f4eb8] hover:from-[#367ff5] hover:to-[#1258c7] text-white text-xs font-black rounded-lg shadow-[0_3px_0_#0a3782,0_6px_12px_rgba(40,116,240,0.3)] active:translate-y-0.5 active:shadow-[0_1px_0_#0a3782] flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <div className="w-5 h-5 rounded-md bg-white/20 border-t border-white/40 flex items-center justify-center shadow-inner">
-                <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                {currentUser ? <UserPlus className="w-3.5 h-3.5 text-yellow-300" /> : <Sparkles className="w-3.5 h-3.5 text-yellow-300" />}
               </div>
-              <span className="truncate">रजिस्ट्रेशन करें (₹{siteConfig.activationFee || 249})</span>
+              <span className="break-words leading-tight">
+                {currentUser ? `नया सदस्य जोड़ें (₹${siteConfig.activationFee || 249})` : `रजिस्ट्रेशन करें (₹${siteConfig.activationFee || 249})`}
+              </span>
               <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
             </button>
           </div>
@@ -1261,7 +1583,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               <div className="w-6 h-6 rounded-lg bg-emerald-500/30 border-t border-emerald-300/40 flex items-center justify-center shadow-inner">
                 <Zap className="w-3.5 h-3.5 text-emerald-300 fill-emerald-300" />
               </div>
-              <span className="truncate">{currentUser ? 'SWIS रिचार्ज वॉलेट डैशबोर्ड' : `SWIS जॉइन करें (₹${siteConfig.activationFee || 249} One-Time)`}</span>
+              <span className="break-words leading-tight">{currentUser ? 'SWIS रिचार्ज वॉलेट डैशबोर्ड' : `SWIS जॉइन करें (₹${siteConfig.activationFee || 249} One-Time)`}</span>
               <ArrowRight className="w-4 h-4 ml-0.5" />
             </button>
           </div>
@@ -1311,13 +1633,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
           <div className="pt-6">
             <button
-              onClick={() => onNavigate(currentUser ? 'dashboard' : 'register')}
+              onClick={() => onNavigate(currentUser ? 'add-member' : 'register')}
               className="w-full py-3 bg-gradient-to-b from-[#fb641b] via-[#ea580c] to-[#c2410c] hover:from-[#ff752b] hover:to-[#b03608] text-white font-black rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all shadow-[0_4px_0_#7c2d12,0_8px_16px_rgba(251,100,27,0.35)] active:translate-y-0.5 active:shadow-[0_1px_0_#7c2d12] cursor-pointer"
             >
               <div className="w-6 h-6 rounded-lg bg-white/20 border-t border-white/40 flex items-center justify-center shadow-inner">
-                <Users className="w-3.5 h-3.5 text-yellow-300" />
+                {currentUser ? <UserPlus className="w-3.5 h-3.5 text-yellow-300" /> : <Users className="w-3.5 h-3.5 text-yellow-300" />}
               </div>
-              <span className="truncate">{currentUser ? 'TWIS रेफरल हब खोलें' : `TWIS जॉइन करें (₹${siteConfig.activationFee || 249} One-Time)`}</span>
+              <span className="break-words leading-tight">{currentUser ? 'अपने नीचे नया सदस्य जोड़ें (₹150 पेआउट)' : `TWIS जॉइन करें (₹${siteConfig.activationFee || 249} One-Time)`}</span>
               <ArrowRight className="w-4 h-4 ml-0.5" />
             </button>
           </div>
@@ -1346,7 +1668,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <div className="w-6 h-6 rounded-lg bg-white/20 border-t border-white/40 flex items-center justify-center shadow-inner">
             <Play className="w-3.5 h-3.5 fill-white text-white" />
           </div>
-          <span className="truncate">वीडियो देखें (YouTube)</span>
+          <span className="break-words leading-tight">वीडियो देखें (YouTube)</span>
         </button>
       </div>
 

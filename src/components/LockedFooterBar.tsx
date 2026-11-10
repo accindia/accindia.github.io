@@ -178,7 +178,7 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
 
   return (
     <div 
-      className="fixed bottom-0 left-0 right-0 z-50 w-full select-none shadow-[0_-4px_25px_rgba(0,0,0,0.25)] border-t border-blue-400/40 bg-[#1d25ad] backdrop-blur-md"
+      className="fixed bottom-0 left-0 right-0 z-40 w-full select-none shadow-[0_-4px_25px_rgba(0,0,0,0.25)] border-t border-blue-400/40 bg-[#1d25ad] backdrop-blur-md"
       style={{ backgroundColor: '#1d25ad' }}
     >
       {/* ------------------------------------------------------------- */}
