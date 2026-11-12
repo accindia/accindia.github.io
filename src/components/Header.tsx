@@ -39,6 +39,7 @@ import { FirestoreService } from '../services/firestore';
 import { AccLogo } from '../assets/logo';
 import { WelcomeWindow, detectCurrentGreetingPeriod, GREETING_DETAILS, GreetingPeriod } from './WelcomeWindow';
 import { PrivateChatBox } from './PrivateChatBox';
+import { SampurnPanchangModal } from './SampurnPanchangModal';
 
 interface HeaderProps {
   activeWindow: ActiveWindow;
@@ -68,6 +69,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [showWelcomeModal, setShowWelcomeModal] = useState<boolean>(false);
   const [showNotificationDrawer, setShowNotificationDrawer] = useState<boolean>(false);
   const [showAdminChatModal, setShowAdminChatModal] = useState<boolean>(false);
+  const [showPanchangModal, setShowPanchangModal] = useState<boolean>(false);
   const [unreadChatCount, setUnreadChatCount] = useState<number>(0);
   const [currentGreetingPeriod, setCurrentGreetingPeriod] = useState<GreetingPeriod>(() => detectCurrentGreetingPeriod());
   const [headerMessages, setHeaderMessages] = useState<PrivateMessage[]>([]);
@@ -174,8 +176,10 @@ export const Header: React.FC<HeaderProps> = ({
         const msgs = StorageService.getPrivateMessages(currentUser.accId);
         setHeaderMessages(msgs);
       } else {
-        setUnreadChatCount(0);
-        setHeaderMessages([]);
+        const allMsgs = StorageService.getPrivateMessages();
+        const broadcastMsgs = allMsgs.filter((m) => m.chatType === 'admin' || m.senderRole === 'admin');
+        setHeaderMessages(broadcastMsgs);
+        setUnreadChatCount(broadcastMsgs.filter((m) => !m.isRead).length);
       }
     };
     updateUnread();
@@ -184,6 +188,10 @@ export const Header: React.FC<HeaderProps> = ({
   }, [currentUser?.accId]);
 
   const handleNavClick = (id: ActiveWindow) => {
+    if (currentUser && (id === 'home' || id === 'login')) {
+      setActiveWindow('dashboard');
+      return;
+    }
     if (id === 'idcard') {
       if (onNavigateToIdCard) {
         onNavigateToIdCard();
@@ -198,10 +206,10 @@ export const Header: React.FC<HeaderProps> = ({
   const primaryNavItems = currentUser
     ? [
         {
-          id: 'home' as ActiveWindow,
-          label: 'होम',
-          icon: <Sparkles className="w-3.5 h-3.5" />,
-          colorClass: 'from-amber-400 to-amber-600 text-white',
+          id: 'dashboard' as ActiveWindow,
+          label: 'डैशबोर्ड',
+          icon: <LayoutDashboard className="w-3.5 h-3.5" />,
+          colorClass: 'from-[#2874f0] to-blue-700 text-white',
         },
         {
           id: 'chat' as ActiveWindow,
@@ -214,12 +222,6 @@ export const Header: React.FC<HeaderProps> = ({
           label: 'नया सदस्य जोड़ें',
           icon: <UserPlus className="w-3.5 h-3.5" />,
           colorClass: 'from-orange-500 to-amber-600 text-white',
-        },
-        {
-          id: 'dashboard' as ActiveWindow,
-          label: 'डैशबोर्ड',
-          icon: <LayoutDashboard className="w-3.5 h-3.5" />,
-          colorClass: 'from-[#2874f0] to-blue-700 text-white',
         },
         {
           id: 'refer' as ActiveWindow,
@@ -397,9 +399,9 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="max-w-7xl mx-auto px-1.5 sm:px-4 py-1.5 sm:py-2 flex items-center justify-between gap-1.5 sm:gap-2 w-full flex-wrap xs:flex-nowrap">
           {/* Brand Logo & Full Name - 100% Complete View, Zero Scroll, Identical on Every Screen */}
           <div 
-            onClick={() => setActiveWindow('home')}
+            onClick={() => setActiveWindow(currentUser ? 'dashboard' : 'home')}
             className="flex items-center gap-1.5 sm:gap-3 cursor-pointer group select-none min-w-0"
-            title="Achievers Club Community (ACC) - Start Young · होम"
+            title={currentUser ? "Achievers Club Community (ACC) - मेरा डैशबोर्ड" : "Achievers Club Community (ACC) - Start Young · होम"}
           >
             {/* Official 3D ACC Emblem Logo (Frameless, Complete, No Cutoff) */}
             <AccLogo size="custom" className="w-8 h-8 xs:w-10 xs:h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 group-hover:scale-105 active:translate-y-0.5 drop-shadow-md shrink-0 transition-transform" />
@@ -426,10 +428,14 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Right Side Info: Live IST Time & Verified Badge (Non-scrollable, Compact) */}
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-            {/* Real-time IST Digital Clock & Date */}
-            <div className="hidden sm:flex items-center gap-2 bg-[#124299]/85 border border-blue-300/30 rounded-xl px-2.5 py-1 text-xs shadow-inner">
+            {/* Real-time IST Digital Clock & Date - Click to open Sampurn Panchang */}
+            <div
+              onClick={() => setShowPanchangModal(true)}
+              className="hidden sm:flex items-center gap-2 bg-[#124299]/85 hover:bg-[#154bb0] border border-blue-300/30 hover:border-amber-300 rounded-xl px-2.5 py-1 text-xs shadow-inner cursor-pointer transition active:scale-95 group"
+              title="क्लिक करके आज का सम्पूर्ण दैनिक पंचांग, शुभ मुहूर्त व चौघड़िया देखें"
+            >
               <div className="flex items-center gap-1 text-yellow-300">
-                <Clock className="w-3.5 h-3.5 text-yellow-300 shrink-0" />
+                <Clock className="w-3.5 h-3.5 text-yellow-300 shrink-0 group-hover:rotate-12 transition-transform" />
                 <span className="font-mono-acc font-bold text-white text-[11px] sm:text-xs">
                   {currentTime || '12:00:00 PM'}
                 </span>
@@ -438,7 +444,21 @@ export const Header: React.FC<HeaderProps> = ({
                 <Calendar className="w-3 h-3 text-cyan-200 shrink-0" />
                 <span>{currentDate}</span>
               </div>
+              <span className="hidden lg:inline-flex items-center gap-0.5 bg-amber-400 text-slate-950 text-[9.5px] font-black px-1.5 py-0.2 rounded shadow-xs">
+                🕉️ पंचांग
+              </span>
             </div>
+
+            {/* Mobile Panchang Button */}
+            <button
+              type="button"
+              onClick={() => setShowPanchangModal(true)}
+              className="sm:hidden flex items-center gap-1 bg-[#124299] hover:bg-[#154bb0] text-amber-300 font-black text-[9px] px-2 py-1 rounded-md border border-amber-300/40 active:scale-95 cursor-pointer shadow-xs"
+              title="सम्पूर्ण दैनिक पंचांग देखें"
+            >
+              <span>🕉️</span>
+              <span>पंचांग</span>
+            </button>
 
             {/* Official Portal Seal Badge */}
             <div className="flex items-center gap-1 bg-gradient-to-b from-amber-300 to-amber-500 text-slate-950 font-black text-[8.5px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md sm:rounded-lg shadow-sm border border-amber-200 shrink-0">
@@ -470,7 +490,7 @@ export const Header: React.FC<HeaderProps> = ({
                     {currentUser.avatarUrl ? (
                       <img src={currentUser.avatarUrl} alt={currentUser.fullName} className="w-full h-full object-cover" />
                     ) : (
-                      currentUser.fullName.substring(0, 2).toUpperCase()
+                      (currentUser.fullName || 'MB').substring(0, 2).toUpperCase()
                     )}
                   </div>
                   <div 
@@ -584,7 +604,7 @@ export const Header: React.FC<HeaderProps> = ({
                   title="लाइव चैट"
                 >
                   <MessageCircle className="w-2.5 h-2.5 text-white" />
-                  <span className="leading-none">चैट</span>
+                  <span className="leading-none">Help chat</span>
                   {unreadChatCount > 0 && (
                     <span className="bg-rose-500 text-white text-[7.5px] font-black px-1 rounded-full">
                       {unreadChatCount}
@@ -685,7 +705,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="w-4.5 h-4.5 rounded bg-emerald-950/40 text-emerald-200 flex items-center justify-center shrink-0 border border-emerald-300/40">
                   <MessageCircle className="w-3 h-3 text-white" />
                 </div>
-                <span className="whitespace-nowrap leading-none">चैट</span>
+                <span className="whitespace-nowrap leading-none">Help chat</span>
                 {unreadChatCount > 0 && (
                   <span className="bg-rose-500 text-white text-[8px] font-black px-1 py-0.2 rounded-full border border-white">
                     {unreadChatCount}
@@ -708,7 +728,7 @@ export const Header: React.FC<HeaderProps> = ({
                     {currentUser.avatarUrl ? (
                       <img src={currentUser.avatarUrl} alt={currentUser.fullName} className="w-full h-full object-cover" />
                     ) : (
-                      currentUser.fullName.substring(0, 2).toUpperCase()
+                      (currentUser.fullName || 'MB').substring(0, 2).toUpperCase()
                     )}
                   </div>
 
@@ -968,7 +988,7 @@ export const Header: React.FC<HeaderProps> = ({
                       {currentUser.avatarUrl ? (
                         <img src={currentUser.avatarUrl} alt={currentUser.fullName} className="w-full h-full object-cover" />
                       ) : (
-                        currentUser.fullName.substring(0, 2).toUpperCase()
+                        (currentUser.fullName || 'MB').substring(0, 2).toUpperCase()
                       )}
                     </div>
                     <div className="min-w-0">
@@ -1185,6 +1205,18 @@ export const Header: React.FC<HeaderProps> = ({
       )}
 
       {/* ========================================================================= */}
+      {/* 4.5 SAMPURN DAINIK PANCHANG MODAL (सम्पूर्ण पंचांग व चौघड़िया पॉपअप)      */}
+      {/* ========================================================================= */}
+      <SampurnPanchangModal
+        isOpen={showPanchangModal}
+        onClose={() => setShowPanchangModal(false)}
+        onNavigateRegister={() => {
+          setShowPanchangModal(false);
+          setActiveWindow(currentUser ? 'dashboard' : 'register');
+        }}
+      />
+
+      {/* ========================================================================= */}
       {/* 5. DUAL-LANGUAGE WELCOME WINDOW (Good Morning/Afternoon/Evening/Night)    */}
       {/* ========================================================================= */}
       <WelcomeWindow
@@ -1202,7 +1234,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* 6. HEADER NOTIFICATIONS DRAWER / POPUP                                    */}
       {/* ========================================================================= */}
       {showNotificationDrawer && (
-        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 sm:p-4 pt-16 sm:pt-4 bg-black/75 backdrop-blur-xs animate-fadeIn">
+        <div className="fixed inset-0 z-[150] flex items-start sm:items-center justify-center p-3 sm:p-4 pt-16 sm:pt-4 bg-black/85 backdrop-blur-xs animate-fadeIn">
           <div className="bg-[#17212b] text-white border-2 border-[#2481cc]/60 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
             <div className="bg-gradient-to-r from-[#17212b] via-[#202b36] to-[#0e1621] p-4 border-b border-[#2481cc]/40 flex items-center justify-between">
               <div className="flex items-center gap-3">

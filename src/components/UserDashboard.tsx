@@ -89,6 +89,7 @@ import { AccLogo } from '../assets/logo';
 import { PrivateChatBox } from './PrivateChatBox';
 import { ReferralTrendChart } from './ReferralTrendChart';
 import { SponsorRegisterMemberModal } from './SponsorRegisterMemberModal';
+import { HomeSliderPopupModal } from './HomeSliderPopupModal';
 
 export type UserDashboardTab =
   | 'applink'
@@ -175,6 +176,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
     StorageService.getPrivateMessages(currentUser.accId)
   );
   const [showNotificationModal, setShowNotificationModal] = useState<boolean>(false);
+  const [isDashboardSliderPopupOpen, setIsDashboardSliderPopupOpen] = useState<boolean>(true);
 
   useEffect(() => {
     setUserMessages(StorageService.getPrivateMessages(currentUser.accId));
@@ -574,7 +576,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
   const [passbookEntries, setPassbookEntries] = useState<PassbookEntry[]>(() =>
     StorageService.getPassbookEntries(currentUser.accId)
   );
-  const [withdrawAmount, setWithdrawAmount] = useState<number>(Math.min(currentUser.walletBalance, 500));
+  const [withdrawAmount, setWithdrawAmount] = useState<number>(Math.min(Number(currentUser.walletBalance || 0), 500));
   const [withdrawUpi, setWithdrawUpi] = useState('');
   const [withdrawMsg, setWithdrawMsg] = useState('');
   const [withdrawError, setWithdrawError] = useState('');
@@ -738,9 +740,10 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
 
   const directSponsoredMembers = allMembers.filter(
     (m) =>
+      m.accId && currentUser.accId &&
       m.accId.toUpperCase() !== currentUser.accId.toUpperCase() &&
-      (m.sponsorId?.trim().toUpperCase() === currentUser.accId.trim().toUpperCase() ||
-        (currentUser.mobile && m.sponsorId?.trim() === currentUser.mobile.trim()))
+      ((m.sponsorId && currentUser.accId && String(m.sponsorId).trim().toUpperCase() === String(currentUser.accId).trim().toUpperCase()) ||
+        (currentUser.mobile && m.sponsorId && String(m.sponsorId).trim() === String(currentUser.mobile).trim()))
   );
 
   const existingRefMap = new Map<string, ReferralRecord>();
@@ -1515,7 +1518,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
             </div>
           </div>
           <span className="font-mono-acc font-black text-xl sm:text-2xl text-emerald-600 block mt-1 tabular-nums break-words">
-            ₹{currentUser.walletBalance.toFixed(2)}
+            ₹{(Number(currentUser.walletBalance) || 0).toFixed(2)}
           </span>
           <div className="flex items-center justify-between text-[9.5px] sm:text-[10px] text-slate-500 mt-1 pt-1.5 border-t border-gray-100">
             <span>निकासी योग्य शेष</span>
@@ -2351,7 +2354,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
               <div className="bg-white text-slate-900 p-4 rounded-lg text-center shrink-0 w-full sm:w-auto shadow-md">
                 <span className="text-[10px] text-slate-500 block font-semibold">कुल रेफरल अर्निंग</span>
                 <span className="font-mono-acc font-black text-2xl sm:text-3xl text-[#2874f0] tabular-nums">
-                  ₹{currentUser.twisEarnings.toFixed(2)}
+                  ₹{(Number(currentUser.twisEarnings) || 0).toFixed(2)}
                 </span>
                 <span className="text-[11px] text-slate-600 block mt-0.5">
                   ({currentUser.referralsCount} छात्र जुड़े)
@@ -3874,7 +3877,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                 </div>
               </div>
               <span className="font-mono-acc font-black text-xl sm:text-2xl text-[#2874f0] block mt-1.5 tabular-nums">
-                ₹{currentUser.walletBalance.toFixed(2)}
+                ₹{(Number(currentUser.walletBalance) || 0).toFixed(2)}
               </span>
               <span className="text-[10px] text-blue-800 font-medium block mt-0.5">
                 तत्काल निकासी योग्य शुद्ध उपलब्ध राशि
@@ -4218,7 +4221,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                 <ArrowUpRight className="w-3.5 h-3.5" />
                 <span>💸 नई निकासी का अनुरोध</span>
                 <span className="bg-emerald-100 text-emerald-800 text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold">
-                  ₹{currentUser.walletBalance.toFixed(2)}
+                  ₹{(Number(currentUser.walletBalance) || 0).toFixed(2)}
                 </span>
               </button>
             </div>
@@ -4286,7 +4289,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                         💳 वर्तमान शुद्ध बैलेंस
                       </span>
                       <span className="font-mono-acc font-black text-lg text-[#2874f0] block mt-0.5">
-                        ₹{currentUser.walletBalance.toFixed(2)}
+                        ₹{(Number(currentUser.walletBalance) || 0).toFixed(2)}
                       </span>
                       <span className="text-[9px] text-blue-800 block mt-0.5">तुरंत निकासी योग्य शेष</span>
                     </div>
@@ -4517,7 +4520,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                     <div>
                       <span className="text-slate-600 block text-[11px]">उपलब्ध निकासी बैलेंस:</span>
                       <span className="font-mono-acc font-black text-2xl text-emerald-700 tabular-nums">
-                        ₹{currentUser.walletBalance.toFixed(2)}
+                        ₹{(Number(currentUser.walletBalance) || 0).toFixed(2)}
                       </span>
                     </div>
                     <span className="text-[10.5px] bg-white border border-gray-200 text-slate-700 px-2 py-1 rounded font-bold">
@@ -4588,10 +4591,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                       ))}
                       <button
                         type="button"
-                        onClick={() => setWithdrawAmount(currentUser.walletBalance)}
+                        onClick={() => setWithdrawAmount(Number(currentUser.walletBalance || 0))}
                         className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-[#2874f0] text-[11px] font-mono-acc font-bold rounded"
                       >
-                        पूरा बैलेंस (₹{currentUser.walletBalance.toFixed(0)})
+                        पूरा बैलेंस (₹{(Number(currentUser.walletBalance) || 0).toFixed(0)})
                       </button>
                     </div>
                   </div>
@@ -5072,7 +5075,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
                           5. मोबाइल नंबर प्राइवेसी (Mobile Number Privacy)
                         </strong>
                         <p className="text-[11px] text-slate-500 mt-0.5">
-                          पब्लिक रखने पर पूर्ण नंबर दिखेगा, प्राइवेट रखने पर मास्क रहेगा ({currentUser.mobile.slice(0, 5)}***** )।
+                          पब्लिक रखने पर पूर्ण नंबर दिखेगा, प्राइवेट रखने पर मास्क रहेगा ({String(currentUser.mobile || '').slice(0, 5)}***** )।
                         </p>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
@@ -5980,6 +5983,27 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
           </div>
         </div>
       )}
+
+      {/* 7-Photo Popup Slider on Dashboard (when configured for dashboard or all) */}
+      {(siteConfig.popupDisplayTarget === 'dashboard' || siteConfig.popupDisplayTarget === 'all') &&
+        siteConfig.homeSliderPhotos &&
+        siteConfig.homeSliderPhotos.length > 0 && (
+          <HomeSliderPopupModal
+            photos={siteConfig.homeSliderPhotos}
+            isOpen={isDashboardSliderPopupOpen}
+            onClose={() => setIsDashboardSliderPopupOpen(false)}
+            enableCelebrationEffect={siteConfig.enableCelebrationEffect !== false}
+            onNavigate={(target) => {
+              if (target === 'chat' && onNavigateToChat) {
+                onNavigateToChat();
+              } else if (target === 'idcard') {
+                setActiveTab('idcard');
+              } else if (target === 'plans') {
+                setActiveTab('courses');
+              }
+            }}
+          />
+        )}
     </div>
   );
 };

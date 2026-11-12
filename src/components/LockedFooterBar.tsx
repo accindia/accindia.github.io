@@ -282,24 +282,24 @@ export const LockedFooterBar: React.FC<LockedFooterBarProps> = ({
           {currentUser && (
             <div className="grid grid-cols-5 gap-0.5 sm:gap-1 text-center">
               <Nav3DButton
-                icon={<Home className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
-                label="होम"
-                subLabel="Home"
-                isActive={activeWindow === 'home'}
+                icon={<LayoutDashboard className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
+                label="डैशबोर्ड"
+                subLabel="Dashboard"
+                isActive={activeWindow === 'dashboard'}
                 themeColor="blue"
-                onClick={() => setActiveWindow('home')}
-                title="मुख्य होम पेज"
+                onClick={() => setActiveWindow('dashboard')}
+                title="यूजर डैशबोर्ड व वॉलेट"
                 style={{ backgroundColor: '#1d25ad' }}
               />
 
               <Nav3DButton
-                icon={<LayoutDashboard className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
-                label="डैशबोर्ड"
-                subLabel="Panel"
-                isActive={activeWindow === 'dashboard'}
-                themeColor="indigo"
-                onClick={() => setActiveWindow('dashboard')}
-                title="यूजर डैशबोर्ड व वॉलेट"
+                icon={<MessageCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
+                label="ACC चैट"
+                subLabel="Help Chat"
+                isActive={activeWindow === 'chat'}
+                themeColor="amber"
+                onClick={() => setActiveWindow('chat')}
+                title="ACC MEMBER CHAT एवं सहायता"
               />
 
               <Nav3DButton

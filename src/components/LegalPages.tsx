@@ -25,7 +25,7 @@ import { StorageService, subscribeToSync } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
 import { FAQSection } from './FAQSection';
 
-export type LegalTabType = 'privacy' | 'disclaimer' | 'terms' | 'about' | 'contact' | 'description' | 'faq';
+export type LegalTabType = 'about' | 'services' | 'faq' | 'description' | 'disclaimer' | 'privacy' | 'terms' | 'contact';
 
 interface LegalPagesProps {
   initialTab?: LegalTabType;
@@ -93,6 +93,7 @@ export const LegalPages: React.FC<LegalPagesProps> = ({
       <div className="flex bg-white border border-gray-200 rounded-lg p-1.5 gap-1 overflow-x-auto no-scrollbar shadow-xs">
         {[
           { id: 'about', label: 'About Us (हमारे बारे में)' },
+          { id: 'services', label: 'Products / Services (उत्पाद व सेवाएं)' },
           { id: 'faq', label: 'FAQ (सामान्य प्रश्न)' },
           { id: 'description', label: 'Description (विस्तृत विवरण)' },
           { id: 'disclaimer', label: 'Disclaimer (अस्वीकरण)' },
@@ -255,23 +256,239 @@ export const LegalPages: React.FC<LegalPagesProps> = ({
         </div>
       )}
 
-      {/* CONTENT: Privacy Policy */}
+      {/* CONTENT: Products & Services (उत्पाद या सेवाएं) */}
+      {tab === 'services' && (
+        <div className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 space-y-6 shadow-sm">
+          <div className="border-b border-gray-100 pb-4">
+            <span className="text-[10px] uppercase font-black bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-md border border-emerald-200">
+              OFFICIAL PRODUCTS & PRICING
+            </span>
+            <h2 className="text-xl sm:text-2xl font-black font-display text-slate-900 mt-2">
+              उत्पाद या सेवाएं (Products & Services) • पारदर्शी मूल्य व विवरण
+            </h2>
+            <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+              Achievers Club Community (ACC) द्वारा अपने अधिकृत सदस्यों को प्रदान किए जाने वाले सभी डिजिटल उत्पादों, यूटिलिटी सेवाओं और पारदर्शी आय प्रणालियों की विस्तृत जानकारी।
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Service 1: Membership Activation */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-300 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold bg-amber-200 text-amber-900 px-2 py-0.5 rounded-md">
+                  प्राथमिक सदस्यता (Core Product)
+                </span>
+                <span className="text-base sm:text-lg font-black text-amber-700 font-mono">
+                  ₹249 <span className="text-[11px] font-normal text-slate-600">(One-Time)</span>
+                </span>
+              </div>
+              <h3 className="font-bold text-slate-900 text-sm sm:text-base">
+                1. लाइफटाइम कम्युनिटी 🆔 सदस्यता (Lifetime Student Membership)
+              </h3>
+              <p className="text-xs text-slate-700 leading-relaxed">
+                केवल ₹249 के एकमुश्त शुल्क में आजीवन सदस्यता। कोई वार्षिक या मासिक रिन्यूअल फीस नहीं। इसके अंतर्गत आपको तुरंत एक विशिष्ट ACC सदस्य ID (उदा. ACC249SWIS...) जारी की जाती है।
+              </p>
+              <ul className="text-[11px] text-slate-700 space-y-1 list-disc pl-4">
+                <li>आजीवन सक्रियण (Lifetime Validity)</li>
+                <li>शून्य रिन्यूअल चार्ज (Zero Renewal Fee)</li>
+                <li>डिजिटल डैशबोर्ड एवं पासबुक ट्रैकिंग</li>
+              </ul>
+            </div>
+
+            {/* Service 2: SWIS Recharge Utility */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md">
+                  यूटिलिटी सर्विस (Utility Service)
+                </span>
+                <span className="text-base sm:text-lg font-black text-blue-700 font-mono">
+                  3.30% <span className="text-[11px] font-normal text-slate-600">Fixed</span>
+                </span>
+              </div>
+              <h3 className="font-bold text-slate-900 text-sm sm:text-base">
+                2. सेल्फ वर्क इनकम सिस्टम (SWIS - Recharge Commission)
+              </h3>
+              <p className="text-xs text-slate-700 leading-relaxed">
+                सभी प्रमुख भारतीय टेलीकॉम ऑपरेटरों (Jio, Airtel, Vi, BSNL) एवं DTH पर 3.30% फिक्स्ड कमीशन। सदस्य स्वयं या परिवार व मित्रों का रिचार्ज कर तुरंत कमीशन सीधे वॉलेट में पाते हैं।
+              </p>
+              <ul className="text-[11px] text-slate-700 space-y-1 list-disc pl-4">
+                <li>तुरंत कमीशन क्रेडिट (Instant Commission)</li>
+                <li>सभी प्रीपेड एवं पोस्टपेड कनेक्शन समर्थित</li>
+                <li>प्रति रिचार्ज ₹10 से ₹50 तक की निश्चित बचत</li>
+              </ul>
+            </div>
+
+            {/* Service 3: TWIS Referral Hub */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-300 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">
+                  रेफरल प्रोग्राम (Referral Hub)
+                </span>
+                <span className="text-base sm:text-lg font-black text-emerald-700 font-mono">
+                  ₹150 <span className="text-[11px] font-normal text-slate-600">/ रेफरल</span>
+                </span>
+              </div>
+              <h3 className="font-bold text-slate-900 text-sm sm:text-base">
+                3. टीम वर्क इनकम सिस्टम (TWIS - Refer & Earn)
+              </h3>
+              <p className="text-xs text-slate-700 leading-relaxed">
+                प्रत्येक छात्र साथी को अपने रेफरल लिंक से जोड़ने पर ₹150 सीधी रेफरल आय। 2 मित्रों को जोड़ते ही ₹300 प्राप्त होते हैं, जिससे आपकी एक्टिवेशन लागत पहले ही दिन वसूल हो जाती है।
+              </p>
+              <ul className="text-[11px] text-slate-700 space-y-1 list-disc pl-4">
+                <li>न्यूनतम निकासी मात्र ₹100</li>
+                <li>दैनिक UPI / बैंक खाता ट्रांसफर (Daily Payout)</li>
+                <li>असीमित रेफरल अवसर (No Earning Cap)</li>
+              </ul>
+            </div>
+
+            {/* Service 4: Certified Digital ID Card */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-purple-50 to-violet-50 border-2 border-purple-200 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold bg-purple-100 text-purple-800 px-2 py-0.5 rounded-md">
+                  पहचान पत्र (Digital Identity)
+                </span>
+                <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                  मुफ़्त (Free with ₹249)
+                </span>
+              </div>
+              <h3 className="font-bold text-slate-900 text-sm sm:text-base">
+                4. प्रमाणित डिजिटल ID कार्ड (Certified QR ID Card)
+              </h3>
+              <p className="text-xs text-slate-700 leading-relaxed">
+                क्यूआर कोड युक्त दोनों तरफ (Front & Back) का HD प्रिंट-रेडी डिजिटल पहचान पत्र। यह कार्ड आपकी प्रामाणिकता सिद्ध करता है और इसमें प्राइवेसी सुरक्षा फीचर्स अंतर्निहित हैं।
+              </p>
+              <ul className="text-[11px] text-slate-700 space-y-1 list-disc pl-4">
+                <li>HD PNG डाउनलोड एवं डायरेक्ट प्रिंट विकल्प</li>
+                <li>केवल कार्डधारक डाउनलोड कर सकता है (सुरक्षित)</li>
+                <li>मोबाइल व ईमेल प्राइवेसी सुरक्षा टॉगल</li>
+              </ul>
+            </div>
+
+            {/* Service 5: Official Android APK */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-cyan-50 to-sky-50 border-2 border-cyan-200 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold bg-cyan-100 text-cyan-800 px-2 py-0.5 rounded-md">
+                  मोबाइल एप्लिकेशन (App Access)
+                </span>
+                <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                  सत्यापित सदस्यों हेतु
+                </span>
+              </div>
+              <h3 className="font-bold text-slate-900 text-sm sm:text-base">
+                5. अधिकृत Android APK डाउनलोड लिंक
+              </h3>
+              <p className="text-xs text-slate-700 leading-relaxed">
+                सत्यापित सदस्यों के डैशबोर्ड में सीधे अधिकृत Android ऐप का सुरक्षित डाउनलोड लिंक उपलब्ध कराया जाता है, जिससे सदस्य 1-क्लिक में मोबाइल पर सभी सेवाएं उपयोग कर सकें।
+              </p>
+            </div>
+
+            {/* Service 6: Community Chat & Helpdesk */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-amber-50 to-yellow-50 border-2 border-amber-200 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md">
+                  कम्युनिटी नेटवर्क (Social Hub)
+                </span>
+                <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                  24x7 Live
+                </span>
+              </div>
+              <h3 className="font-bold text-slate-900 text-sm sm:text-base">
+                6. ACC MEMBER CHAT एवं सोशल हेल्प हब
+              </h3>
+              <p className="text-xs text-slate-700 leading-relaxed">
+                कम्युनिटी के अन्य सक्रिय सदस्यों, स्पॉन्सर और ग्रुप एडमिन से 1-on-1 सुरक्षित बातचीत, फ़ोटो व वीडियो साझा करने का एन्क्रिप्टेड माध्यम।
+              </p>
+            </div>
+          </div>
+
+          <div className="text-center pt-2">
+            <button
+              type="button"
+              onClick={onGoToRegister}
+              className="px-6 py-3 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:brightness-110 text-slate-950 font-black text-sm rounded-xl shadow-md transition active:scale-95 cursor-pointer"
+            >
+              🚀 अभी सदस्यता लें — केवल ₹249 में एक्टिवेट करें
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* CONTENT: Privacy Policy (गोपनीयता नीति) */}
       {tab === 'privacy' && (
-        <div className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 space-y-4 shadow-sm">
-          <h2 className="text-lg font-bold text-slate-900">Privacy Policy (गोपनीयता नीति)</h2>
-          <div className="space-y-3 text-xs sm:text-sm text-slate-700 leading-relaxed">
-            <p>
-              Achievers Club Community (ACC) आपकी व्यक्तिगत गोपनीयता का पूर्ण सम्मान करता है। यह नीति स्पष्ट करती है कि हम आपका डेटा कैसे सुरक्षित रखते हैं।
+        <div className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 space-y-5 shadow-sm">
+          <div className="border-b border-gray-100 pb-3">
+            <span className="text-[10px] uppercase font-black bg-blue-100 text-[#2874f0] px-2.5 py-0.5 rounded-md border border-blue-200">
+              LEGAL & PRIVACY COMPLIANCE
+            </span>
+            <h2 className="text-xl sm:text-2xl font-black font-display text-slate-900 mt-1">
+              गोपनीयता नीति (Privacy Policy)
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              अंतिम अद्यतन: 2026 • डिजिटल व्यक्तिगत डेटा संरक्षण अधिनियम (DPDP Act) एवं Google AdSense मानकों के अनुरूप
             </p>
-            <p>
-              <strong>1. संग्रहीत जानकारी:</strong> रजिस्ट्रेशन के दौरान हम आपका नाम, मोबाइल नंबर, व्हाट्सएप नंबर, ईमेल, शैक्षणिक योग्यता और शहर की जानकारी प्राप्त करते हैं। यह जानकारी केवल आपकी डिजिटल 🆔 तैयार करने और सपोर्ट प्रदान करने के लिए उपयोग होती है।
-            </p>
-            <p>
-              <strong>2. डेटा सुरक्षा:</strong> आपका डेटा किसी भी तीसरे पक्ष के साथ साझा या बेचा नहीं जाता है। भुगतान संबंधी जानकारी (जैसे UTR नंबर) केवल ट्रांजैक्शन ऑडिट के लिए स्टोर की जाती है।
-            </p>
-            <p>
-              <strong>3. अधिकार:</strong> आप कभी भी अपने खाते की जानकारी अपडेट करने या सहायता प्राप्त करने के लिए <code>santosh09patidar@gmail.com</code> पर संपर्क कर सकते हैं।
-            </p>
+          </div>
+
+          <div className="space-y-4 text-xs sm:text-sm text-slate-700 leading-relaxed">
+            <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-blue-950">
+              <strong className="block text-sm mb-1">संक्षेप में हमारी प्रतिबद्धता:</strong>
+              Achievers Club Community (ACC) आपकी व्यक्तिगत जानकारी का सर्वोच्च सम्मान करता है। हम आपके डेटा को न तो बेचते हैं और न ही किसी तीसरे पक्ष के साथ अनैतिक रूप से साझा करते हैं।
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="font-bold text-slate-900 text-sm">
+                1. हम कौन सा डेटा एकत्र करते हैं (Data Collection):
+              </h3>
+              <p>
+                जब आप हमारी वेबसाइट पर रजिस्ट्रेशन करते हैं या फॉर्म भरते हैं, तो हम निम्नलिखित जानकारी सुरक्षित रूप से संग्रहीत करते हैं:
+              </p>
+              <ul className="list-disc pl-5 space-y-1 text-slate-600">
+                <li><strong>व्यक्तिगत पहचान:</strong> आपका पूरा नाम, ईमेल आईडी, मोबाइल नंबर, व्हाट्सएप नंबर।</li>
+                <li><strong>खाता विवरण:</strong> स्पॉन्सर आईडी, चयनित प्लान (SWIS / TWIS), ट्रांजैक्शन यूटीआर (UTR) संख्या।</li>
+                <li><strong>स्थान व शिक्षा:</strong> शहर, राज्य, पिनकोड और शैक्षणिक योग्यता (छात्र पहचान हेतु)।</li>
+                <li><strong>तकनीकी डेटा:</strong> इंटरनेट प्रोटोकॉल (IP) पता, ब्राउज़र का प्रकार, विज़िट समय और कुकीज़ (Cookies)।</li>
+              </ul>
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="font-bold text-slate-900 text-sm">
+                2. कुकीज़ एवं Google AdSense विज्ञापन नीति (Cookies & AdSense Compliance):
+              </h3>
+              <p>
+                हमारी वेबसाइट उपयोगकर्ताओं के अनुभव को बेहतर बनाने और आगंतुकों के लिए प्रासंगिक सामग्री प्रदर्शित करने के लिए 'कुकीज़' (Cookies) का उपयोग कर सकती है:
+              </p>
+              <ul className="list-disc pl-5 space-y-1 text-slate-600">
+                <li><strong>तृतीय-पक्ष विक्रेता:</strong> Google सहित तृतीय-पक्ष विक्रेता हमारी वेबसाइट पर उपयोगकर्ता के पूर्व विज़िट के आधार पर विज्ञापन (Ads) प्रदर्शित करने के लिए कुकीज़ (जैसे Google DoubleClick DART Cookie) का उपयोग कर सकते हैं।</li>
+                <li><strong>उपयोगकर्ता विकल्प:</strong> उपयोगकर्ता <a href="https://adssettings.google.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold underline">Google Ad Settings</a> पर जाकर वैयक्तिकृत विज्ञापनों (Personalised Advertising) को किसी भी समय ऑप्ट-आउट कर सकते हैं।</li>
+                <li><strong>लॉग फ़ाइलें:</strong> साइट विज़िट के सामान्य रुझानों का विश्लेषण करने, साइट व्यवस्थापन और सुरक्षा ऑडिट हेतु लॉग फ़ाइलें तैयार की जाती हैं।</li>
+              </ul>
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="font-bold text-slate-900 text-sm">
+                3. उपयोगकर्ता गोपनीयता नियंत्रण (User Privacy Controls):
+              </h3>
+              <p className="bg-amber-50 p-3 rounded-xl border border-amber-300 text-amber-950 font-medium">
+                <strong>विशेष सुरक्षा नियम:</strong> केवल आपकी <strong>ACC सदस्य आईडी ({siteConfig.adminSignatoryName ? 'ACC249...' : 'ACC ID'})</strong> हमेशा सार्वजनिक पहचान के रूप में प्रदर्शित रहती है। बाकी सभी व्यक्तिगत विवरण (प्रोफाइल फोटो, नाम, मोबाइल नंबर, ईमेल, स्पॉन्सर आईडी, यूज़रनेम) आप अपने डैशबोर्ड व चैट प्राइवेसी सेटिंग्स से अपनी इच्छानुसार <strong>पब्लिक या मास्क/प्राइवेट</strong> रख सकते हैं।
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="font-bold text-slate-900 text-sm">
+                4. डेटा सुरक्षा व गैर-बिक्री आश्वासन (No-Sale Guarantee):
+              </h3>
+              <p>
+                हम आपके किसी भी व्यक्तिगत या वित्तीय डेटा को विपणन या विज्ञापन उद्देश्यों के लिए किसी अन्य कंपनी को नहीं बेचते हैं। भुगतान सत्यापन के बाद आपके सभी विवरण एन्क्रिप्टेड सुरक्षित डेटाबेस में संग्रहित रहते हैं।
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="font-bold text-slate-900 text-sm">
+                5. संपर्क एवं डेटा संशोधन अनुरोध:
+              </h3>
+              <p>
+                यदि आपके पास इस गोपनीयता नीति के संबंध में कोई प्रश्न है या आप अपने खाते की जानकारी को संशोधित अथवा हटाना चाहते हैं, तो आप हमारे आधिकारिक ईमेल <strong>{siteConfig.officialEmail || 'newuserhelpline@gmail.com'}</strong> अथवा Telegram <strong>@NEWUSERHELPLINE</strong> पर संपर्क कर सकते हैं।
+              </p>
+            </div>
           </div>
         </div>
       )}

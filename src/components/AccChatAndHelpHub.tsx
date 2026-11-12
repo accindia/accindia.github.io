@@ -36,6 +36,9 @@ import {
   Volume2,
   VolumeX,
   CreditCard,
+  Lock,
+  Shield,
+  CheckCircle2,
 } from 'lucide-react';
 import {
   Member,
@@ -44,12 +47,14 @@ import {
   ChatGroup,
   SocialNotification,
   AvatarFrameType,
+  PrivacySettings,
 } from '../types';
 import { StorageService, subscribeToSync } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
 import { AvatarWith3DFrame } from './AvatarWith3DFrame';
 import { DigitalIdCard } from './DigitalIdCard';
 import { ensureSafeFirestoreSize } from '../utils/imageCompressor';
+import { getMemberPrivacyDisplay } from '../utils/privacyMask';
 
 interface AccChatAndHelpHubProps {
   currentUser: Member;
@@ -100,6 +105,26 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
 
   // ID Card Modal State
   const [selectedIdCardMember, setSelectedIdCardMember] = useState<Member | null>(null);
+
+  // Profile Modal State (Pop-up inside chat room without navigating away)
+  const [viewedProfileModalMember, setViewedProfileModalMember] = useState<Member | null>(null);
+
+  // User Profile & Digital ID Card Privacy Settings Modal State
+  const [showChatPrivacyModal, setShowChatPrivacyModal] = useState<boolean>(false);
+  const [chatPrivacyDraft, setChatPrivacyDraft] = useState<PrivacySettings>(() => currentUser.privacySettings || {
+    showProfilePic: true,
+    showFullNamePublic: true,
+    showMobile: false,
+    showWhatsapp: false,
+    showEmail: false,
+    showSponsorId: true,
+    showUsername: true,
+    showCity: true,
+    showProfileLink: true,
+    showPersonalQr: false,
+  });
+  const [isSavingChatPrivacy, setIsSavingChatPrivacy] = useState<boolean>(false);
+  const [chatPrivacySuccessMsg, setChatPrivacySuccessMsg] = useState<string>('');
 
   // Create Group Modal
   const [createGroupModalOpen, setCreateGroupModalOpen] = useState(false);
@@ -226,13 +251,44 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
     setActiveTab('chats');
   };
 
-  // Handle visit profile
-  const handleVisitProfile = async (member: Member) => {
+  // Handle visit profile: Opens the pop-up modal directly inside the chat room so the user never loses their active chat
+  const openMemberProfileModal = async (member: Member) => {
     setViewedMember(member);
-    setActiveTab('profile');
+    setViewedProfileModalMember(member);
     if (member.accId.toUpperCase() !== currentUser.accId.toUpperCase()) {
       await StorageService.recordProfileView(member.accId, currentUser);
       reloadData();
+    }
+  };
+
+  const handleVisitProfile = (member: Member) => {
+    openMemberProfileModal(member);
+  };
+
+  // Save privacy settings directly from chat hub
+  const handleSaveChatPrivacy = async () => {
+    setIsSavingChatPrivacy(true);
+    setChatPrivacySuccessMsg('');
+    try {
+      const updated = StorageService.updateMember(currentUser.accId, {
+        privacySettings: chatPrivacyDraft,
+      });
+      await FirestoreService.updateMember(currentUser.accId, {
+        privacySettings: chatPrivacyDraft,
+      });
+      if (updated) {
+        currentUser.privacySettings = chatPrivacyDraft;
+        reloadData();
+      }
+      setChatPrivacySuccessMsg('✓ प्राइवेसी सेटिंग्स सफलतापूर्वक सुरक्षित हो गईं!');
+      setTimeout(() => {
+        setChatPrivacySuccessMsg('');
+        setShowChatPrivacyModal(false);
+      }, 1500);
+    } catch (err) {
+      console.error('Error saving chat privacy settings:', err);
+    } finally {
+      setIsSavingChatPrivacy(false);
     }
   };
 
@@ -542,8 +598,9 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
 
             {/* My Profile Quick Button */}
             <button
-              onClick={() => handleVisitProfile(currentUser)}
-              className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 hover:border-amber-400 transition-all text-left"
+              onClick={() => openMemberProfileModal(currentUser)}
+              className="flex items-center gap-2 px-2 sm:px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 hover:border-amber-400 transition-all text-left cursor-pointer"
+              title="मेरी प्रोफ़ाइल एवं प्राइवेसी सेटिंग्स"
             >
               <AvatarWith3DFrame
                 avatarUrl={currentUser.avatarUrl}
@@ -560,6 +617,21 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
                   @{currentUser.username || currentUser.accId}
                 </p>
               </div>
+            </button>
+
+            {/* Top-Right Corner Prominent Close Button */}
+            <button
+              type="button"
+              onClick={() => {
+                if (onClose) onClose();
+                else if (onNavigateToDashboard) onNavigateToDashboard();
+              }}
+              className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:brightness-110 text-white font-black text-xs shadow-md border border-red-400/50 transition-all cursor-pointer shrink-0 active:scale-95"
+              title="चैट बंद करें और डैशबोर्ड पर जाएं"
+              aria-label="चैट बंद करें"
+            >
+              <X className="w-4 h-4 text-white" />
+              <span className="hidden xs:inline">बंद करें</span>
             </button>
           </div>
         </div>
@@ -2509,6 +2581,466 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
                 onClose={() => setSelectedIdCardMember(null)}
                 isSponsorCard={false}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* 9. MEMBER PROFILE POP-UP MODAL (INSIDE ACTIVE CHAT)           */}
+      {/* ------------------------------------------------------------- */}
+      {viewedProfileModalMember && (() => {
+        const isSelf = viewedProfileModalMember.accId.toUpperCase() === currentUser.accId.toUpperCase();
+        const privacy = getMemberPrivacyDisplay(viewedProfileModalMember, isSelf);
+        const isTargetAdmin = isGroupAdmin(selectedGroup, viewedProfileModalMember.accId);
+        const isTargetTop = isTopPerformer(viewedProfileModalMember.accId);
+        const isAlreadyFriend = myFriends.some(
+          (f) => f.accId.toUpperCase() === viewedProfileModalMember.accId.toUpperCase()
+        );
+
+        return (
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto animate-fadeIn"
+            onClick={() => setViewedProfileModalMember(null)}
+          >
+            <div
+              className="relative w-[95vw] sm:w-full max-w-md bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 rounded-3xl border-2 border-amber-500/70 p-4 sm:p-6 shadow-[0_10px_40px_rgba(0,0,0,0.8)] space-y-4 my-auto text-white overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Subtle Ambient Glow */}
+              <div className="absolute -top-16 -right-16 w-36 h-36 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+
+              {/* Modal Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center justify-center font-bold text-xs">
+                    👤
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-black text-white">
+                      {isSelf ? 'मेरी कम्युनिटी प्रोफ़ाइल' : 'सदस्य प्रोफ़ाइल'}
+                    </h3>
+                    <p className="text-[10px] text-slate-400">
+                      सुरक्षित सदस्य विवरण व डिजिटल पहचान
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setViewedProfileModalMember(null)}
+                  className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                  title="बंद करें"
+                  aria-label="प्रोफ़ाइल पॉप-अप बंद करें"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Avatar & Verification Section */}
+              <div className="flex items-center gap-3.5 bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800">
+                <div className="relative shrink-0">
+                  <AvatarWith3DFrame
+                    avatarUrl={privacy.avatarUrl}
+                    name={privacy.displayName}
+                    frame={viewedProfileModalMember.avatarFrame || 'acc_medallion'}
+                    size="md"
+                  />
+                  <div className="absolute -bottom-1 -right-1 bg-amber-500 text-slate-950 p-1 rounded-full shadow">
+                    <ShieldCheck className="w-3 h-3" />
+                  </div>
+                </div>
+
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h4 className="text-sm sm:text-base font-bold text-white truncate">
+                      {privacy.displayName}
+                    </h4>
+
+                    {/* Admin Badge */}
+                    {isTargetAdmin && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-black uppercase bg-gradient-to-r from-purple-700 to-indigo-700 text-purple-100 border border-purple-400/50 shadow-xs">
+                        <Crown className="w-2.5 h-2.5 text-amber-300 fill-amber-300" />
+                        <span>Admin</span>
+                      </span>
+                    )}
+
+                    {/* Top Performer Badge */}
+                    {isTargetTop && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-black uppercase bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 border border-yellow-200 shadow-xs">
+                        <Flame className="w-2.5 h-2.5 text-red-600 fill-red-600 animate-bounce" />
+                        <span>Top Performer</span>
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-amber-300 font-mono">
+                    {privacy.displayUsername}
+                  </p>
+
+                  <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                    <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                      {viewedProfileModalMember.plan} Plan
+                    </span>
+                    <span>•</span>
+                    <span className="text-emerald-400 font-medium">सत्यापित सक्रिय सदस्य ✓</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* CRITICAL RULE: Prominent Permanent Public ACC ID Banner */}
+              <div className="bg-gradient-to-r from-amber-500/20 via-yellow-500/10 to-amber-500/20 border-2 border-amber-500/60 rounded-2xl p-3 flex items-center justify-between gap-2 shadow-inner">
+                <div className="min-w-0">
+                  <span className="text-[9.5px] uppercase font-black tracking-wider text-amber-300 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
+                    <span>OFFICIAL ACC MEMBER 🆔 (सार्वजनिक)</span>
+                  </span>
+                  <p className="font-mono font-black text-base sm:text-lg text-amber-400 tracking-wider truncate">
+                    {privacy.displayAccId}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(privacy.displayAccId);
+                    alert(`ACC सदस्य ID (${privacy.displayAccId}) कॉपी हो गई!`);
+                  }}
+                  className="px-2.5 py-1.5 bg-amber-500/30 hover:bg-amber-500/40 text-amber-300 rounded-xl border border-amber-500/50 text-xs font-bold transition flex items-center gap-1 cursor-pointer shrink-0 active:scale-95"
+                  title="सदस्य ID कॉपी करें"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Copy</span>
+                </button>
+              </div>
+
+              {/* Masked / Protected Details Grid */}
+              <div className="grid grid-cols-2 gap-2 text-xs bg-slate-950/70 p-3 rounded-2xl border border-slate-800">
+                <div className="min-w-0">
+                  <span className="text-[9.5px] text-slate-400 block font-medium">स्पॉन्सर आईडी (Sponsor):</span>
+                  <span className="font-mono text-slate-200 text-[10.5px] font-semibold truncate block">
+                    {privacy.displaySponsorId}
+                  </span>
+                </div>
+
+                <div className="min-w-0">
+                  <span className="text-[9.5px] text-slate-400 block font-medium">स्पॉन्सर नाम (Name):</span>
+                  <span className="text-slate-200 text-[10.5px] font-semibold truncate block">
+                    {privacy.displaySponsorName}
+                  </span>
+                </div>
+
+                <div className="min-w-0">
+                  <span className="text-[9.5px] text-slate-400 block font-medium">मोबाइल नंबर (Mobile):</span>
+                  <span className="font-mono text-slate-200 text-[10.5px] font-semibold truncate block">
+                    {privacy.displayMobile}
+                  </span>
+                </div>
+
+                <div className="min-w-0">
+                  <span className="text-[9.5px] text-slate-400 block font-medium">ईमेल आईडी (Email):</span>
+                  <span className="font-mono text-slate-200 text-[10.5px] font-semibold truncate block">
+                    {privacy.displayEmail}
+                  </span>
+                </div>
+              </div>
+
+              {/* Bio / Status */}
+              {viewedProfileModalMember.bio && (
+                <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/80 text-xs text-slate-300 italic">
+                  "{viewedProfileModalMember.bio}"
+                </div>
+              )}
+
+              {/* Action Buttons: Digital ID Card, Direct Chat, Privacy Settings */}
+              <div className="space-y-2 pt-1">
+                {/* 1. Digital ID Card Popup Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const mem = viewedProfileModalMember;
+                    setViewedProfileModalMember(null);
+                    setSelectedIdCardMember(mem);
+                  }}
+                  className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:brightness-110 text-white font-black text-xs sm:text-sm rounded-xl shadow-md border border-blue-400/40 flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer"
+                >
+                  <CreditCard className="w-4 h-4 text-amber-300" />
+                  <span>🪪 डिजिटल ID कार्ड देखें (View Digital ID Card)</span>
+                </button>
+
+                {/* 2. Direct 1-on-1 Chat Button (if not viewing self) */}
+                {!isSelf && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const mem = viewedProfileModalMember;
+                      setViewedProfileModalMember(null);
+                      openDirectChatWithMember(mem);
+                    }}
+                    className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-500 hover:brightness-110 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    <span>💬 बातचीत शुरू करें (Start 1-on-1 Chat)</span>
+                  </button>
+                )}
+
+                {/* 3. Friend Request Button (if not self and not friends) */}
+                {!isSelf && !isAlreadyFriend && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const res = StorageService.sendFriendRequest(currentUser, viewedProfileModalMember.accId);
+                      alert(res.message);
+                      reloadData();
+                    }}
+                    className="w-full py-2 px-4 bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs rounded-xl border border-amber-500/40 flex items-center justify-center gap-2 transition cursor-pointer"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>मित्र अनुरोध भेजें (Send Friend Request)</span>
+                  </button>
+                )}
+
+                {/* 4. Privacy Settings Quick Button (if viewing own profile) */}
+                {isSelf && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChatPrivacyDraft(currentUser.privacySettings || {
+                        showProfilePic: true,
+                        showFullNamePublic: true,
+                        showMobile: false,
+                        showWhatsapp: false,
+                        showEmail: false,
+                        showSponsorId: true,
+                        showUsername: true,
+                        showCity: true,
+                        showProfileLink: true,
+                        showPersonalQr: false,
+                      });
+                      setShowChatPrivacyModal(true);
+                    }}
+                    className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs sm:text-sm rounded-xl border border-amber-500/50 flex items-center justify-center gap-2 transition cursor-pointer"
+                  >
+                    <Lock className="w-4 h-4 text-amber-400" />
+                    <span>🔒 प्रोफ़ाइल व 🆔 कार्ड गोपनीयता सेटिंग्स</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ------------------------------------------------------------- */}
+      {/* 10. CHAT & ID CARD PRIVACY SETTINGS MODAL                     */}
+      {/* ------------------------------------------------------------- */}
+      {showChatPrivacyModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto animate-fadeIn"
+          onClick={() => setShowChatPrivacyModal(false)}
+        >
+          <div
+            className="relative w-[95vw] sm:w-full max-w-md bg-white rounded-3xl border-2 border-amber-500/70 p-4 sm:p-6 shadow-2xl space-y-4 my-auto text-slate-800 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+                  🔒
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                    गोपनीयता सेटिंग्स (Privacy Settings)
+                  </h3>
+                  <p className="text-[10px] text-slate-500">
+                    प्रोफ़ाइल व डिजिटल ID कार्ड पर क्या सार्वजनिक रखना है
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowChatPrivacyModal(false)}
+                className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                title="बंद करें"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Permanent Public Rule Banner */}
+            <div className="bg-amber-50 border border-amber-300 p-3 rounded-xl text-[11px] text-amber-900 leading-relaxed">
+              <strong className="text-amber-950 block">📌 सुरक्षा नियम (Rule):</strong>
+              केवल आपकी <strong>ACC सदस्य आईडी ({currentUser.accId})</strong> हमेशा सार्वजनिक रहेगी। बाकी सभी विवरण (फोटो, नाम, मोबाइल, ईमेल, स्पॉन्सर आईडी, यूज़रनेम) आप अपनी इच्छानुसार प्राइवेट या मास्क रख सकते हैं।
+            </div>
+
+            {chatPrivacySuccessMsg && (
+              <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 p-2.5 rounded-xl font-bold text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{chatPrivacySuccessMsg}</span>
+              </div>
+            )}
+
+            {/* Toggles Container */}
+            <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1 text-xs">
+              {/* 1. Profile Picture */}
+              <div className="flex items-center justify-between p-2.5 rounded-xl border border-gray-200 hover:bg-slate-50 transition">
+                <div className="space-y-0.5">
+                  <span className="font-bold text-slate-900 block">प्रोफ़ाइल फ़ोटो दिखाएं (Show Photo)</span>
+                  <p className="text-[10px] text-slate-500">बंद रहने पर सुरक्षित ACC प्रतीक दिखेगा।</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={chatPrivacyDraft.showProfilePic !== false}
+                    onChange={(e) => setChatPrivacyDraft({ ...chatPrivacyDraft, showProfilePic: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                </label>
+              </div>
+
+              {/* 2. Full Name */}
+              <div className="flex items-center justify-between p-2.5 rounded-xl border border-gray-200 hover:bg-slate-50 transition">
+                <div className="space-y-0.5">
+                  <span className="font-bold text-slate-900 block">पूरा नाम सार्वजनिक करें (Show Full Name)</span>
+                  <p className="text-[10px] text-slate-500">बंद रहने पर मास्क नाम दिखेगा।</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={chatPrivacyDraft.showFullNamePublic !== false}
+                    onChange={(e) => setChatPrivacyDraft({ ...chatPrivacyDraft, showFullNamePublic: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                </label>
+              </div>
+
+              {/* 3. Sponsor ID */}
+              <div className="flex items-center justify-between p-2.5 rounded-xl border border-gray-200 hover:bg-slate-50 transition">
+                <div className="space-y-0.5">
+                  <span className="font-bold text-slate-900 block">स्पॉन्सर आईडी दिखाएं (Show Sponsor ID)</span>
+                  <p className="text-[10px] text-slate-500">बंद रहने पर ACC249**** दिखेगा।</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={chatPrivacyDraft.showSponsorId !== false}
+                    onChange={(e) => setChatPrivacyDraft({ ...chatPrivacyDraft, showSponsorId: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+
+              {/* 4. Username */}
+              <div className="flex items-center justify-between p-2.5 rounded-xl border border-gray-200 hover:bg-slate-50 transition">
+                <div className="space-y-0.5">
+                  <span className="font-bold text-slate-900 block">यूज़रनेम दिखाएं (Show Username @handle)</span>
+                  <p className="text-[10px] text-slate-500">बंद रहने पर @us**** दिखेगा।</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={chatPrivacyDraft.showUsername !== false}
+                    onChange={(e) => setChatPrivacyDraft({ ...chatPrivacyDraft, showUsername: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-600"></div>
+                </label>
+              </div>
+
+              {/* 5. Mobile */}
+              <div className="flex items-center justify-between p-2.5 rounded-xl border border-gray-200 hover:bg-slate-50 transition">
+                <div className="space-y-0.5">
+                  <span className="font-bold text-slate-900 block">मोबाइल नंबर दिखाएं (Show Mobile)</span>
+                  <p className="text-[10px] text-slate-500">बंद रहने पर +91 98••••••10 दिखेगा।</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={chatPrivacyDraft.showMobile}
+                    onChange={(e) => setChatPrivacyDraft({ ...chatPrivacyDraft, showMobile: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#2874f0]"></div>
+                </label>
+              </div>
+
+              {/* 6. Email */}
+              <div className="flex items-center justify-between p-2.5 rounded-xl border border-gray-200 hover:bg-slate-50 transition">
+                <div className="space-y-0.5">
+                  <span className="font-bold text-slate-900 block">ईमेल आईडी दिखाएं (Show Email)</span>
+                  <p className="text-[10px] text-slate-500">बंद रहने पर m*****@acc.in दिखेगा।</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={chatPrivacyDraft.showEmail}
+                    onChange={(e) => setChatPrivacyDraft({ ...chatPrivacyDraft, showEmail: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-600"></div>
+                </label>
+              </div>
+
+              {/* 7. WhatsApp Chat */}
+              <div className="flex items-center justify-between p-2.5 rounded-xl border border-gray-200 hover:bg-slate-50 transition">
+                <div className="space-y-0.5">
+                  <span className="font-bold text-slate-900 block">WhatsApp डायरेक्ट चैट (Direct WhatsApp)</span>
+                  <p className="text-[10px] text-slate-500">अन्य सदस्य सीधे WhatsApp पर संपर्क कर सकेंगे।</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={chatPrivacyDraft.showWhatsapp}
+                    onChange={(e) => setChatPrivacyDraft({ ...chatPrivacyDraft, showWhatsapp: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                </label>
+              </div>
+
+              {/* 8. City & State */}
+              <div className="flex items-center justify-between p-2.5 rounded-xl border border-gray-200 hover:bg-slate-50 transition">
+                <div className="space-y-0.5">
+                  <span className="font-bold text-slate-900 block">स्थान / शहर दिखाएं (Show City)</span>
+                  <p className="text-[10px] text-slate-500">बंद रहने पर केवल 'भारत (India)' दिखेगा।</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={chatPrivacyDraft.showCity !== false}
+                    onChange={(e) => setChatPrivacyDraft({ ...chatPrivacyDraft, showCity: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                </label>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowChatPrivacyModal(false)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl transition cursor-pointer text-xs"
+              >
+                रद्द करें
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveChatPrivacy}
+                disabled={isSavingChatPrivacy}
+                className="px-5 py-2 bg-[#2874f0] hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition disabled:opacity-50 cursor-pointer text-xs"
+              >
+                {isSavingChatPrivacy ? 'सुरक्षित कर रहे हैं...' : 'सेटिंग्स सहेजें ✓'}
+              </button>
             </div>
           </div>
         </div>

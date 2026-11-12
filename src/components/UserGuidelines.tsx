@@ -71,7 +71,7 @@ export const UserGuidelines: React.FC<UserGuidelinesProps> = ({
               onClick={onGoToDashboard}
               className="px-4 py-2.5 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black text-xs rounded-lg shadow-sm transition flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              <span>डैशबोर्ड खोलें ({currentUser.fullName.split(' ')[0]})</span>
+              <span>डैशबोर्ड खोलें ({(currentUser.fullName || 'सदस्य').split(' ')[0]})</span>
               <ChevronRight className="w-4 h-4" />
             </button>
           ) : (

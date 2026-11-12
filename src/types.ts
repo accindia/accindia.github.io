@@ -5,16 +5,19 @@ export type UserRole = 'member' | 'admin';
 export type VerificationStatus = 'verified' | 'pending' | 'rejected';
 
 export interface PrivacySettings {
-  showMobile?: boolean; // If false (default), mobile number is masked on public/sponsor ID card
-  showWhatsapp?: boolean; // If false, whatsapp contact button is hidden/masked
-  showEmail?: boolean; // If false, email is masked
+  showProfilePic?: boolean; // If false, profile picture is private (masked with default avatar)
+  showFullNamePublic?: boolean; // If false, full name is masked (e.g. R**** K****)
+  showMobile?: boolean; // If false (default), mobile number is masked (+91 88••••••45)
+  showEmail?: boolean; // If false, email is masked (e.g. ra****@gmail.com)
+  showSponsorId?: boolean; // If false, sponsor ID is masked (e.g. ACC249****)
+  showUsername?: boolean; // If false, username is masked / hidden
   showCity?: boolean; // If false, address/city is hidden
+  showWhatsapp?: boolean; // If false, whatsapp contact button is hidden/masked
   showProfileLink?: boolean; // Whether custom profile link is public
   showPersonalQr?: boolean; // Whether personal QR is shown on sponsor card
-  showFullNamePublic?: boolean; // If false, full name is masked (e.g. A*** S***)
-  showUserAccIdPublic?: boolean; // If false, user ID is masked (e.g. ACC249***)
   showReferralBonusPublic?: boolean; // If false, bonus amount is masked
   showJoiningDatePublic?: boolean; // If false, exact joining date is masked
+  showUserAccIdPublic?: boolean; // User ID public indicator
 }
 
 export interface PaymentAccountDetails {
@@ -335,6 +338,7 @@ export type ActiveWindow =
   | 'plans'
   | 'calculator'
   | 'promotions'
+  | 'services'
   | 'about'
   | 'privacy'
   | 'disclaimer'
@@ -373,6 +377,20 @@ export interface PromotionalPoster {
   createdAt: string;
 }
 
+export interface HomeSliderPhoto {
+  id: string;
+  imageUrl: string;
+  title?: string;
+  subtitle?: string;
+  category?: 'celebration' | 'offer' | 'announcement' | 'income' | 'service' | 'idcard' | 'festive' | 'general';
+  actionUrl?: string; // e.g. 'register', 'idcard', 'video', 'calculator', or external link
+  actionLabel?: string;
+  congratulationEffect?: boolean; // celebration confetti burst
+  order?: number;
+  isActive?: boolean;
+  createdAt?: string;
+}
+
 export interface SiteConfig {
   helplinePhone: string; // e.g. "+91 8877490845"
   whatsappNumber: string; // e.g. "+91 8877490845"
@@ -404,4 +422,7 @@ export interface SiteConfig {
   appDownloadNotice?: string; // User installation guidelines and tips
   services: AppServiceItem[];
   promotionalPosters: PromotionalPoster[];
+  homeSliderPhotos?: HomeSliderPhoto[]; // Up to 7 photos for home popup slider
+  popupDisplayTarget?: 'home' | 'all' | 'dashboard' | 'visitors' | 'disabled'; // Where popup displays
+  enableCelebrationEffect?: boolean; // Celebration confetti effect toggle
 }

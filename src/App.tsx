@@ -47,15 +47,36 @@ import {
   Megaphone,
   BookOpen,
   Send,
+  Zap,
 } from 'lucide-react';
 
 export default function App() {
-  const [activeWindow, setActiveWindow] = useState<ActiveWindow>('home');
-  const [currentUser, setCurrentUser] = useState<Member | null>(null);
+  const [currentUser, setCurrentUser] = useState<Member | null>(() => {
+    const user = StorageService.getCurrentUser();
+    if (user && user.id !== 'mem-001' && user.id !== 'mem-002' && user.id !== 'mem-003') {
+      return user;
+    }
+    return null;
+  });
+  const [activeWindow, setActiveWindow] = useState<ActiveWindow>(() => {
+    const user = StorageService.getCurrentUser();
+    if (user && user.id !== 'mem-001' && user.id !== 'mem-002' && user.id !== 'mem-003') {
+      return 'dashboard';
+    }
+    return 'home';
+  });
   const [siteConfig, setSiteConfig] = useState<SiteConfig>(() => StorageService.getSiteConfig());
   const [referralSponsor, setReferralSponsor] = useState<Member | null>(null);
   const [deviceKickoutAlertOpen, setDeviceKickoutAlertOpen] = useState(false);
   const [showForgotCredentialsModal, setShowForgotCredentialsModal] = useState(false);
+
+  // CRITICAL: Any user who has joined ACC (logged-in member) must NEVER see the Home page!
+  // The Home page is strictly for visitors. Direct them to Dashboard.
+  useEffect(() => {
+    if (currentUser && activeWindow === 'home') {
+      setActiveWindow('dashboard');
+    }
+  }, [currentUser, activeWindow]);
 
   // Detect ?sponsor= or ?ref= parameter from URL or sessionStorage
   useEffect(() => {
@@ -166,27 +187,10 @@ export default function App() {
       setSiteConfig(StorageService.getSiteConfig());
     });
 
-    // 5. Periodic heartbeat session validator (runs every 3.5 seconds)
-    const sessionHeartbeat = setInterval(() => {
-      const activeMem = StorageService.getCurrentUser();
-      if (activeMem && activeMem.accId) {
-        const localSess = StorageService.getLocalSessionId();
-        const memRecord = StorageService.getMembers().find(
-          (m) => m.accId.toUpperCase() === activeMem.accId.toUpperCase()
-        );
-        if (memRecord?.activeSessionId && localSess && memRecord.activeSessionId !== localSess) {
-          StorageService.clearSession();
-          setCurrentUser(null);
-          setDeviceKickoutAlertOpen(true);
-        }
-      }
-    }, 3500);
-
     return () => {
       unsubscribeFirestore();
       unsubscribeConfig();
       unsubscribeSync();
-      clearInterval(sessionHeartbeat);
     };
   }, []);
 
@@ -202,21 +206,21 @@ export default function App() {
   };
 
   const handleNavigateWithScroll = (windowName: ActiveWindow) => {
-    // If user is already logged in, never let them open public login or register
+    // If user is already logged in, never let them open public login, register, or visitor home page
     if (currentUser) {
-      if (windowName === 'login') {
+      if (windowName === 'home' || windowName === 'login') {
         setActiveWindow('dashboard');
+        scrollToTopSection(false);
         return;
       }
       if (windowName === 'register') {
         setActiveWindow('add-member');
+        scrollToTopSection(false);
         return;
       }
     }
     setActiveWindow(windowName);
-    if (windowName === 'home') {
-      scrollToTopSection(false);
-    }
+    scrollToTopSection(false);
   };
 
   // Automatically scroll to top when returning to home
@@ -268,19 +272,21 @@ export default function App() {
 
       {/* Main Container - 100% Mobile Fluid Fit with Zero Header Overlap */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-2 sm:p-4 md:p-6 pb-24 overflow-x-hidden pt-1 sm:pt-2">
-        {/* VIEW: HOME (Persistent base view - stays active under modal popups) */}
-        <HomeView
-          onNavigate={(view) => {
-            if (view === 'idcard') {
-              handleNavigateToIdCard();
-            } else {
-              handleNavigateWithScroll(view);
-            }
-          }}
-          currentUser={currentUser}
-          referralSponsor={referralSponsor}
-          onNavigateToIdCard={handleNavigateToIdCard}
-        />
+        {/* VIEW: HOME - STRICTLY AND EXCLUSIVELY FOR VISITORS (!currentUser) */}
+        {!currentUser && activeWindow === 'home' && (
+          <HomeView
+            onNavigate={(view) => {
+              if (view === 'idcard') {
+                handleNavigateToIdCard();
+              } else {
+                handleNavigateWithScroll(view);
+              }
+            }}
+            currentUser={currentUser}
+            referralSponsor={referralSponsor}
+            onNavigateToIdCard={handleNavigateToIdCard}
+          />
+        )}
 
         {/* VIEW: VIDEO TRAINING */}
         {activeWindow === 'video' && (
@@ -288,7 +294,7 @@ export default function App() {
             title="ACC ट्रेनिंग वीडियो व बिजनेस प्लान (YouTube Full Video)"
             subtitle="Start Young Retire Young • SWIS & TWIS Complete Walkthrough"
             icon={<Video className="w-4 h-4 text-rose-400" />}
-            onClose={() => setActiveWindow('home')}
+            onClose={() => setActiveWindow(currentUser ? 'dashboard' : 'home')}
           >
             <VideoTrainingModal
               onGoToRegister={() => setActiveWindow('register')}
@@ -355,7 +361,7 @@ export default function App() {
             title="लाइव कमीशन एवं बचत कैलकुलेटर (SWIS 3.30% vs Google Pay / PhonePe)"
             subtitle="कैलकुलेट करें अपनी और परिवार के बिलों पर मासिक व वार्षिक बचत"
             icon={<Calculator className="w-4 h-4 text-emerald-400" />}
-            onClose={() => setActiveWindow('home')}
+            onClose={() => setActiveWindow(currentUser ? 'dashboard' : 'home')}
           >
             <CommissionCalculator
               onGoToRegister={() => setActiveWindow('register')}
@@ -388,7 +394,7 @@ export default function App() {
             {currentUser ? (
               <DigitalIdCard
                 member={currentUser}
-                onClose={() => setActiveWindow('home')}
+                onClose={() => setActiveWindow(currentUser ? 'dashboard' : 'home')}
                 onUpdateMember={(updated) => setCurrentUser(updated)}
               />
             ) : referralSponsor ? (
@@ -448,12 +454,12 @@ export default function App() {
             title={currentUser ? `रेफर & कमाएं हब (${currentUser.fullName})` : 'रेफर & कमाएं हब (TWIS Refer & Earn)'}
             subtitle="प्रति रेफरल ₹150 तुरंत पेआउट बैंक/UPI में • लाइफटाइम 3.30% रिचार्ज कमीशन • प्रचार किट व स्टेटस"
             icon={<Users className="w-4 h-4 text-orange-500" />}
-            onClose={() => handleNavigateWithScroll('home')}
+            onClose={() => handleNavigateWithScroll(currentUser ? 'dashboard' : 'home')}
           >
             {currentUser ? (
               <ReferAndEarnModal
                 currentUser={currentUser}
-                onClose={() => handleNavigateWithScroll('home')}
+                onClose={() => handleNavigateWithScroll(currentUser ? 'dashboard' : 'home')}
                 onGoToPromotions={() => handleNavigateWithScroll('promotions')}
                 onGoToIdCard={() => handleNavigateWithScroll('idcard')}
                 onGoToAddMember={() => handleNavigateWithScroll('add-member')}
@@ -468,28 +474,29 @@ export default function App() {
           </WindowFrame>
         )}
 
-        {/* VIEW: USER DASHBOARD */}
-        {activeWindow === 'dashboard' && (
+        {/* VIEW: USER DASHBOARD (Direct Digital Command Center for Logged-In Members) */}
+        {currentUser && (activeWindow === 'dashboard' || activeWindow === 'home') && (
+          <UserDashboard
+            currentUser={currentUser}
+            onUpdateUser={(updated) => setCurrentUser(updated)}
+            onNavigateToPromotions={() => setActiveWindow('promotions')}
+            onNavigateToChat={() => handleNavigateWithScroll('chat')}
+          />
+        )}
+
+        {/* VIEW: VISITOR STUDENT PORTAL GATE (For Non-Logged-in Users) */}
+        {!currentUser && activeWindow === 'dashboard' && (
           <WindowFrame
-            title={currentUser ? `विद्यार्थी डैशबोर्ड (${currentUser.fullName})` : "विद्यार्थी सदस्य पोर्टल (Student Portal)"}
-            subtitle={currentUser ? `यूनिक 🆔: ${currentUser.accId} • SWIS रिचार्ज 3.30% • TWIS रेफरल ₹150` : "अपने विद्यार्थी 🆔 या मोबाइल नंबर से लॉगिन करें अथवा नया ₹249 रजिस्ट्रेशन करें"}
+            title="विद्यार्थी सदस्य पोर्टल (Student Portal)"
+            subtitle="अपने विद्यार्थी 🆔 या मोबाइल नंबर से लॉगिन करें अथवा नया ₹249 रजिस्ट्रेशन करें"
             icon={<LayoutDashboard className="w-4 h-4 text-indigo-400" />}
             onClose={() => setActiveWindow('home')}
           >
-            {currentUser ? (
-              <UserDashboard
-                currentUser={currentUser}
-                onUpdateUser={(updated) => setCurrentUser(updated)}
-                onNavigateToPromotions={() => setActiveWindow('promotions')}
-                onNavigateToChat={() => handleNavigateWithScroll('chat')}
-              />
-            ) : (
-              <StudentPortalGate
-                onLoginSuccess={handleLoginSuccess}
-                onGoToRegister={() => setActiveWindow('register')}
-                onCancel={() => setActiveWindow('home')}
-              />
-            )}
+            <StudentPortalGate
+              onLoginSuccess={handleLoginSuccess}
+              onGoToRegister={() => setActiveWindow('register')}
+              onCancel={() => setActiveWindow('home')}
+            />
           </WindowFrame>
         )}
 
@@ -545,7 +552,7 @@ export default function App() {
             title="केंद्रीय एडमिन पैनल (Root Admin Management)"
             subtitle="यूजर रजिस्ट्रेशन रिकॉर्ड, 🆔 एक्टिवेशन सत्यापन एवं निकासी प्रबंधन"
             icon={<ShieldCheck className="w-4 h-4 text-red-400" />}
-            onClose={() => setActiveWindow('home')}
+            onClose={() => setActiveWindow(currentUser ? 'dashboard' : 'home')}
           >
             <AdminPanel
               onRefresh={() => {
@@ -562,7 +569,7 @@ export default function App() {
             title="प्रचार किट, विजिटिंग कार्ड व सोशल मीडिया पोस्टर्स (Branding & Promotion Hub)"
             subtitle="ACC पोस्टर स्टाइल में अपने नाम व स्पॉन्सर 🆔 का आधिकारिक विजिटिंग कार्ड और पोस्टर बनाएं"
             icon={<Megaphone className="w-4 h-4 text-amber-500" />}
-            onClose={() => setActiveWindow('home')}
+            onClose={() => setActiveWindow(currentUser ? 'dashboard' : 'home')}
           >
             <PromotionBrandingHub
               currentUser={currentUser}
@@ -579,7 +586,7 @@ export default function App() {
             title="विद्यार्थी उपयोगकर्ता मार्गदर्शन केंद्र (User Guidelines & Help Center)"
             subtitle="नए सदस्य, पेंडिंग वेरिफिकेशन, एक्टिव मेंबर्स एवं सपोर्ट हेल्पडेस्क की सम्पूर्ण गाइड"
             icon={<BookOpen className="w-4 h-4 text-emerald-400" />}
-            onClose={() => setActiveWindow('home')}
+            onClose={() => setActiveWindow(currentUser ? 'dashboard' : 'home')}
           >
             <UserGuidelines
               currentUser={currentUser}
@@ -591,8 +598,9 @@ export default function App() {
           </WindowFrame>
         )}
 
-        {/* VIEW: LEGAL PAGES (About, Privacy, Disclaimer, Terms, Contact, FAQ) */}
+        {/* VIEW: LEGAL PAGES (About, Services, Privacy, Disclaimer, Terms, Contact, FAQ) */}
         {(activeWindow === 'about' ||
+          activeWindow === 'services' ||
           activeWindow === 'privacy' ||
           activeWindow === 'disclaimer' ||
           activeWindow === 'terms' ||
@@ -605,6 +613,8 @@ export default function App() {
                 ? 'सामान्य प्रश्न (Frequently Asked Questions - FAQ)'
                 : activeWindow === 'about'
                 ? 'हमारे बारे में (About Achievers Club Community)'
+                : activeWindow === 'services'
+                ? 'उत्पाद या सेवाएं (Products & Services - ₹249 One-Time)'
                 : activeWindow === 'terms'
                 ? 'नियम एवं शर्तें (Terms & Conditions)'
                 : activeWindow === 'privacy'
@@ -618,6 +628,8 @@ export default function App() {
                 ? 'SWIS 3.30% रिचार्ज कमीशन, TWIS ₹150 रेफरल बोनस, रजिस्ट्रेशन व त्वरित पेआउट संबंधित सवाल'
                 : activeWindow === 'about'
                 ? 'ACC कम्युनिटी विजन, मिशन और युवाओं के लिए जीरो-इन्वेस्टमेंट मॉडल'
+                : activeWindow === 'services'
+                ? 'SWIS 3.30% रिचार्ज कमीशन, TWIS ₹150 रेफरल प्रोग्राम एवं डिजिटल ID कार्ड विवरण'
                 : activeWindow === 'terms'
                 ? 'सदस्यता दिशानिर्देश, 3.30% रिचार्ज कमीशन व ₹150 रेफरल नियम'
                 : activeWindow === 'privacy'
@@ -631,6 +643,8 @@ export default function App() {
                 <HelpCircle className="w-4 h-4 text-yellow-400" />
               ) : activeWindow === 'about' ? (
                 <Building2 className="w-4 h-4 text-amber-400" />
+              ) : activeWindow === 'services' ? (
+                <Zap className="w-4 h-4 text-emerald-400" />
               ) : activeWindow === 'terms' ? (
                 <FileCheck className="w-4 h-4 text-emerald-400" />
               ) : activeWindow === 'privacy' ? (
@@ -641,7 +655,7 @@ export default function App() {
                 <Phone className="w-4 h-4 text-blue-400" />
               )
             }
-            onClose={() => handleNavigateWithScroll('home')}
+            onClose={() => handleNavigateWithScroll(currentUser ? 'dashboard' : 'home')}
           >
             <LegalPages
               key={activeWindow}
@@ -681,10 +695,10 @@ export default function App() {
               <li>
                 <button
                   type="button"
-                  onClick={() => handleNavigateWithScroll('home')}
+                  onClick={() => handleNavigateWithScroll(currentUser ? 'dashboard' : 'home')}
                   className="hover:text-white transition cursor-pointer text-left block w-full py-0.5"
                 >
-                  होम पेज (Home)
+                  {currentUser ? 'विद्यार्थी डैशबोर्ड (Dashboard)' : 'होम पेज (Home)'}
                 </button>
               </li>
               <li>
@@ -755,6 +769,15 @@ export default function App() {
                   className="hover:text-white transition cursor-pointer text-left block w-full py-0.5"
                 >
                   हमारे बारे में (About Us)
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => handleNavigateWithScroll('services')}
+                  className="hover:text-white transition cursor-pointer text-left block w-full py-0.5 text-amber-300 font-bold"
+                >
+                  उत्पाद या सेवाएं (Products & Services)
                 </button>
               </li>
               <li>

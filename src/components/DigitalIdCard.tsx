@@ -38,6 +38,7 @@ import {
 } from '../utils/idCardGenerator';
 import { AvatarWith3DFrame } from './AvatarWith3DFrame';
 import { AccLogo } from '../assets/logo';
+import { getMemberPrivacyDisplay } from '../utils/privacyMask';
 
 interface DigitalIdCardProps {
   member: Member;
@@ -103,18 +104,22 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
   const isSponsorOrOther = !canDownload;
 
   const currentPrivacy: PrivacySettings = member.privacySettings || {
+    showProfilePic: true,
+    showFullNamePublic: true,
     showMobile: false,
     showWhatsapp: false,
     showEmail: false,
+    showSponsorId: true,
+    showUsername: true,
     showCity: true,
     showProfileLink: true,
     showPersonalQr: false,
   };
 
+  const privacyDisplay = getMemberPrivacyDisplay(member, isOwnCard);
   const isMobileVisible = isOwnCard || Boolean(currentPrivacy.showMobile);
-  const maskedMobile = member.mobile
-    ? `${member.mobile.slice(0, 2)}••••••${member.mobile.slice(-2)}`
-    : '98••••••10';
+  const rawMobile = String(member.mobile || '');
+  const maskedMobile = privacyDisplay.displayMobile;
 
   const referralLink = typeof window !== 'undefined'
     ? `${window.location.origin}/?sponsor=${member.accId}`
@@ -332,8 +337,8 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
             {/* Avatar / Photo with 3D Live Frame */}
             <div className="relative shrink-0 p-1">
               <AvatarWith3DFrame
-                avatarUrl={member.avatarUrl}
-                name={member.fullName}
+                avatarUrl={privacyDisplay.avatarUrl}
+                name={privacyDisplay.displayName}
                 frame={member.avatarFrame || 'acc_medallion'}
                 size="md"
               />
@@ -349,7 +354,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
                   {isOwnCard ? 'Authorized Member Name' : 'Official Sponsor Name'}
                 </span>
                 <h3 className="text-sm sm:text-base font-bold text-white tracking-wide truncate">
-                  {member.fullName}
+                  {privacyDisplay.displayName}
                 </h3>
               </div>
 
@@ -366,7 +371,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-slate-400 text-[10px] shrink-0">Mobile:</span>
                   <span className="font-mono-acc text-slate-200 text-[10.5px] sm:text-[11px] font-bold">
-                    +91 {isMobileVisible ? member.mobile : maskedMobile}
+                    {privacyDisplay.displayMobile}
                   </span>
                   {isOwnCard && (
                     <span className="text-[8px] text-slate-400 bg-slate-800/80 px-1 rounded border border-slate-700">
@@ -396,7 +401,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
                   <Sparkles className="w-3 h-3 shrink-0" /> OFFICIAL UNIQUE MEMBER 🆔
                 </span>
                 <p className="font-mono-acc font-black text-sm sm:text-base md:text-lg text-amber-300 tracking-wider truncate">
-                  {member.accId}
+                  {privacyDisplay.displayAccId}
                 </p>
               </div>
               <button
@@ -421,13 +426,13 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
             <div className="min-w-0">
               <span className="text-[9px] text-slate-400 block">Sponsor ID:</span>
               <span className="font-mono-acc font-semibold text-slate-200 text-[10px] truncate block">
-                {member.sponsorId || 'ACC249SWISRK01'}
+                {privacyDisplay.displaySponsorId}
               </span>
             </div>
             <div className="min-w-0">
               <span className="text-[9px] text-slate-400 block">Sponsor Name:</span>
               <span className="font-semibold text-slate-200 text-[10px] truncate block">
-                {member.sponsorName || 'Rahul Kumar'}
+                {privacyDisplay.displaySponsorName}
               </span>
             </div>
             <div className="min-w-0">
@@ -1031,7 +1036,100 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
                 </div>
               )}
 
-              {/* Toggle 1: Mobile */}
+              {/* Perm Public Rule Banner */}
+              <div className="bg-amber-100/70 border border-amber-300 p-2.5 rounded-lg text-[11px] text-amber-900 font-medium">
+                <span className="font-bold text-amber-950">📌 सुरक्षा नियम:</span> केवल आपकी <strong>ACC सदस्य आईडी ({member.accId})</strong> हमेशा सार्वजनिक रहेगी। बाकी सभी विवरण (फोटो, नाम, मोबाइल, ईमेल, स्पॉन्सर आईडी, यूज़रनेम) आप अपनी इच्छानुसार प्राइवेट या मास्क रख सकते हैं।
+              </div>
+
+              {/* Toggle: Profile Picture */}
+              <div className="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-slate-50 transition">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2 font-bold text-slate-900">
+                    <User className="w-4 h-4 text-amber-600" />
+                    <span>प्रोफ़ाइल फ़ोटो दिखाएं (Show Profile Picture)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    बंद रहने पर अन्य सदस्यों व आगंतुकों को आपकी फ़ोटो के स्थान पर ACC प्रमाणित प्रतीक (Emblem) दिखेगा।
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={privacyDraft.showProfilePic !== false}
+                    onChange={(e) => setPrivacyDraft({ ...privacyDraft, showProfilePic: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                </label>
+              </div>
+
+              {/* Toggle: Full Name */}
+              <div className="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-slate-50 transition">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2 font-bold text-slate-900">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>पूरा नाम सार्वजनिक करें (Show Full Name)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    बंद रहने पर आपका नाम अन्य सदस्यों को मास्क किया हुआ (उदा. R**** K****) दिखेगा।
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={privacyDraft.showFullNamePublic !== false}
+                    onChange={(e) => setPrivacyDraft({ ...privacyDraft, showFullNamePublic: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                </label>
+              </div>
+
+              {/* Toggle: Sponsor ID */}
+              <div className="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-slate-50 transition">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2 font-bold text-slate-900">
+                    <Shield className="w-4 h-4 text-indigo-600" />
+                    <span>स्पॉन्सर आईडी दिखाएं (Show Sponsor ID)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    बंद रहने पर अन्य सदस्यों को आपकी स्पॉन्सर आईडी मास्क रूप में (ACC249****) दिखेगी।
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={privacyDraft.showSponsorId !== false}
+                    onChange={(e) => setPrivacyDraft({ ...privacyDraft, showSponsorId: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+
+              {/* Toggle: Username */}
+              <div className="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-slate-50 transition">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2 font-bold text-slate-900">
+                    <Sparkles className="w-4 h-4 text-cyan-600" />
+                    <span>यूज़रनेम दिखाएं (Show Username @handle)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    बंद रहने पर आपका हैंडल अन्य सदस्यों को मास्क किया हुआ (@us****) दिखेगा।
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={privacyDraft.showUsername !== false}
+                    onChange={(e) => setPrivacyDraft({ ...privacyDraft, showUsername: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
+                </label>
+              </div>
+
+              {/* Toggle: Mobile */}
               <div className="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-slate-50 transition">
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2 font-bold text-slate-900">
@@ -1053,7 +1151,29 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
                 </label>
               </div>
 
-              {/* Toggle 2: WhatsApp Chat */}
+              {/* Toggle: Email */}
+              <div className="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-slate-50 transition">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2 font-bold text-slate-900">
+                    <Mail className="w-4 h-4 text-rose-600" />
+                    <span>ईमेल आईडी दिखाएं (Show Email ID)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    यदि बंद रहेगा तो ईमेल आईडी <strong>{privacyDisplay.displayEmail}</strong> के रूप में सुरक्षित रहेगा।
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={privacyDraft.showEmail}
+                    onChange={(e) => setPrivacyDraft({ ...privacyDraft, showEmail: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600"></div>
+                </label>
+              </div>
+
+              {/* Toggle: WhatsApp Chat */}
               <div className="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-slate-50 transition">
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2 font-bold text-slate-900">
@@ -1075,7 +1195,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
                 </label>
               </div>
 
-              {/* Toggle 3: City & State */}
+              {/* Toggle: City & State */}
               <div className="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-slate-50 transition">
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2 font-bold text-slate-900">
@@ -1097,7 +1217,7 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
                 </label>
               </div>
 
-              {/* Toggle 4: Profile Link */}
+              {/* Toggle: Profile Link */}
               <div className="flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:bg-slate-50 transition">
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2 font-bold text-slate-900">

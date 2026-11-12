@@ -21,6 +21,49 @@ const WITHDRAWALS_COL = 'withdrawals';
 const SETTINGS_COL = 'settings';
 const SITE_CONFIG_DOC = 'site_config';
 
+// Helper to guarantee completely safe and non-null member objects from Firestore
+export function sanitizeMember(data: any, fallbackId?: string): Member {
+  const d = data && typeof data === 'object' ? data : {};
+  const fid = fallbackId || d.accId || d.id || 'ACC249MEMBER';
+  return {
+    ...d,
+    id: d.id || d.accId || fid,
+    accId: d.accId || fid,
+    fullName: d.fullName || 'Member',
+    mobile: String(d.mobile || ''),
+    whatsapp: String(d.whatsapp || d.mobile || ''),
+    email: d.email || '',
+    qualification: d.qualification || 'Graduate',
+    state: d.state || 'Madhya Pradesh',
+    city: d.city || 'Indore',
+    pincode: d.pincode || '452001',
+    address: d.address || 'ACC Hub',
+    plan: d.plan || 'SWIS',
+    sponsorName: d.sponsorName || 'ACC Admin',
+    sponsorId: d.sponsorId || 'ACC249ADMIN01',
+    activationCharge: Number(d.activationCharge || 249),
+    utrNumber: String(d.utrNumber || ''),
+    paymentDate: d.paymentDate || '2026-10-08',
+    status: d.status || 'pending',
+    isActive: d.isActive !== undefined ? Boolean(d.isActive) : true,
+    role: d.role || 'member',
+    walletBalance: Number(d.walletBalance || 0),
+    totalEarnings: Number(d.totalEarnings || 0),
+    swisEarnings: Number(d.swisEarnings || 0),
+    twisEarnings: Number(d.twisEarnings || 0),
+    rechargesCount: Number(d.rechargesCount || 0),
+    referralsCount: Number(d.referralsCount || 0),
+    createdAt: d.createdAt || new Date().toISOString(),
+    privacySettings: d.privacySettings || {
+      showMobile: false,
+      showEmail: false,
+      showCity: false,
+      showWhatsapp: true,
+      showProfileLink: true,
+    },
+  };
+}
+
 export const FirestoreService = {
   // Sync seed member or check if exists
   async initSeedData(
@@ -55,27 +98,7 @@ export const FirestoreService = {
   async getMembers(): Promise<Member[]> {
     try {
       const snap = await getDocs(collection(db, MEMBERS_COL));
-      return snap.docs.map((d) => {
-        const data = d.data() as Member;
-        return {
-          ...data,
-          id: data.id || d.id,
-          accId: data.accId || d.id,
-          fullName: data.fullName || 'Member',
-          mobile: String(data.mobile || ''),
-          email: data.email || '',
-          plan: data.plan || 'SWIS',
-          status: data.status || 'pending',
-          utrNumber: String(data.utrNumber || ''),
-          walletBalance: Number(data.walletBalance || 0),
-          totalEarnings: Number(data.totalEarnings || 0),
-          swisEarnings: Number(data.swisEarnings || 0),
-          twisEarnings: Number(data.twisEarnings || 0),
-          rechargesCount: Number(data.rechargesCount || 0),
-          referralsCount: Number(data.referralsCount || 0),
-          createdAt: data.createdAt || new Date().toISOString(),
-        };
-      });
+      return snap.docs.map((d) => sanitizeMember(d.data(), d.id));
     } catch (err) {
       console.warn('Error fetching members from Firestore:', err);
       return [];
@@ -237,21 +260,21 @@ export const FirestoreService = {
       const idUpper = raw.toUpperCase();
       const docSnap = await getDoc(doc(db, MEMBERS_COL, idUpper));
       if (docSnap.exists()) {
-        return docSnap.data() as Member;
+        return sanitizeMember(docSnap.data(), docSnap.id);
       }
 
       // 2. Query by mobile
       const qMob = query(collection(db, MEMBERS_COL), where('mobile', '==', raw));
       const snapMob = await getDocs(qMob);
       if (!snapMob.empty) {
-        return snapMob.docs[0].data() as Member;
+        return sanitizeMember(snapMob.docs[0].data(), snapMob.docs[0].id);
       }
 
       // 3. Query by email
       const qEmail = query(collection(db, MEMBERS_COL), where('email', '==', raw.toLowerCase()));
       const snapEmail = await getDocs(qEmail);
       if (!snapEmail.empty) {
-        return snapEmail.docs[0].data() as Member;
+        return sanitizeMember(snapEmail.docs[0].data(), snapEmail.docs[0].id);
       }
     } catch (e) {
       console.warn('findMemberByMobileOrEmail error:', e);
@@ -359,27 +382,7 @@ export const FirestoreService = {
       return onSnapshot(
         collection(db, MEMBERS_COL),
         (snapshot) => {
-          const list = snapshot.docs.map((d) => {
-            const data = d.data() as Member;
-            return {
-              ...data,
-              id: data.id || d.id,
-              accId: data.accId || d.id,
-              fullName: data.fullName || 'Member',
-              mobile: String(data.mobile || ''),
-              email: data.email || '',
-              plan: data.plan || 'SWIS',
-              status: data.status || 'pending',
-              utrNumber: String(data.utrNumber || ''),
-              walletBalance: Number(data.walletBalance || 0),
-              totalEarnings: Number(data.totalEarnings || 0),
-              swisEarnings: Number(data.swisEarnings || 0),
-              twisEarnings: Number(data.twisEarnings || 0),
-              rechargesCount: Number(data.rechargesCount || 0),
-              referralsCount: Number(data.referralsCount || 0),
-              createdAt: data.createdAt || new Date().toISOString(),
-            };
-          });
+          const list = snapshot.docs.map((d) => sanitizeMember(d.data(), d.id));
           onUpdate(list);
         },
         (error) => {
@@ -399,7 +402,7 @@ export const FirestoreService = {
         doc(db, MEMBERS_COL, accId),
         (snapshot) => {
           if (snapshot.exists()) {
-            onUpdate(snapshot.data() as Member);
+            onUpdate(sanitizeMember(snapshot.data(), snapshot.id));
           } else {
             onUpdate(null);
           }

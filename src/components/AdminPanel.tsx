@@ -63,6 +63,7 @@ import {
   LayoutGrid,
   Table,
   ChevronDown,
+  ChevronUp,
   AlertCircle,
   Save,
   EyeOff,
@@ -90,12 +91,16 @@ import {
   PrivateMessage,
   PassbookEntry,
   PassbookCategory,
+  HomeSliderPhoto,
 } from '../types';
 import { StorageService, subscribeToSync, SEED_MEMBERS } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
 import { downloadPremiumIdCard } from '../utils/idCardGenerator';
 import { PrivateChatBox } from './PrivateChatBox';
 import { AvatarWith3DFrame, AVATAR_FRAMES } from './AvatarWith3DFrame';
+import { compressImage } from '../utils/imageCompressor';
+import { HomeSliderPopupModal } from './HomeSliderPopupModal';
+import { HomeSliderManagerModal } from './HomeSliderManagerModal';
 
 interface AdminPanelProps {
   onRefresh: () => void;
@@ -246,6 +251,92 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   const [posterCtaLinkInput, setPosterCtaLinkInput] = useState('register');
   const [posterIsActiveInput, setPosterIsActiveInput] = useState(true);
 
+  // 7-Photo Home Slider CMS State
+  const [sliderPhotos, setSliderPhotos] = useState<HomeSliderPhoto[]>(() => siteConfig.homeSliderPhotos || []);
+  const sliderUploadFileRef = useRef<HTMLInputElement>(null);
+  const [sliderNewTitle, setSliderNewTitle] = useState('');
+  const [sliderNewSubtitle, setSliderNewSubtitle] = useState('');
+  const [sliderNewActionUrl, setSliderNewActionUrl] = useState('register');
+  const [sliderNewActionLabel, setSliderNewActionLabel] = useState('अभी जॉइन करें (₹249)');
+  const [sliderNewImageUrlInput, setSliderNewImageUrlInput] = useState('');
+  const [sliderImagePreview, setSliderImagePreview] = useState<string | null>(null);
+  const [sliderSaving, setSliderSaving] = useState(false);
+  const [sliderSaveSuccess, setSliderSaveSuccess] = useState('');
+  const [sliderLivePreviewOpen, setSliderLivePreviewOpen] = useState(false);
+
+  const handleAddSliderPhoto = () => {
+    const finalImg = sliderImagePreview || sliderNewImageUrlInput.trim();
+    if (!finalImg) {
+      alert('कृपया फोटो फ़ाइल चुनें या फोटो का वैध URL दर्ज करें!');
+      return;
+    }
+    if (sliderPhotos.length >= 7) {
+      alert('अधिकतम 7 फोटो ही जोड़ी जा सकती हैं!');
+      return;
+    }
+
+    const newPhoto: HomeSliderPhoto = {
+      id: `slide_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      imageUrl: finalImg,
+      title: sliderNewTitle.trim() || undefined,
+      subtitle: sliderNewSubtitle.trim() || undefined,
+      actionUrl: sliderNewActionUrl.trim() || undefined,
+      actionLabel: sliderNewActionLabel.trim() || undefined,
+      createdAt: new Date().toISOString(),
+    };
+
+    const nextList = [...sliderPhotos, newPhoto];
+    setSliderPhotos(nextList);
+    setSliderImagePreview(null);
+    setSliderNewImageUrlInput('');
+    setSliderNewTitle('');
+    setSliderNewSubtitle('');
+    if (sliderUploadFileRef.current) sliderUploadFileRef.current.value = '';
+  };
+
+  const handleDeleteSliderPhoto = (id: string) => {
+    if (window.confirm('क्या आप इस फोटो को स्लाइडर से हटाना चाहते हैं?')) {
+      const nextList = sliderPhotos.filter((p) => p.id !== id);
+      setSliderPhotos(nextList);
+    }
+  };
+
+  const handleMoveSliderPhoto = (index: number, direction: 'up' | 'down') => {
+    const targetIdx = direction === 'up' ? index - 1 : index + 1;
+    if (targetIdx < 0 || targetIdx >= sliderPhotos.length) return;
+    const copy = [...sliderPhotos];
+    const temp = copy[index];
+    copy[index] = copy[targetIdx];
+    copy[targetIdx] = temp;
+    setSliderPhotos(copy);
+  };
+
+  const handleSaveSliderPhotos = async () => {
+    setSliderSaving(true);
+    setSliderSaveSuccess('');
+    try {
+      const updated = StorageService.updateSiteConfig({
+        homeSliderPhotos: sliderPhotos,
+        popupDisplayTarget: siteConfig.popupDisplayTarget || 'home',
+        enableCelebrationEffect: siteConfig.enableCelebrationEffect !== false,
+      });
+      await FirestoreService.saveSiteConfig({
+        ...siteConfig,
+        homeSliderPhotos: sliderPhotos,
+        popupDisplayTarget: siteConfig.popupDisplayTarget || 'home',
+        enableCelebrationEffect: siteConfig.enableCelebrationEffect !== false,
+      });
+      setSiteConfig(updated);
+      setSliderSaveSuccess('✓ 7-फोटो होमपेज स्लाइडर व सेटिंग्स सफलतापूर्वक सहेज दिया गया!');
+      setTimeout(() => setSliderSaveSuccess(''), 3000);
+    } catch (err) {
+      console.error('Error saving slider photos:', err);
+      alert('स्लाइडर फोटो सहेजने में त्रुटि हुई!');
+    } finally {
+      setSliderSaving(false);
+    }
+  };
+
   const [searchQuery, setSearchQuery] = useState('');
   const [filterPlan, setFilterPlan] = useState<'ALL' | PlanType>('ALL');
   const [filterStatus, setFilterStatus] = useState<'ALL' | VerificationStatus>('ALL');
@@ -271,6 +362,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
     StorageService.getPrivateMessages()
   );
   const [showAdminNotifModal, setShowAdminNotifModal] = useState<boolean>(false);
+  const [showSliderStudioModal, setShowSliderStudioModal] = useState<boolean>(false);
 
   // Real-time Firestore sync on mount & when unlocked
   useEffect(() => {
@@ -352,7 +444,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
   }, []);
 
   const userIncomingMessages = adminMessages
-    .filter((m) => m.senderRole === 'user')
+    .filter((m) => m.senderRole !== 'admin')
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   const unreadUserMessagesCount = userIncomingMessages.filter((m) => !m.isRead).length;
@@ -1337,13 +1429,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
             <ShieldCheck className="w-6 h-6" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-lg font-bold text-slate-900">
                 Achievers Club Community - केंद्रीय एडमिन पैनल
               </h2>
               <span className="text-[10px] bg-red-50 text-red-700 px-2 py-0.5 rounded font-mono-acc font-bold border border-red-200">
                 ROOT ACCESS
               </span>
+
+              {/* 🎯 "एडमिन पैनल में जो स्लाइडर का बटन है वो स्वागत 3संदेश इफेक्ट का पॉप up system ka है" */}
+              <button
+                type="button"
+                onClick={() => setShowSliderStudioModal(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:brightness-110 text-slate-950 font-black text-xs rounded-lg shadow-md border-2 border-yellow-300 active:scale-95 transition-all cursor-pointer animate-pulse whitespace-nowrap"
+                title="स्वागत 3-संदेश इफ़ेक्ट व 7-स्लाइडर पॉपअप स्टूडियो (Celebration Popup & Link System)"
+              >
+                <Sparkles className="w-3.5 h-3.5 fill-slate-950 text-slate-950" />
+                <ImageIcon className="w-3.5 h-3.5 text-slate-950" />
+                <span>✨ स्वागत 3-संदेश व 7-स्लाइडर स्टूडियो</span>
+                <span className="bg-slate-950 text-amber-300 text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                  {sliderPhotos.length}/7
+                </span>
+              </button>
             </div>
             <p className="text-xs text-slate-500">
               यूजर रजिस्ट्रेशन रिकॉर्ड, पेमेंट स्क्रीनशॉट सत्यापन (Approve / Reject) एवं Real App Link वितरण
@@ -1353,11 +1460,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
 
         {/* Database backup, change password & logout buttons */}
         <div className="flex items-center gap-2 flex-wrap">
+          {/* 7-Slide & 3-Welcome Messages Studio Action Button */}
+          <button
+            type="button"
+            onClick={() => setShowSliderStudioModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:brightness-110 text-slate-950 text-xs font-black rounded-lg shadow-[0_2.5px_0_#b45309] border border-amber-300 active:translate-y-0.5 transition cursor-pointer shrink-0"
+            title="स्वागत 3-संदेश व 7-स्लाइडर पॉपअप स्टूडियो"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-slate-950" />
+            <span>✨ स्वागत 3-संदेश व 7-स्लाइडर</span>
+            <span className="bg-slate-950 text-amber-300 text-[10px] font-black px-1.5 py-0.2 rounded-full">
+              {sliderPhotos.length}/7
+            </span>
+          </button>
+
           {/* 3D Admin Live Notification Button */}
           <button
             type="button"
             onClick={() => setShowAdminNotifModal(true)}
-            className="relative flex items-center gap-2 px-3.5 py-1.5 bg-gradient-to-b from-[#e11d48] via-[#be123c] to-[#9f1239] hover:from-[#f43f5e] hover:to-[#be123c] text-white text-xs font-black rounded-lg shadow-[0_2.5px_0_#4c0519] active:translate-y-0.5 active:shadow-none border border-rose-400/40 transition cursor-pointer"
+            className="relative flex items-center gap-2 px-3.5 py-1.5 bg-gradient-to-b from-[#e11d48] via-[#be123c] to-[#9f1239] hover:from-[#f43f5e] hover:to-[#be123c] text-white text-xs font-black rounded-lg shadow-[0_2.5px_0_#4c0519] active:translate-y-0.5 active:shadow-none border border-rose-400/40 transition cursor-pointer shrink-0"
             title="यूजर प्राइवेट मैसेज व लाइव नोटिफिकेशन"
           >
             <Bell className={`w-3.5 h-3.5 ${unreadUserMessagesCount > 0 ? 'animate-bounce text-amber-300' : 'text-white'}`} />
@@ -4871,6 +4992,380 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
               </div>
             ))}
           </div>
+        )}
+      </div>
+
+      {/* SECTION 6: 7-PHOTO HOMEPAGE POP-UP SLIDER MANAGEMENT */}
+      <div className="bg-white border-2 border-amber-500/40 rounded-2xl p-4 sm:p-6 space-y-5 shadow-md">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] uppercase font-black bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 px-2 py-0.5 rounded shadow-xs">
+                HOMEPAGE POPUP CMS
+              </span>
+              <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-gray-200">
+                वर्तमान: <strong>{sliderPhotos.length} / 7</strong> फ़ोटो
+              </span>
+            </div>
+            <h4 className="text-base font-bold text-slate-900 flex items-center gap-2 mt-1">
+              <ImageIcon className="w-5 h-5 text-amber-500" />
+              <span>📸 7-फोटो होमपेज पॉप-अप स्लाइडर प्रबंधन (Dynamic Auto-Fit Popup Slider)</span>
+            </h4>
+            <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
+              होमपेज पर आने वाले नए आगंतुकों (Visitors) के सामने यह पॉप-अप स्वतः दिखाई देगा। फोटो के वास्तविक आकार (Natural Aspect Ratio) के अनुसार पॉप-अप स्वतः बड़ा या छोटा एडजस्ट होगा और इसमें स्मूथ Zoom-In / Zoom-Out इफ़ेक्ट है। <strong>यदि आप कोई फोटो अपलोड नहीं करेंगे तो कोई पॉप-अप नहीं खुलेगा।</strong>
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {sliderPhotos.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSliderLivePreviewOpen(true)}
+                className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-yellow-400 hover:brightness-110 text-slate-950 font-black text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+                title="होमपेज पॉप-अप का लाइव प्रिव्यू देखें"
+              >
+                <Eye className="w-4 h-4" />
+                <span>लाइव पॉप-अप प्रिव्यू</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleSaveSliderPhotos}
+              disabled={sliderSaving}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer"
+            >
+              <Save className="w-4 h-4" />
+              <span>{sliderSaving ? 'सहेज रहे हैं...' : 'स्लाइडर सहेजें ✓'}</span>
+            </button>
+          </div>
+        </div>
+
+        {sliderSaveSuccess && (
+          <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 p-3 rounded-xl font-bold text-xs flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{sliderSaveSuccess}</span>
+          </div>
+        )}
+        {/* Popup Display Location & Celebration Selector in Admin Panel */}
+        <div className="bg-amber-50/70 border border-amber-300 rounded-xl p-3.5 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <span className="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-1.5">
+              <span>🎯</span>
+              <span>पॉप-अप कहाँ दिखाएं? (Select Popup Display Target)</span>
+            </span>
+
+            {/* Celebration toggle */}
+            <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-gray-200">
+              <input
+                type="checkbox"
+                checked={siteConfig.enableCelebrationEffect !== false}
+                onChange={(e) => {
+                  const updated = { ...siteConfig, enableCelebrationEffect: e.target.checked };
+                  setSiteConfig(updated);
+                  StorageService.updateSiteConfig({ enableCelebrationEffect: e.target.checked });
+                  FirestoreService.saveSiteConfig(updated);
+                }}
+                className="rounded text-amber-500"
+              />
+              <span>🎉 बधाई व सेलिब्रेशन इफ़ेक्ट (Celebration Confetti)</span>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+            {[
+              { id: 'home', label: '🏠 होमपेज (Default)', desc: 'केवल मुख्य पेज पर' },
+              { id: 'all', label: '🌐 सभी पेजों पर', desc: 'हर विज़िटर को' },
+              { id: 'dashboard', label: '👤 केवल डैशबोर्ड', desc: 'लॉगिन मेंबर्स' },
+              { id: 'visitors', label: '👥 केवल विज़िटर्स', desc: 'बिना लॉगिन' },
+              { id: 'disabled', label: '🚫 बंद रखें', desc: 'नो पॉप-अप' },
+            ].map((tgt) => (
+              <button
+                key={tgt.id}
+                type="button"
+                onClick={() => {
+                  const updated = { ...siteConfig, popupDisplayTarget: tgt.id as any };
+                  setSiteConfig(updated);
+                  StorageService.updateSiteConfig({ popupDisplayTarget: tgt.id as any });
+                  FirestoreService.saveSiteConfig(updated);
+                }}
+                className={`p-2 rounded-lg border text-left transition cursor-pointer ${
+                  (siteConfig.popupDisplayTarget || 'home') === tgt.id
+                    ? 'bg-amber-500 text-slate-950 font-bold border-amber-600 shadow-xs'
+                    : 'bg-white text-slate-700 border-gray-300 hover:border-gray-400'
+                }`}
+              >
+                <div className="font-bold">{tgt.label}</div>
+                <div className="text-[10px] opacity-80">{tgt.desc}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Add Photo Form */}
+        <div className="bg-slate-50 border border-gray-200 rounded-xl p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <h5 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <PlusCircle className="w-4 h-4 text-[#2874f0]" />
+              <span>नई स्लाइडर फ़ोटो जोड़ें (अधिकतम 7 फ़ोटो तक)</span>
+            </h5>
+            <span className="text-[11px] text-slate-500 font-mono">
+              शेष स्थान: {7 - sliderPhotos.length}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            {/* Left: Image Selection (File Upload or URL) */}
+            <div className="space-y-3">
+              <label className="block font-bold text-slate-700">
+                1. फोटो चुनें या URL दर्ज करें:
+              </label>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  ref={sliderUploadFileRef}
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      try {
+                        const compressed = await compressImage(file, 900, 900, 0.72);
+                        setSliderImagePreview(compressed);
+                        setSliderNewImageUrlInput('');
+                      } catch (err) {
+                        console.error('Image compression failed:', err);
+                      }
+                    }
+                  }}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => sliderUploadFileRef.current?.click()}
+                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>फ़ाइल अपलोड करें (Auto Compress)</span>
+                </button>
+
+                <span className="text-slate-400 font-semibold">या</span>
+              </div>
+
+              <input
+                type="text"
+                value={sliderNewImageUrlInput}
+                onChange={(e) => {
+                  setSliderNewImageUrlInput(e.target.value);
+                  if (e.target.value.trim()) setSliderImagePreview(null);
+                }}
+                placeholder="https://images.unsplash.com/... (फोटो URL)"
+                className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0]"
+              />
+
+              {/* Thumbnail Preview */}
+              {(sliderImagePreview || sliderNewImageUrlInput.trim()) && (
+                <div className="relative w-40 h-28 rounded-xl overflow-hidden border-2 border-amber-400 shadow-sm bg-slate-950 flex items-center justify-center">
+                  <img
+                    src={sliderImagePreview || sliderNewImageUrlInput.trim()}
+                    alt="Preview"
+                    className="w-full h-full object-contain"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSliderImagePreview(null);
+                      setSliderNewImageUrlInput('');
+                      if (sliderUploadFileRef.current) sliderUploadFileRef.current.value = '';
+                    }}
+                    className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-full hover:bg-red-700 shadow-xs"
+                    title="हटाएं"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Right: Caption, Action & CTA */}
+            <div className="space-y-2.5">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  2. फोटो शीर्षक (Title - वैकल्पिक):
+                </label>
+                <input
+                  type="text"
+                  value={sliderNewTitle}
+                  onChange={(e) => setSliderNewTitle(e.target.value)}
+                  placeholder="उदा. दीपावली व धनतेरस विशेष धमाका ऑफर"
+                  className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0]"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  3. विवरण / उपशीर्षक (Subtitle - वैकल्पिक):
+                </label>
+                <input
+                  type="text"
+                  value={sliderNewSubtitle}
+                  onChange={(e) => setSliderNewSubtitle(e.target.value)}
+                  placeholder="उदा. केवल ₹249 में एक्टिवेट करें और पाएं 3.30% रिचार्ज कमीशन + ₹150 रेफरल"
+                  className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    4. क्लिक पर कहां ले जाएं (Target):
+                  </label>
+                  <select
+                    value={sliderNewActionUrl}
+                    onChange={(e) => setSliderNewActionUrl(e.target.value)}
+                    className="w-full bg-white border border-gray-300 rounded-xl px-2.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0]"
+                  >
+                    <option value="register">रजिस्ट्रेशन फॉर्म (Register ₹249)</option>
+                    <option value="video">ट्रेनिंग वीडियो (Video Tour)</option>
+                    <option value="calculator">अर्निंग कैलकुलेटर (Calculator)</option>
+                    <option value="idcard">डिजिटल ID कार्ड (ID Card)</option>
+                    <option value="plans">प्लान विवरण (Plans SWIS/TWIS)</option>
+                    <option value="contact">सपोर्ट हेल्पलाइन (Contact Us)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    5. बटन का नाम (CTA Label):
+                  </label>
+                  <input
+                    type="text"
+                    value={sliderNewActionLabel}
+                    onChange={(e) => setSliderNewActionLabel(e.target.value)}
+                    placeholder="अभी जॉइन करें"
+                    className="w-full bg-white border border-gray-300 rounded-xl px-2.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0]"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={handleAddSliderPhoto}
+                  disabled={sliderPhotos.length >= 7 || (!sliderImagePreview && !sliderNewImageUrlInput.trim())}
+                  className="w-full py-2 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:brightness-110 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-sm transition disabled:opacity-40 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>➕ इस फोटो को 7-स्लाइडर में जोड़ें ({sliderPhotos.length}/7)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Current Photos List */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h5 className="text-xs font-bold text-slate-800">
+              सक्रिय स्लाइडर फोटो क्रम (Slider Order & Status):
+            </h5>
+            <span className="text-[11px] text-slate-500">
+              तीर (↑ / ↓) द्वारा क्रम बदलें • री-ऑर्डर करें
+            </span>
+          </div>
+
+          {sliderPhotos.length === 0 ? (
+            <div className="p-6 text-center text-xs text-slate-500 bg-slate-50 rounded-xl border border-dashed border-gray-300 space-y-1.5">
+              <ImageIcon className="w-8 h-8 mx-auto text-slate-400" />
+              <p className="font-bold text-slate-700">कोई फोटो अपलोड नहीं की गई है</p>
+              <p className="text-[11px] text-slate-500">
+                जब तक आप ऊपर से फोटो अपलोड नहीं करेंगे, होमपेज पर आगंतुकों के सामने कोई भी पॉप-अप नहीं खुलेगा।
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {sliderPhotos.map((photo, idx) => (
+                <div
+                  key={photo.id || idx}
+                  className="bg-white border-2 border-slate-200 rounded-xl p-3 space-y-2.5 shadow-xs relative flex flex-col justify-between"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs pb-1.5 border-b border-gray-100">
+                      <span className="font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                        फोटो #{idx + 1}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleMoveSliderPhoto(idx, 'up')}
+                          disabled={idx === 0}
+                          className="p-1 rounded hover:bg-slate-100 text-slate-600 disabled:opacity-30 cursor-pointer"
+                          title="ऊपर ले जाएं"
+                        >
+                          <ChevronUp className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMoveSliderPhoto(idx, 'down')}
+                          disabled={idx === sliderPhotos.length - 1}
+                          className="p-1 rounded hover:bg-slate-100 text-slate-600 disabled:opacity-30 cursor-pointer"
+                          title="नीचे ले जाएं"
+                        >
+                          <ChevronDown className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSliderPhoto(photo.id)}
+                          className="p-1 rounded hover:bg-red-50 text-red-600 transition cursor-pointer"
+                          title="हटाएं (Delete)"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="h-32 rounded-lg overflow-hidden bg-slate-950 border border-gray-200 flex items-center justify-center">
+                      <img
+                        src={photo.imageUrl}
+                        alt={photo.title || `Slider photo ${idx + 1}`}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+
+                    <div className="text-xs space-y-0.5">
+                      <p className="font-bold text-slate-900 truncate">
+                        {photo.title || 'शीर्षक रहित (No Title)'}
+                      </p>
+                      {photo.subtitle && (
+                        <p className="text-[11px] text-slate-500 line-clamp-2">
+                          {photo.subtitle}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-[11px] text-slate-600">
+                    <span className="font-mono">
+                      लिंक: <strong>{photo.actionUrl || 'register'}</strong>
+                    </span>
+                    <span className="font-bold text-blue-600">
+                      [{photo.actionLabel || 'देखें'}]
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Live Preview Modal for Admin */}
+        {sliderLivePreviewOpen && sliderPhotos.length > 0 && (
+          <HomeSliderPopupModal
+            photos={sliderPhotos}
+            isOpen={sliderLivePreviewOpen}
+            onClose={() => setSliderLivePreviewOpen(false)}
+          />
         )}
       </div>
     </div>
@@ -9982,7 +10477,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
       {showAdminNotifModal &&
         (() => {
           const modalContent = (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-fadeIn">
+            <div className="fixed inset-0 z-[150] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-xs animate-fadeIn">
               <div className="bg-white border-2 border-slate-300 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-[#1e293b] text-white p-4 sm:p-5 flex items-center justify-between">
@@ -10132,6 +10627,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
           );
           return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
         })()}
+
+      {/* 7-Photo Popup Slider Studio Modal in Admin Panel */}
+      <HomeSliderManagerModal
+        isOpen={showSliderStudioModal}
+        onClose={() => setShowSliderStudioModal(false)}
+        siteConfig={siteConfig}
+        onUpdateSiteConfig={async (newPhotos, displayTarget, celebrationEffect) => {
+          setSliderPhotos(newPhotos);
+          const updates: Partial<SiteConfig> = { homeSliderPhotos: newPhotos };
+          if (displayTarget) updates.popupDisplayTarget = displayTarget;
+          if (celebrationEffect !== undefined) updates.enableCelebrationEffect = celebrationEffect;
+
+          const updated = StorageService.updateSiteConfig(updates);
+          await FirestoreService.saveSiteConfig({ ...siteConfig, ...updates });
+          setSiteConfig(updated);
+        }}
+        onPreviewLivePopup={() => {
+          setShowSliderStudioModal(false);
+          setSliderLivePreviewOpen(true);
+        }}
+      />
     </div>
   );
 };

@@ -189,6 +189,7 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
   appDownloadNotice: 'केवल अधिकृत ACC वेबसाइट से ही APK डाउनलोड करें। इंस्टालेशन के समय "Install from Unknown Sources" को अनुमति दें।',
   services: DEFAULT_SERVICES,
   promotionalPosters: DEFAULT_PROMOTIONAL_POSTERS,
+  homeSliderPhotos: [],
 };
 
 // Helper to extract uppercase initials
@@ -1529,7 +1530,34 @@ export const StorageService = {
     try {
       const data = localStorage.getItem(CURRENT_USER_KEY);
       if (!data) return null;
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      if (!parsed || typeof parsed !== 'object') return null;
+
+      // Sanitize member properties to avoid any undefined/null numeric or string crashes
+      const sanitized: Member = {
+        ...parsed,
+        id: parsed.id || parsed.accId || 'mem-custom',
+        accId: parsed.accId || 'ACC249MEMBER',
+        fullName: parsed.fullName || 'सदस्य',
+        mobile: String(parsed.mobile || ''),
+        email: parsed.email || '',
+        plan: parsed.plan || 'SWIS',
+        status: parsed.status || 'verified',
+        walletBalance: Number(parsed.walletBalance || 0),
+        totalEarnings: Number(parsed.totalEarnings || 0),
+        swisEarnings: Number(parsed.swisEarnings || 0),
+        twisEarnings: Number(parsed.twisEarnings || 0),
+        rechargesCount: Number(parsed.rechargesCount || 0),
+        referralsCount: Number(parsed.referralsCount || 0),
+        privacySettings: parsed.privacySettings || {
+          showMobile: false,
+          showEmail: false,
+          showCity: false,
+          showWhatsapp: true,
+          showProfileLink: true,
+        },
+      };
+      return sanitized;
     } catch {
       return null;
     }
@@ -1539,6 +1567,17 @@ export const StorageService = {
     if (!member) {
       localStorage.removeItem(CURRENT_USER_KEY);
     } else {
+      // Ensure member has an active session ID and keep local session aligned
+      if (typeof window !== 'undefined') {
+        let currentSess = localStorage.getItem(CURRENT_SESSION_ID_KEY);
+        if (!currentSess) {
+          currentSess = member.activeSessionId || `sess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+          localStorage.setItem(CURRENT_SESSION_ID_KEY, currentSess);
+        }
+        if (!member.activeSessionId) {
+          member.activeSessionId = currentSess;
+        }
+      }
       localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(member));
     }
     notifySync();
@@ -1667,6 +1706,7 @@ export const StorageService = {
           Array.isArray(parsed.promotionalPosters) && parsed.promotionalPosters.some((p: PromotionalPoster) => Boolean(p.imageUrl))
             ? parsed.promotionalPosters
             : DEFAULT_PROMOTIONAL_POSTERS,
+        homeSliderPhotos: Array.isArray(parsed.homeSliderPhotos) ? parsed.homeSliderPhotos : [],
       };
     } catch {
       return DEFAULT_SITE_CONFIG;

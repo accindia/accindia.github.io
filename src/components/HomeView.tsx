@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Sparkles,
   Play,
@@ -35,10 +36,21 @@ import {
   CheckCircle,
   UserPlus,
 } from 'lucide-react';
-import { ActiveWindow, Member, SiteConfig, AppServiceItem, PromotionalPoster } from '../types';
+import { ActiveWindow, Member, SiteConfig, AppServiceItem, PromotionalPoster, HomeSliderPhoto } from '../types';
 import { StorageService, subscribeToSync } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
 import { AccLogo } from '../assets/logo';
+import { HomeSliderPopupModal } from './HomeSliderPopupModal';
+import { SampurnPanchangModal } from './SampurnPanchangModal';
+import {
+  generateDynamicHomeSlides,
+  getLivePanchangDetails,
+  calculateFestivalCountdown,
+  getNextUpcomingFestival,
+  DynamicSlide,
+  PanchangInfo,
+  FestivalEvent,
+} from '../utils/festivalPanchangEngine';
 
 export interface FestiveArticleSlide {
   id: string;
@@ -248,25 +260,47 @@ export const HomeView: React.FC<HomeViewProps> = ({
     };
   }, []);
 
-  // 7-Slide Festive & Earning Carousel Auto-Slider State
+  // Dynamic Real-time Hindu Panchang & 7-Slide Festival/Suvichar Engine
+  const [dynamicSlides, setDynamicSlides] = useState<DynamicSlide[]>(() => generateDynamicHomeSlides());
+  const [livePanchang, setLivePanchang] = useState<PanchangInfo>(() => getLivePanchangDetails());
+  const [nextFestival, setNextFestival] = useState<FestivalEvent>(() => getNextUpcomingFestival());
+  const [countdownTicker, setCountdownTicker] = useState(() => calculateFestivalCountdown(getNextUpcomingFestival().date));
+
   const [currentSlideIndex, setCurrentSlideIndex] = useState<number>(0);
   const [isSlidePaused, setIsSlidePaused] = useState<boolean>(false);
   const [previewBannerImage, setPreviewBannerImage] = useState<string | null>(null);
+  const [showPanchangModal, setShowPanchangModal] = useState<boolean>(false);
 
+  // 1-second live ticker for real-time countdown, live Panchang, and auto-removing passed festivals
   useEffect(() => {
-    if (isSlidePaused) return;
+    const timer = setInterval(() => {
+      const now = new Date();
+      const upcoming = getNextUpcomingFestival(now);
+      setNextFestival(upcoming);
+      setLivePanchang(getLivePanchangDetails(now));
+      setCountdownTicker(calculateFestivalCountdown(upcoming.date, now));
+      setDynamicSlides(generateDynamicHomeSlides(now));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Carousel auto-advance
+  useEffect(() => {
+    if (isSlidePaused || dynamicSlides.length === 0) return;
     const interval = setInterval(() => {
-      setCurrentSlideIndex((prev) => (prev + 1) % FESTIVE_ARTICLE_SLIDES.length);
+      setCurrentSlideIndex((prev) => (prev + 1) % dynamicSlides.length);
     }, 4500);
     return () => clearInterval(interval);
-  }, [isSlidePaused]);
+  }, [isSlidePaused, dynamicSlides.length]);
 
   const handlePrevSlide = () => {
-    setCurrentSlideIndex((prev) => (prev - 1 + FESTIVE_ARTICLE_SLIDES.length) % FESTIVE_ARTICLE_SLIDES.length);
+    if (dynamicSlides.length === 0) return;
+    setCurrentSlideIndex((prev) => (prev - 1 + dynamicSlides.length) % dynamicSlides.length);
   };
 
   const handleNextSlide = () => {
-    setCurrentSlideIndex((prev) => (prev + 1) % FESTIVE_ARTICLE_SLIDES.length);
+    if (dynamicSlides.length === 0) return;
+    setCurrentSlideIndex((prev) => (prev + 1) % dynamicSlides.length);
   };
 
   // Helper for service icons
@@ -305,8 +339,34 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   const cleanWhatsApp = (siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '');
 
+  // 7-Photo Dynamic Popup Slider Modal State (Configured strictly via Admin Panel)
+  const [isHomeSliderPopupOpen, setIsHomeSliderPopupOpen] = useState<boolean>(true);
+
   return (
     <div className="space-y-5 sm:space-y-6 max-w-7xl mx-auto px-1 sm:px-0">
+      {/* 7-Photo Dynamic Popup Slider on Home Page (Natural Aspect Auto-Fit + Zoom In/Out Animation + Celebration Confetti) */}
+      {siteConfig.homeSliderPhotos &&
+        siteConfig.homeSliderPhotos.length > 0 &&
+        siteConfig.popupDisplayTarget !== 'disabled' &&
+        siteConfig.popupDisplayTarget !== 'dashboard' && (
+        <HomeSliderPopupModal
+          photos={siteConfig.homeSliderPhotos}
+          isOpen={isHomeSliderPopupOpen}
+          onClose={() => setIsHomeSliderPopupOpen(false)}
+          enableCelebrationEffect={siteConfig.enableCelebrationEffect !== false}
+          onNavigate={(target) => {
+            if (onNavigate) onNavigate(target as ActiveWindow);
+          }}
+        />
+      )}
+
+      {/* Sampurn Dainik Vedic Panchang Modal */}
+      <SampurnPanchangModal
+        isOpen={showPanchangModal}
+        onClose={() => setShowPanchangModal(false)}
+        onNavigateRegister={() => onNavigate(currentUser ? 'add-member' : 'register')}
+      />
+
       {/* ========================================================================= */}
       {/* 5 TO 10 SECOND INSTANT GATEWAY: ACC क्या है और आपको आगे क्या करना है? */}
       {/* ========================================================================= */}
@@ -408,7 +468,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             </span>
             {currentUser && (
               <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded font-bold">
-                लॉगिन सदस्य: {currentUser.fullName.split(' ')[0]} ({currentUser.accId})
+                लॉगिन सदस्य: {(currentUser.fullName || 'सदस्य').split(' ')[0]} ({currentUser.accId})
               </span>
             )}
           </div>
@@ -568,9 +628,25 @@ export const HomeView: React.FC<HomeViewProps> = ({
         <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-5 sm:gap-8 w-full">
           {/* Left Hero Text - Targeted Selector 1 - Zero Cutoff, Fluid Typography */}
           <div className="space-y-3 sm:space-y-4 max-w-2xl text-center lg:text-left w-full">
-            <div className="inline-flex items-center gap-1.5 text-[10px] xs:text-xs font-bold text-[#ffe500] bg-blue-900/60 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-sm border border-blue-400/30 max-w-full flex-wrap justify-center lg:justify-start leading-tight">
-              <Zap className="w-3 h-3 xs:w-3.5 xs:h-3.5 fill-[#ffe500] text-[#ffe500] shrink-0" />
-              <span className="break-words">SPECIAL STUDENT & YOUTH EARNING PROGRAM · ACC ASSURED ✓</span>
+            <div className="flex flex-wrap items-center gap-2 justify-center lg:justify-start">
+              <div className="inline-flex items-center gap-1.5 text-[10px] xs:text-xs font-bold text-[#ffe500] bg-blue-900/60 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-sm border border-blue-400/30 max-w-full flex-wrap justify-center lg:justify-start leading-tight">
+                <Zap className="w-3 h-3 xs:w-3.5 xs:h-3.5 fill-[#ffe500] text-[#ffe500] shrink-0" />
+                <span className="break-words">SPECIAL STUDENT & YOUTH EARNING PROGRAM · ACC ASSURED ✓</span>
+              </div>
+
+              {/* Clickable Live Panchang & Next Mahaparva Chhath Puja Trigger */}
+              <button
+                type="button"
+                onClick={() => setShowPanchangModal(true)}
+                className="inline-flex items-center gap-1.5 text-[10px] xs:text-xs font-black text-amber-200 bg-amber-950/80 hover:bg-amber-900 px-2.5 py-0.5 sm:py-1 rounded-lg border border-amber-400/60 shadow-md cursor-pointer transition active:scale-95 group"
+                title="क्लिक करके आज का सम्पूर्ण दैनिक पंचांग, शुभ मुहूर्त व छठ महापर्व विवरण देखें"
+              >
+                <span>🕉️ {livePanchang.dayName}, {livePanchang.tithi}</span>
+                <span className="text-yellow-300 font-extrabold">• अगला महापर्व: {nextFestival.hindiName}</span>
+                <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded shadow-xs group-hover:scale-105 transition-transform">
+                  सम्पूर्ण पंचांग ↗
+                </span>
+              </button>
             </div>
 
             <h1 className="font-display font-black text-xl xs:text-2xl sm:text-4xl lg:text-5xl text-white tracking-tight leading-snug sm:leading-tight break-words">
@@ -616,7 +692,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-gradient-to-b from-[#2874f0] to-[#1258c7] text-white flex items-center justify-center shadow-[0_2px_4px_rgba(40,116,240,0.35),inset_0_1px_0.5px_rgba(255,255,255,0.6)] shrink-0">
                       <LayoutDashboard className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                     </div>
-                    <span className="leading-tight break-words">मेरा डैशबोर्ड खोलें ({currentUser.fullName.split(' ')[0]})</span>
+                    <span className="leading-tight break-words">मेरा डैशबोर्ड खोलें ({(currentUser.fullName || 'सदस्य').split(' ')[0]})</span>
                     <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-0.5 group-hover:translate-x-0.5 transition-transform shrink-0" />
                   </button>
 
@@ -794,7 +870,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* 7-SLIDE AUTO-SLIDING FESTIVAL & VALUE ARTICLE POSTER CAROUSEL */}
+      {/* 7-SLIDE DYNAMIC REAL-TIME PANCHANG & FESTIVAL / SUVICHAR CAROUSEL */}
       {/* ========================================================================= */}
       <div 
         className="relative bg-gradient-to-r from-slate-900 via-[#17212b] to-slate-950 rounded-2xl p-4 sm:p-6 md:p-8 shadow-xl border-2 border-amber-400/50 overflow-hidden text-white transition-all"
@@ -806,29 +882,38 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <AccLogo watermark size="custom" className="w-full h-full" />
         </div>
 
-        {/* Carousel Top Navigation Bar */}
-        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3 mb-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-md text-sm">
-              {FESTIVE_ARTICLE_SLIDES[currentSlideIndex].iconEmoji}
+        {/* Carousel Top Navigation Bar with Real-Time Panchang & Festival Status */}
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/10 pb-3 mb-4">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 text-slate-950 flex items-center justify-center font-black shadow-md text-base shrink-0">
+              {dynamicSlides[currentSlideIndex]?.iconEmoji || '🪔'}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs sm:text-sm font-black text-amber-300 uppercase tracking-wider">
-                  त्योहार विशेष व छात्र आमदनी विशेषांक
+                  दैनिक पंचांग, महापर्व व सुविचार
                 </span>
-                <span className="text-[10px] bg-red-600/80 text-white font-black px-2 py-0.5 rounded-full animate-pulse">
-                  {isSlidePaused ? '⏸ पॉज़्ड (होवर)' : '⚡ ऑटो-स्लाइड लाइव'}
+                <span className="text-[10px] bg-red-600 text-white font-black px-2 py-0.5 rounded-full animate-pulse">
+                  {isSlidePaused ? '⏸ पॉज़्ड (होवर)' : '⚡ लाइव ऑटो-स्लाइड'}
                 </span>
+                <button
+                  type="button"
+                  onClick={() => setShowPanchangModal(true)}
+                  className="text-[10px] bg-amber-400/20 hover:bg-amber-400 hover:text-slate-950 text-amber-300 font-bold px-2.5 py-0.5 rounded-full border border-amber-400/40 transition active:scale-95 cursor-pointer flex items-center gap-1 shadow-xs"
+                  title="क्लिक करके आज का सम्पूर्ण दैनिक पंचांग, शुभ मुहूर्त व चौघड़िया देखें"
+                >
+                  <span>🕉️ {livePanchang.dayName}, {livePanchang.tithi}</span>
+                  <span className="text-[9px] underline font-black ml-0.5">सम्पूर्ण पंचांग देखें ↗</span>
+                </button>
               </div>
-              <p className="text-[11px] text-slate-300">
-                स्लाइड {currentSlideIndex + 1} of {FESTIVE_ARTICLE_SLIDES.length} · धनतेरस, दिवाली, गोवर्धन, भाई दूज, छठ पूजा व ₹249 का सच
+              <p className="text-[11px] text-slate-300 truncate">
+                स्लाइड {currentSlideIndex + 1} of {dynamicSlides.length} · {dynamicSlides[currentSlideIndex]?.festivalOrDayTitle}
               </p>
             </div>
           </div>
 
-          {/* Prev / Next 3D Arrows */}
-          <div className="flex items-center gap-2 self-end sm:self-auto">
+          {/* Prev / Next 3D Arrows & Slide Counter (No public slider buttons) */}
+          <div className="flex items-center gap-2 self-end md:self-auto shrink-0">
             <button
               type="button"
               onClick={handlePrevSlide}
@@ -838,7 +923,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               <ChevronLeft className="w-4 h-4" />
             </button>
             <span className="text-xs font-mono font-bold text-amber-300 px-1">
-              0{currentSlideIndex + 1} / 0{FESTIVE_ARTICLE_SLIDES.length}
+              0{currentSlideIndex + 1} / 0{dynamicSlides.length}
             </span>
             <button
               type="button"
@@ -851,40 +936,73 @@ export const HomeView: React.FC<HomeViewProps> = ({
           </div>
         </div>
 
-        {/* Active Slide Display */}
+        {/* Live Festival Countdown Ticker Strip */}
+        <div className="relative z-10 mb-4 p-2.5 sm:p-3 rounded-xl bg-gradient-to-r from-amber-950/80 via-slate-900/90 to-amber-950/80 border border-amber-400/40 flex flex-col sm:flex-row items-center justify-between gap-2.5 shadow-md">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-lg animate-bounce">{nextFestival.iconEmoji}</span>
+            <div className="min-w-0">
+              <span className="text-[10px] text-amber-300 font-bold block uppercase tracking-wider">
+                अगला महापर्व (Coming Soon)
+              </span>
+              <span className="text-xs sm:text-sm font-black text-white truncate block">
+                {nextFestival.hindiName} ({new Date(nextFestival.date).toLocaleDateString('hi-IN', { day: 'numeric', month: 'long', year: 'numeric' })})
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            <div className="flex items-center gap-1.5 bg-black/60 px-3 py-1 rounded-lg border border-amber-300/30 text-xs font-mono font-bold text-amber-300">
+              <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0 animate-pulse" />
+              <span>
+                {countdownTicker.days}d : {countdownTicker.hours}h : {countdownTicker.minutes}m : {countdownTicker.seconds}s
+              </span>
+              <span className="text-[10px] text-slate-300 font-sans font-normal ml-1">शेष</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowPanchangModal(true)}
+              className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-400 to-orange-500 hover:brightness-110 text-slate-950 text-xs font-black shadow-md border border-yellow-200 active:scale-95 transition cursor-pointer flex items-center gap-1"
+              title="सम्पूर्ण दैनिक पंचांग, शुभ मुहूर्त व चौघड़िया देखें"
+            >
+              <span>🕉️ सम्पूर्ण पंचांग</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Active Dynamic Slide Display */}
         {(() => {
-          const slide = FESTIVE_ARTICLE_SLIDES[currentSlideIndex];
+          const slide = dynamicSlides[currentSlideIndex] || dynamicSlides[0];
+          if (!slide) return null;
           return (
             <div 
               key={slide.id}
               className={`relative z-10 bg-gradient-to-r ${slide.gradient} rounded-xl p-5 sm:p-7 md:p-8 border-2 ${slide.borderColor} shadow-2xl animate-fadeIn space-y-4`}
             >
               <div className="flex flex-col lg:flex-row items-center lg:items-start justify-between gap-5">
-                {/* Real 8K Festival Banner Image - 100% Full Uncropped View on all screens */}
+                {/* 8K HD Poster Image - 100% Full Uncropped View */}
                 {slide.imageUrl && (
                   <div className="w-full lg:w-[380px] xl:w-[440px] shrink-0 flex flex-col gap-1.5">
                     <div 
                       onClick={() => setPreviewBannerImage(slide.imageUrl || null)}
                       className="w-full aspect-[16/9] rounded-xl overflow-hidden border-2 border-amber-300/80 shadow-[0_8px_25px_rgba(0,0,0,0.5)] relative group bg-slate-950 flex items-center justify-center cursor-pointer select-none"
-                      title="क्लिक करके पूरा HD फेस्टिवल पोस्टर 100% फुल स्क्रीन में देखें"
+                      title="क्लिक करके पूरा HD पोस्टर 100% फुल स्क्रीन में देखें"
                     >
-                      {/* Ambient background blur to smoothly blend poster on widescreen/tall mobile */}
                       <img
                         src={slide.imageUrl}
                         alt=""
                         aria-hidden="true"
                         className="absolute inset-0 w-full h-full object-cover blur-md opacity-35 scale-105 pointer-events-none"
                       />
-                      {/* Crisp Foreground Poster: Complete & Uncropped View */}
                       <img
                         src={slide.imageUrl}
-                        alt={slide.festivalName}
+                        alt={slide.festivalOrDayTitle}
                         className="relative z-10 w-full h-full object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)] group-hover:scale-[1.02] transition-transform duration-300"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent flex items-end justify-between p-2.5 z-20 pointer-events-none">
                         <span className="text-[10px] font-black text-amber-300 bg-black/80 px-2 py-0.5 rounded backdrop-blur-xs flex items-center gap-1 border border-amber-400/30">
                           <span>{slide.iconEmoji}</span>
-                          <span>{slide.festivalName}</span>
+                          <span>{slide.festivalOrDayTitle}</span>
                         </span>
                         <span className="text-[9px] font-bold text-white bg-emerald-600 px-2 py-0.5 rounded shadow-sm flex items-center gap-1">
                           <span>🔍 100% पूरा पोस्टर</span>
@@ -892,7 +1010,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       </div>
                     </div>
                     <div className="flex items-center justify-between text-[10px] text-amber-200/90 px-1 font-semibold">
-                      <span>✨ 8K HD रियल फेस्टिवल पोस्टर</span>
+                      <span>✨ 8K HD रियल पोस्टर (ऑटो-अपडेट)</span>
                       <button
                         type="button"
                         onClick={() => setPreviewBannerImage(slide.imageUrl || null)}
@@ -904,9 +1022,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   </div>
                 )}
 
-                <div className="space-y-2 flex-1">
+                <div className="space-y-2 flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`text-[11px] font-black px-3 py-1 rounded-full shadow-md ${slide.accentBg}`}>
+                    <span className="text-[11px] font-black px-3 py-1 rounded-full shadow-md bg-amber-400 text-slate-950">
                       {slide.badge}
                     </span>
                     <span className="text-[11px] text-white/90 font-bold bg-black/30 backdrop-blur-xs px-2.5 py-1 rounded-full border border-white/20">
@@ -915,23 +1033,32 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   </div>
 
                   <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-white font-display leading-tight drop-shadow-md">
-                    {slide.title}
+                    {slide.mainHeadline}
                   </h3>
 
                   <p className="text-xs sm:text-sm text-white/95 leading-relaxed font-medium max-w-3xl">
                     {slide.description}
                   </p>
+
+                  {/* Shubh Muhurat & Lagan Banner if upcoming/active festival */}
+                  {slide.panchangHighlight && (
+                    <div className="mt-2 p-2.5 rounded-lg bg-black/35 backdrop-blur-xs border border-white/15 text-xs text-amber-200 flex flex-wrap items-center gap-x-4 gap-y-1">
+                      <span>📅 <strong className="text-white">तिथि:</strong> {slide.panchangHighlight.tithi}</span>
+                      <span>⏰ <strong className="text-white">शुभ मुहूर्त:</strong> {slide.panchangHighlight.muhurat}</span>
+                      {slide.panchangHighlight.lagan && (
+                        <span>🚩 <strong className="text-white">शुभ लग्न:</strong> {slide.panchangHighlight.lagan}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Official ACC India Logo & Name Emblem Card */}
                 <div className="shrink-0 flex flex-col items-center justify-center p-3 sm:p-4 bg-gradient-to-b from-slate-950/85 via-blue-950/90 to-slate-950/90 backdrop-blur-md rounded-2xl border-2 border-amber-400/60 shadow-[0_8px_24px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.2)] text-center min-w-[150px] sm:min-w-[175px] self-stretch lg:self-auto space-y-2 select-none group">
-                  {/* 3D ACC Official Vector Emblem Logo */}
                   <div className="relative">
                     <AccLogo size="custom" className="w-13 h-13 sm:w-15 sm:h-15 drop-shadow-[0_4px_12px_rgba(245,158,11,0.45)] group-hover:scale-105 transition-transform" />
                     <span className="absolute -top-1 -right-1 text-sm">{slide.iconEmoji}</span>
                   </div>
 
-                  {/* Brand Name & Indian Tiranga Badge */}
                   <div className="flex flex-col items-center">
                     <span className="font-display font-black text-xs sm:text-sm text-white tracking-tight leading-tight block drop-shadow-[0_1.5px_2px_rgba(0,0,0,0.8)]">
                       Achievers Club
@@ -947,7 +1074,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     </span>
                   </div>
 
-                  {/* Verified & Lifetime ₹249 Badge */}
                   <div className="w-full pt-1 border-t border-white/15 space-y-1">
                     <div className="w-full bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 font-black text-[9.5px] sm:text-[10px] py-1 px-1.5 rounded-lg shadow-sm flex items-center justify-center gap-1">
                       <Sparkles className="w-2.5 h-2.5 fill-slate-950 text-slate-950 shrink-0" />
@@ -961,7 +1087,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 </div>
               </div>
 
-              {/* 4 Feature Bullet Points Grid */}
+              {/* Feature Highlights Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-white/20">
                 {slide.highlightPoints.map((pt, idx) => (
                   <div key={idx} className="flex items-start gap-2 bg-black/25 backdrop-blur-xs p-2.5 rounded-lg border border-white/10 text-xs text-white">
@@ -976,7 +1102,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => onNavigate(currentUser ? 'add-member' : slide.ctaTarget)}
+                    onClick={() => onNavigate(currentUser ? 'add-member' : (slide.ctaTarget as ActiveWindow))}
                     className="px-5 py-2.5 bg-gradient-to-b from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-[0_3px_0_#9a3412] active:translate-y-0.5 active:shadow-none inline-flex items-center gap-2 transition cursor-pointer"
                   >
                     <Sparkles className="w-4 h-4 text-slate-950 animate-pulse" />
@@ -1004,7 +1130,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
         {/* 7 Slide Indicator Dots Bar */}
         <div className="relative z-10 flex items-center justify-center gap-1.5 sm:gap-2 pt-4">
-          {FESTIVE_ARTICLE_SLIDES.map((s, idx) => (
+          {dynamicSlides.map((s, idx) => (
             <button
               key={s.id}
               type="button"
@@ -1014,7 +1140,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   ? 'w-8 bg-amber-400 shadow-md ring-2 ring-amber-300/50'
                   : 'w-2.5 bg-white/30 hover:bg-white/50'
               }`}
-              title={`${s.festivalName} स्लाइड देखें`}
+              title={`${s.festivalOrDayTitle} स्लाइड देखें`}
             />
           ))}
         </div>
@@ -1725,9 +1851,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
       </footer>
 
       {/* 100% Full View 8K Festival Poster Modal */}
-      {previewBannerImage && (
+      {previewBannerImage && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/90 backdrop-blur-md animate-fadeIn"
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-[160] flex items-center justify-center p-3 sm:p-6 bg-black/90 backdrop-blur-md animate-fadeIn"
           onClick={() => setPreviewBannerImage(null)}
         >
           <div 
@@ -1758,7 +1886,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
               <span className="text-[11px] text-slate-400">सभी स्क्रीन पर 100% पूरा दृश्य</span>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
