@@ -74,6 +74,7 @@ import {
   Gem,
   Bell,
   Camera,
+  PartyPopper,
 } from 'lucide-react';
 import {
   Member,
@@ -92,6 +93,7 @@ import {
   PassbookEntry,
   PassbookCategory,
   HomeSliderPhoto,
+  CelebrationPopupItem,
   ActiveWindow,
 } from '../types';
 import { StorageService, subscribeToSync, SEED_MEMBERS } from '../services/storage';
@@ -102,6 +104,8 @@ import { AvatarWith3DFrame, AVATAR_FRAMES } from './AvatarWith3DFrame';
 import { compressImage } from '../utils/imageCompressor';
 import { HomeSliderPopupModal } from './HomeSliderPopupModal';
 import { HomeSliderManagerModal } from './HomeSliderManagerModal';
+import { CelebrationPopupModal } from './CelebrationPopupModal';
+import { CelebrationPopupManagerModal } from './CelebrationPopupManagerModal';
 
 interface AdminPanelProps {
   onRefresh: () => void;
@@ -401,6 +405,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
   );
   const [showAdminNotifModal, setShowAdminNotifModal] = useState<boolean>(false);
   const [showSliderStudioModal, setShowSliderStudioModal] = useState<boolean>(false);
+  const [showCelebrationPopupModal, setShowCelebrationPopupModal] = useState<boolean>(false);
+  const [celebrationPreviewItems, setCelebrationPreviewItems] = useState<CelebrationPopupItem[] | null>(null);
 
   // Real-time Firestore sync on mount & when unlocked
   useEffect(() => {
@@ -1505,17 +1511,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
 
         {/* Database backup, change password & logout buttons */}
         <div className="flex items-center gap-2 flex-wrap">
-          {/* 7-Slide & 3-Welcome Messages Studio Action Button */}
+          {/* 2nd Button: Dedicated Congratulations & Celebration Popup Effect Studio */}
           <button
             type="button"
-            onClick={() => setShowSliderStudioModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:brightness-110 text-slate-950 text-xs font-black rounded-lg shadow-[0_2.5px_0_#b45309] border border-amber-300 active:translate-y-0.5 transition cursor-pointer shrink-0"
-            title="स्वागत 3-संदेश व 7-स्लाइडर पॉपअप स्टूडियो"
+            onClick={() => setShowCelebrationPopupModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500 via-rose-500 to-amber-500 hover:brightness-110 text-white text-xs font-black rounded-lg shadow-[0_2.5px_0_#9f1239] border border-rose-300/70 active:translate-y-0.5 transition cursor-pointer shrink-0"
+            title="सेलिब्रेशन व बधाई पॉप-अप इफ़ेक्ट स्टूडियो (फोटो + संदेश + कट बटन)"
           >
-            <Sparkles className="w-3.5 h-3.5 text-slate-950" />
-            <span>✨ स्वागत 3-संदेश व 7-स्लाइडर</span>
+            <PartyPopper className="w-3.5 h-3.5 text-yellow-200 animate-bounce" />
+            <span>🎉 सेलिब्रेशन पॉप-अप इफ़ेक्ट</span>
             <span className="bg-slate-950 text-amber-300 text-[10px] font-black px-1.5 py-0.2 rounded-full">
-              {sliderPhotos.length}/7
+              {(siteConfig.celebrationPopups || []).length} सक्रिय
             </span>
           </button>
 
@@ -10706,6 +10712,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
           isOpen={sliderLivePreviewOpen}
           onClose={() => setSliderLivePreviewOpen(false)}
           enableCelebrationEffect={siteConfig.enableCelebrationEffect !== false}
+          onNavigate={onNavigate ? (target) => onNavigate(target as ActiveWindow) : undefined}
+        />
+      )}
+
+      {/* Dedicated Celebration Popup Effect Studio Modal (Connected to 2nd Studio Button) */}
+      <CelebrationPopupManagerModal
+        isOpen={showCelebrationPopupModal}
+        onClose={() => setShowCelebrationPopupModal(false)}
+        siteConfig={siteConfig}
+        onSaveCelebrationConfig={async (updates) => {
+          const updated = StorageService.updateSiteConfig(updates);
+          setSiteConfig(updated);
+          await FirestoreService.saveSiteConfig(updated);
+        }}
+        onPreviewPopup={(itemsToPreview) => setCelebrationPreviewItems(itemsToPreview)}
+      />
+
+      {/* Live Preview of Celebration Popup inside Admin Panel */}
+      {celebrationPreviewItems && celebrationPreviewItems.length > 0 && (
+        <CelebrationPopupModal
+          items={celebrationPreviewItems}
+          isOpen={Boolean(celebrationPreviewItems)}
+          onClose={() => setCelebrationPreviewItems(null)}
           onNavigate={onNavigate ? (target) => onNavigate(target as ActiveWindow) : undefined}
         />
       )}

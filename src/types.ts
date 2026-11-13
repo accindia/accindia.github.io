@@ -391,6 +391,18 @@ export interface HomeSliderPhoto {
   createdAt?: string;
 }
 
+export interface CelebrationPopupItem {
+  id: string;
+  imageUrl?: string;
+  title: string;
+  message: string;
+  badgeText?: string;
+  actionUrl?: string;
+  actionLabel?: string;
+  enableCelebrationEffect?: boolean;
+  createdAt?: string;
+}
+
 export interface SiteConfig {
   helplinePhone: string; // e.g. "+91 8877490845"
   whatsappNumber: string; // e.g. "+91 8877490845"
@@ -425,4 +437,8 @@ export interface SiteConfig {
   homeSliderPhotos?: HomeSliderPhoto[]; // Up to 7 photos for home popup slider
   popupDisplayTarget?: 'home' | 'all' | 'dashboard' | 'visitors' | 'disabled'; // Where popup displays
   enableCelebrationEffect?: boolean; // Celebration confetti effect toggle
+  // Dedicated Celebration Popup System (Connected to 2nd Studio Button in Admin Panel)
+  celebrationPopups?: CelebrationPopupItem[];
+  celebrationPopupTarget?: 'home' | 'all' | 'dashboard' | 'visitors' | 'disabled';
+  celebrationAutoRealTimeFestival?: boolean; // Only auto-show popup when no manual item exists AND today is a real-time festival
 }

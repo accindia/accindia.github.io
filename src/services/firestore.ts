@@ -455,9 +455,20 @@ export const FirestoreService = {
     try {
       const clean: SiteConfig = JSON.parse(JSON.stringify(config));
 
-      // Safeguard slider photos: compress each image to keep whole document well within 1MB Firestore limit
+      // Safeguard slider & celebration popup photos: compress each image to keep document within 1MB Firestore limit
       if (clean.homeSliderPhotos && Array.isArray(clean.homeSliderPhotos)) {
         for (const p of clean.homeSliderPhotos) {
+          if (p.imageUrl && p.imageUrl.startsWith('data:image') && p.imageUrl.length > 80000) {
+            try {
+              p.imageUrl = await ensureSafeFirestoreSize(p.imageUrl, 700, 0.62);
+            } catch {
+              // ignore
+            }
+          }
+        }
+      }
+      if (clean.celebrationPopups && Array.isArray(clean.celebrationPopups)) {
+        for (const p of clean.celebrationPopups) {
           if (p.imageUrl && p.imageUrl.startsWith('data:image') && p.imageUrl.length > 80000) {
             try {
               p.imageUrl = await ensureSafeFirestoreSize(p.imageUrl, 700, 0.62);
@@ -476,6 +487,13 @@ export const FirestoreService = {
         const fallbackConfig: SiteConfig = JSON.parse(JSON.stringify(config));
         if (fallbackConfig.homeSliderPhotos && Array.isArray(fallbackConfig.homeSliderPhotos)) {
           for (const p of fallbackConfig.homeSliderPhotos) {
+            if (p.imageUrl && p.imageUrl.length > 50000) {
+              p.imageUrl = await ensureSafeFirestoreSize(p.imageUrl, 450, 0.5);
+            }
+          }
+        }
+        if (fallbackConfig.celebrationPopups && Array.isArray(fallbackConfig.celebrationPopups)) {
+          for (const p of fallbackConfig.celebrationPopups) {
             if (p.imageUrl && p.imageUrl.length > 50000) {
               p.imageUrl = await ensureSafeFirestoreSize(p.imageUrl, 450, 0.5);
             }

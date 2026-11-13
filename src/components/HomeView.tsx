@@ -41,6 +41,7 @@ import { StorageService, subscribeToSync } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
 import { AccLogo } from '../assets/logo';
 import { HomeSliderPopupModal } from './HomeSliderPopupModal';
+import { CelebrationPopupModal, resolveActiveCelebrationPopups } from './CelebrationPopupModal';
 import { SampurnPanchangModal } from './SampurnPanchangModal';
 import {
   generateDynamicHomeSlides,
@@ -362,16 +363,28 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   const cleanWhatsApp = (siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '');
 
-  // 7-Photo Dynamic Popup Slider Modal State (Configured strictly via Admin Panel)
+  // 7-Photo Dynamic Popup Slider Modal State (Configured via 1st Admin Slider Button)
   const [isHomeSliderPopupOpen, setIsHomeSliderPopupOpen] = useState<boolean>(true);
+  // Dedicated Celebration Popup Effect State (Configured via 2nd Admin Popup Button)
+  const [isCelebrationPopupOpen, setIsCelebrationPopupOpen] = useState<boolean>(true);
 
-  // Automatically re-open popup whenever admin saves photos or updates the slider list
+  // Automatically re-open popup whenever admin saves photos or updates the slider/popup list
   const photosSignature = (siteConfig.homeSliderPhotos || []).map((p) => p.id || p.imageUrl).join(',');
   useEffect(() => {
     if (siteConfig.homeSliderPhotos && siteConfig.homeSliderPhotos.length > 0) {
       setIsHomeSliderPopupOpen(true);
     }
   }, [photosSignature]);
+
+  const activeCelebrationPopups = resolveActiveCelebrationPopups(siteConfig, 'home', Boolean(currentUser));
+  const celebrationSignature = activeCelebrationPopups
+    .map((p) => `${p.id}:${p.title}:${p.imageUrl || ''}`)
+    .join('|') + `::${siteConfig.celebrationPopupTarget || 'all'}`;
+  useEffect(() => {
+    if (activeCelebrationPopups.length > 0) {
+      setIsCelebrationPopupOpen(true);
+    }
+  }, [celebrationSignature]);
 
   return (
     <div className="space-y-5 sm:space-y-6 max-w-7xl mx-auto px-1 sm:px-0">
@@ -394,8 +407,21 @@ export const HomeView: React.FC<HomeViewProps> = ({
         </div>
       )}
 
-      {/* 7-Photo Dynamic Popup Slider on Home Page (Natural Aspect Auto-Fit + Zoom In/Out Animation + Celebration Confetti) */}
-      {siteConfig.homeSliderPhotos &&
+      {/* Dedicated Celebration Popup Effect (Admin Photo/Message OR Real-Time Festival Today Only) */}
+      {activeCelebrationPopups.length > 0 && (
+        <CelebrationPopupModal
+          items={activeCelebrationPopups}
+          isOpen={isCelebrationPopupOpen}
+          onClose={() => setIsCelebrationPopupOpen(false)}
+          onNavigate={(target) => {
+            if (onNavigate) onNavigate(target as ActiveWindow);
+          }}
+        />
+      )}
+
+      {/* 7-Photo Dynamic Popup Slider on Home Page (Shown when no separate Celebration Popup is active) */}
+      {activeCelebrationPopups.length === 0 &&
+        siteConfig.homeSliderPhotos &&
         siteConfig.homeSliderPhotos.length > 0 &&
         siteConfig.popupDisplayTarget !== 'disabled' &&
         siteConfig.popupDisplayTarget !== 'dashboard' && (

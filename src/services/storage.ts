@@ -190,6 +190,9 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
   services: DEFAULT_SERVICES,
   promotionalPosters: DEFAULT_PROMOTIONAL_POSTERS,
   homeSliderPhotos: [],
+  celebrationPopups: [],
+  celebrationPopupTarget: 'all',
+  celebrationAutoRealTimeFestival: true,
 };
 
 // Helper to extract uppercase initials
@@ -1707,6 +1710,9 @@ export const StorageService = {
             ? parsed.promotionalPosters
             : DEFAULT_PROMOTIONAL_POSTERS,
         homeSliderPhotos: Array.isArray(parsed.homeSliderPhotos) ? parsed.homeSliderPhotos : [],
+        celebrationPopups: Array.isArray(parsed.celebrationPopups) ? parsed.celebrationPopups : [],
+        celebrationPopupTarget: parsed.celebrationPopupTarget || 'all',
+        celebrationAutoRealTimeFestival: parsed.celebrationAutoRealTimeFestival !== false,
       };
     } catch {
       return DEFAULT_SITE_CONFIG;
@@ -1759,6 +1765,10 @@ export const StorageService = {
           homeSliderPhotos: config.homeSliderPhotos?.map((p) => ({
             ...p,
             imageUrl: p.imageUrl.startsWith('data:') ? p.imageUrl.slice(0, 50000) : p.imageUrl,
+          })),
+          celebrationPopups: config.celebrationPopups?.map((p) => ({
+            ...p,
+            imageUrl: p.imageUrl && p.imageUrl.startsWith('data:') ? p.imageUrl.slice(0, 50000) : p.imageUrl,
           })),
         };
         localStorage.setItem(SITE_CONFIG_KEY, JSON.stringify(compact));

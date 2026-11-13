@@ -78,6 +78,7 @@ import {
   PrivateMessage,
   PassbookEntry,
   PassbookCategory,
+  SiteConfig,
 } from '../types';
 import { StorageService, subscribeToSync } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
@@ -90,6 +91,7 @@ import { PrivateChatBox } from './PrivateChatBox';
 import { ReferralTrendChart } from './ReferralTrendChart';
 import { SponsorRegisterMemberModal } from './SponsorRegisterMemberModal';
 import { HomeSliderPopupModal } from './HomeSliderPopupModal';
+import { CelebrationPopupModal, resolveActiveCelebrationPopups } from './CelebrationPopupModal';
 
 export type UserDashboardTab =
   | 'applink'
@@ -169,7 +171,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
   const [copiedId, setCopiedId] = useState(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [statusCheckMsg, setStatusCheckMsg] = useState('');
-  const siteConfig = StorageService.getSiteConfig();
+  const [siteConfig, setSiteConfig] = useState<SiteConfig>(() => StorageService.getSiteConfig());
 
   // User Private Messages & 3D Live Notifications System (Admin Message Alerts)
   const [userMessages, setUserMessages] = useState<PrivateMessage[]>(() =>
@@ -177,6 +179,18 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
   );
   const [showNotificationModal, setShowNotificationModal] = useState<boolean>(false);
   const [isDashboardSliderPopupOpen, setIsDashboardSliderPopupOpen] = useState<boolean>(true);
+  const [isDashboardCelebrationOpen, setIsDashboardCelebrationOpen] = useState<boolean>(true);
+
+  const dashboardCelebrationItems = resolveActiveCelebrationPopups(siteConfig, 'dashboard', true);
+  const dashboardCelSig = dashboardCelebrationItems
+    .map((p) => `${p.id}:${p.title}:${p.imageUrl || ''}`)
+    .join('|') + `::${siteConfig.celebrationPopupTarget || 'all'}`;
+
+  useEffect(() => {
+    if (dashboardCelebrationItems.length > 0) {
+      setIsDashboardCelebrationOpen(true);
+    }
+  }, [dashboardCelSig]);
 
   useEffect(() => {
     setUserMessages(StorageService.getPrivateMessages(currentUser.accId));
@@ -186,12 +200,20 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
         setUserMessages(cloudMsgs);
       }
     });
+    const unsubscribeSite = FirestoreService.subscribeToSiteConfig((cloudCfg) => {
+      if (cloudCfg) {
+        setSiteConfig(cloudCfg);
+        StorageService.saveSiteConfig(cloudCfg, true);
+      }
+    });
     const unsubscribeSync = subscribeToSync(() => {
       setUserMessages(StorageService.getPrivateMessages(currentUser.accId));
       setPassbookEntries(StorageService.getPassbookEntries(currentUser.accId));
+      setSiteConfig(StorageService.getSiteConfig());
     });
     return () => {
       unsubscribeMessages();
+      unsubscribeSite();
       unsubscribeSync();
     };
   }, [currentUser.accId]);
@@ -5984,8 +6006,27 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
         </div>
       )}
 
-      {/* 7-Photo Popup Slider on Dashboard (when configured for dashboard or all) */}
-      {(siteConfig.popupDisplayTarget === 'dashboard' || siteConfig.popupDisplayTarget === 'all') &&
+      {/* Dedicated Celebration Popup on Dashboard (when set to dashboard or all, OR real-time festival) */}
+      {dashboardCelebrationItems.length > 0 && (
+        <CelebrationPopupModal
+          items={dashboardCelebrationItems}
+          isOpen={isDashboardCelebrationOpen}
+          onClose={() => setIsDashboardCelebrationOpen(false)}
+          onNavigate={(target) => {
+            if (target === 'chat' && onNavigateToChat) {
+              onNavigateToChat();
+            } else if (target === 'idcard') {
+              setActiveTab('idcard');
+            } else if (target === 'plans') {
+              setActiveTab('courses');
+            }
+          }}
+        />
+      )}
+
+      {/* 7-Photo Popup Slider on Dashboard (when configured for dashboard or all, and no celebration popup active) */}
+      {dashboardCelebrationItems.length === 0 &&
+        (siteConfig.popupDisplayTarget === 'dashboard' || siteConfig.popupDisplayTarget === 'all') &&
         siteConfig.homeSliderPhotos &&
         siteConfig.homeSliderPhotos.length > 0 && (
           <HomeSliderPopupModal

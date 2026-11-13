@@ -21,6 +21,7 @@ import { MandatoryPasswordUpdateModal } from './components/MandatoryPasswordUpda
 import { AccChatAndHelpHub } from './components/AccChatAndHelpHub';
 import { DeviceKickoutAlertModal } from './components/DeviceKickoutAlertModal';
 import { ForgotCredentialsModal } from './components/ForgotCredentialsModal';
+import { CelebrationPopupModal, resolveActiveCelebrationPopups } from './components/CelebrationPopupModal';
 import { ActiveWindow, Member, SiteConfig } from './types';
 import { StorageService, subscribeToSync } from './services/storage';
 import { FirestoreService } from './services/firestore';
@@ -51,6 +52,7 @@ import {
 } from 'lucide-react';
 
 export default function App() {
+  const [globalCelebrationOpen, setGlobalCelebrationOpen] = useState<boolean>(true);
   const [currentUser, setCurrentUser] = useState<Member | null>(() => {
     const user = StorageService.getCurrentUser();
     if (user && user.id !== 'mem-001' && user.id !== 'mem-002' && user.id !== 'mem-003') {
@@ -69,6 +71,17 @@ export default function App() {
   const [referralSponsor, setReferralSponsor] = useState<Member | null>(null);
   const [deviceKickoutAlertOpen, setDeviceKickoutAlertOpen] = useState(false);
   const [showForgotCredentialsModal, setShowForgotCredentialsModal] = useState(false);
+
+  const globalCelebrationItems = resolveActiveCelebrationPopups(siteConfig, 'other', Boolean(currentUser));
+  const globalCelebrationSig =
+    globalCelebrationItems.map((p) => `${p.id}:${p.title}:${p.imageUrl || ''}`).join('|') +
+    `::${siteConfig.celebrationPopupTarget || 'all'}`;
+
+  useEffect(() => {
+    if (globalCelebrationItems.length > 0) {
+      setGlobalCelebrationOpen(true);
+    }
+  }, [globalCelebrationSig]);
 
   // When a user logs in for the first time or from outside, default to dashboard if on login/register
   useEffect(() => {
@@ -940,6 +953,23 @@ export default function App() {
           }}
         />
       )}
+
+      {/* GLOBAL CELEBRATION POPUP WHEN ADMIN SELECTS 'all' PAGES (Non-Home, Non-Dashboard, Non-Admin Views) */}
+      {activeWindow !== 'home' &&
+        activeWindow !== 'dashboard' &&
+        activeWindow !== 'admin' &&
+        (() => {
+          const items = resolveActiveCelebrationPopups(siteConfig, 'other', Boolean(currentUser));
+          if (items.length === 0) return null;
+          return (
+            <CelebrationPopupModal
+              items={items}
+              isOpen={globalCelebrationOpen}
+              onClose={() => setGlobalCelebrationOpen(false)}
+              onNavigate={(target) => handleNavigateWithScroll(target as ActiveWindow)}
+            />
+          );
+        })()}
     </div>
   );
 }
