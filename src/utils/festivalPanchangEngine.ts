@@ -820,12 +820,41 @@ export function getNextUpcomingFestival(currentDate: Date = new Date()): Festiva
 }
 
 // -------------------------------------------------------------
+// Get Strictly Future Festival (Whose countdown is > 0 seconds)
+// Used when today's festival time count has ended (0d:0h:0m:0s)
+// -------------------------------------------------------------
+export function getStrictlyUpcomingFestival(currentDate: Date = new Date()): FestivalEvent {
+  const nowMs = currentDate.getTime();
+  const strictlyFuture = MASTER_FESTIVALS_CALENDAR.filter((f) => {
+    const fTime = new Date(`${f.date}T00:00:00`).getTime();
+    return fTime > nowMs;
+  });
+
+  if (strictlyFuture.length > 0) {
+    return strictlyFuture[0];
+  }
+
+  return MASTER_FESTIVALS_CALENDAR[0];
+}
+
+// -------------------------------------------------------------
+// Get the Following Festival Right After a Given Festival ID
+// -------------------------------------------------------------
+export function getFestivalAfter(festivalId: string): FestivalEvent {
+  const idx = MASTER_FESTIVALS_CALENDAR.findIndex((f) => f.id === festivalId);
+  if (idx >= 0 && idx + 1 < MASTER_FESTIVALS_CALENDAR.length) {
+    return MASTER_FESTIVALS_CALENDAR[idx + 1];
+  }
+  return MASTER_FESTIVALS_CALENDAR[0];
+}
+
+// -------------------------------------------------------------
 // Generate Active 7 Slides for Home Page Carousel
 // (Automatic Festival Detection + Auto-Remove Past + 7 Good Morning Slides)
 // -------------------------------------------------------------
 export function generateDynamicHomeSlides(currentDate: Date = new Date()): DynamicSlide[] {
   const todayFestival = getTodayFestival(currentDate);
-  const nextFestival = getNextUpcomingFestival(currentDate);
+  const nextFestival = getStrictlyUpcomingFestival(currentDate);
   const panchang = getLivePanchangDetails(currentDate);
   const countdown = calculateFestivalCountdown(nextFestival.date, currentDate);
 
@@ -863,17 +892,22 @@ export function generateDynamicHomeSlides(currentDate: Date = new Date()): Dynam
   }
 
   // 2. Next Upcoming Festival Slide (with Live Countdown & Coming Soon Date)
+  const formattedNextDate = new Date(`${nextFestival.date}T00:00:00`).toLocaleDateString('hi-IN', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
   slides.push({
     id: `upcoming_${nextFestival.id}`,
     type: 'upcoming_festival',
     badge: `⏳ अगला पावन पर्व (Coming Soon): ${nextFestival.hindiName}`,
     iconEmoji: nextFestival.iconEmoji,
     festivalOrDayTitle: `${nextFestival.hindiName} (Coming Soon)`,
-    tagline: `आगामी तिथि: ${new Date(nextFestival.date).toLocaleDateString('hi-IN', { day: 'numeric', month: 'long', year: 'numeric' })} • समय शेष: ${countdown.days} दिन ${countdown.hours} घंटे`,
+    tagline: `आगामी तिथि: ${formattedNextDate} • समय शेष: ${countdown.days} दिन ${countdown.hours} घंटे`,
     mainHeadline: `तैयार रहें! अगला महापर्व आ रहा है: ${nextFestival.hindiName}`,
     description: `${nextFestival.tagline}. ${nextFestival.significance} त्योहार के बीतते ही पिछला स्लाइडर स्वतः हट जाता है और अगला पर्व सक्रिय हो जाता है।`,
     highlightPoints: [
-      `पर्व की शुभ तिथि: ${new Date(nextFestival.date).toLocaleDateString('hi-IN', { day: 'numeric', month: 'long', year: 'numeric' })} (${nextFestival.tithi})`,
+      `पर्व की शुभ तिथि: ${formattedNextDate} (${nextFestival.tithi})`,
       `शुभ मुहूर्त व पूजा वेला: ${nextFestival.shubhMuhurat}`,
       `शुभ लग्न: ${nextFestival.lagan}`,
       `समय शेष: ${countdown.days} दिन, ${countdown.hours} घंटे, ${countdown.minutes} मिनट`,

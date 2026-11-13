@@ -47,6 +47,8 @@ import {
   getLivePanchangDetails,
   calculateFestivalCountdown,
   getNextUpcomingFestival,
+  getStrictlyUpcomingFestival,
+  getFestivalAfter,
   DynamicSlide,
   PanchangInfo,
   FestivalEvent,
@@ -269,6 +271,17 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const [livePanchang, setLivePanchang] = useState<PanchangInfo>(() => getLivePanchangDetails());
   const [nextFestival, setNextFestival] = useState<FestivalEvent>(() => getNextUpcomingFestival());
   const [countdownTicker, setCountdownTicker] = useState(() => calculateFestivalCountdown(getNextUpcomingFestival().date));
+  const [strictlyNextFestival, setStrictlyNextFestival] = useState<FestivalEvent>(() => {
+    const current = getNextUpcomingFestival();
+    const ticker = calculateFestivalCountdown(current.date);
+    return ticker.isPast ? getStrictlyUpcomingFestival() : getFestivalAfter(current.id);
+  });
+  const [strictlyNextCountdown, setStrictlyNextCountdown] = useState(() => {
+    const current = getNextUpcomingFestival();
+    const ticker = calculateFestivalCountdown(current.date);
+    const target = ticker.isPast ? getStrictlyUpcomingFestival() : getFestivalAfter(current.id);
+    return calculateFestivalCountdown(target.date);
+  });
 
   const [currentSlideIndex, setCurrentSlideIndex] = useState<number>(0);
   const [isSlidePaused, setIsSlidePaused] = useState<boolean>(false);
@@ -280,9 +293,15 @@ export const HomeView: React.FC<HomeViewProps> = ({
     const timer = setInterval(() => {
       const now = new Date();
       const upcoming = getNextUpcomingFestival(now);
+      const upcomingCountdown = calculateFestivalCountdown(upcoming.date, now);
+      const secondaryFestival = upcomingCountdown.isPast
+        ? getStrictlyUpcomingFestival(now)
+        : getFestivalAfter(upcoming.id);
       setNextFestival(upcoming);
       setLivePanchang(getLivePanchangDetails(now));
-      setCountdownTicker(calculateFestivalCountdown(upcoming.date, now));
+      setCountdownTicker(upcomingCountdown);
+      setStrictlyNextFestival(secondaryFestival);
+      setStrictlyNextCountdown(calculateFestivalCountdown(secondaryFestival.date, now));
       setDynamicSlides(generateDynamicHomeSlides(now));
     }, 1000);
     return () => clearInterval(timer);
@@ -802,8 +821,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 {/* Live Festival Slide Ticker */}
                 <div className="flex items-center justify-between gap-1 text-[10px] bg-amber-50 text-amber-900 border border-amber-300 px-2 py-1 rounded-lg">
                   <span className="font-bold flex items-center gap-1 break-words leading-tight">
-                    <span>{FESTIVE_ARTICLE_SLIDES[currentSlideIndex].iconEmoji}</span>
-                    <span>{FESTIVE_ARTICLE_SLIDES[currentSlideIndex].festivalName}</span>
+                    <span>{dynamicSlides[currentSlideIndex]?.iconEmoji || FESTIVE_ARTICLE_SLIDES[currentSlideIndex % FESTIVE_ARTICLE_SLIDES.length]?.iconEmoji || '🎉'}</span>
+                    <span>{dynamicSlides[currentSlideIndex]?.festivalOrDayTitle || FESTIVE_ARTICLE_SLIDES[currentSlideIndex % FESTIVE_ARTICLE_SLIDES.length]?.festivalName || 'ACC महापर्व ऑफर'}</span>
                   </span>
                   <span className="text-[9px] bg-amber-200 text-amber-950 px-1.5 py-0.2 rounded font-bold shrink-0">
                     ऑफर एक्टिव ✓
@@ -967,33 +986,75 @@ export const HomeView: React.FC<HomeViewProps> = ({
           </div>
         </div>
 
-        {/* Live Festival Countdown Ticker Strip */}
-        <div className="relative z-10 mb-4 p-2.5 sm:p-3 rounded-xl bg-gradient-to-r from-amber-950/80 via-slate-900/90 to-amber-950/80 border border-amber-400/40 flex flex-col sm:flex-row items-center justify-between gap-2.5 shadow-md">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-lg animate-bounce">{nextFestival.iconEmoji}</span>
-            <div className="min-w-0">
-              <span className="text-[10px] text-amber-300 font-bold block uppercase tracking-wider">
-                अगला महापर्व (Coming Soon)
-              </span>
-              <span className="text-xs sm:text-sm font-black text-white truncate block">
-                {nextFestival.hindiName} ({new Date(nextFestival.date).toLocaleDateString('hi-IN', { day: 'numeric', month: 'long', year: 'numeric' })})
-              </span>
+        {/* Live Festival Countdown Ticker Strip (Targeted Strip: Today's Active Festival + Side-by-Side Next Festival Countdown) */}
+        <div className="relative z-10 mb-4 p-2.5 sm:p-3 rounded-xl bg-gradient-to-r from-amber-950/85 via-slate-900/95 to-amber-950/85 border border-amber-400/45 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-2.5 shadow-md">
+          {/* Two Side-by-Side Festival Blocks: Current Active/Primary + Next Upcoming beside it */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 flex-1 min-w-0">
+            {/* Block 1: Today's Festival (when countdown ended/today) OR Immediate Upcoming Festival */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-black/35 px-3 py-2 rounded-lg border border-amber-400/25 min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-lg shrink-0">{nextFestival.iconEmoji}</span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className={`text-[10px] font-black uppercase tracking-wider ${countdownTicker.isPast ? 'text-emerald-300' : 'text-amber-300'}`}>
+                      {countdownTicker.isPast ? '🎉 आज का महापर्व (सक्रिय ✓)' : '⏳ आगामी महापर्व (Coming Soon)'}
+                    </span>
+                    {countdownTicker.isPast && (
+                      <span className="text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 px-1.5 py-0.2 rounded font-bold">
+                        काउंटिंग पूर्ण
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs sm:text-sm font-black text-white truncate block" title={nextFestival.hindiName}>
+                    {nextFestival.hindiName} ({new Date(`${nextFestival.date}T00:00:00`).toLocaleDateString('hi-IN', { day: 'numeric', month: 'long', year: 'numeric' })})
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 bg-black/60 px-2.5 py-1 rounded-lg border border-amber-300/30 text-[11px] font-mono font-bold text-amber-300 shrink-0 self-start sm:self-center">
+                <Clock className={`w-3.5 h-3.5 shrink-0 ${countdownTicker.isPast ? 'text-emerald-400' : 'text-amber-400 animate-pulse'}`} />
+                {countdownTicker.isPast ? (
+                  <span className="text-emerald-300 font-sans font-extrabold">00d:00h:00m • आज सक्रिय ✓</span>
+                ) : (
+                  <>
+                    <span>
+                      {countdownTicker.days}d : {countdownTicker.hours}h : {countdownTicker.minutes}m : {countdownTicker.seconds}s
+                    </span>
+                    <span className="text-[10px] text-slate-300 font-sans font-normal ml-0.5">शेष</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Block 2 (बगल में): Next Upcoming Festival Live Countdown so upcoming festival is visible simultaneously */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-black/40 px-3 py-2 rounded-lg border border-amber-300/40 min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-lg shrink-0 animate-bounce">{strictlyNextFestival.iconEmoji}</span>
+                <div className="min-w-0">
+                  <span className="text-[10px] text-yellow-300 font-black block uppercase tracking-wider">
+                    {countdownTicker.isPast ? '⏭️ अगला आने वाला पर्व (Next Coming Soon)' : '⏭️ उसके बाद अगला पर्व'}
+                  </span>
+                  <span className="text-xs sm:text-sm font-black text-white truncate block" title={strictlyNextFestival.hindiName}>
+                    {strictlyNextFestival.hindiName} ({new Date(`${strictlyNextFestival.date}T00:00:00`).toLocaleDateString('hi-IN', { day: 'numeric', month: 'long', year: 'numeric' })})
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 bg-black/70 px-2.5 py-1 rounded-lg border border-yellow-300/45 text-[11px] font-mono font-bold text-yellow-300 shrink-0 self-start sm:self-center shadow-xs">
+                <Clock className="w-3.5 h-3.5 text-yellow-400 shrink-0 animate-pulse" />
+                <span>
+                  {strictlyNextCountdown.days}d : {strictlyNextCountdown.hours}h : {strictlyNextCountdown.minutes}m : {strictlyNextCountdown.seconds}s
+                </span>
+                <span className="text-[10px] text-slate-300 font-sans font-normal ml-0.5">शेष</span>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0 flex-wrap">
-            <div className="flex items-center gap-1.5 bg-black/60 px-3 py-1 rounded-lg border border-amber-300/30 text-xs font-mono font-bold text-amber-300">
-              <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0 animate-pulse" />
-              <span>
-                {countdownTicker.days}d : {countdownTicker.hours}h : {countdownTicker.minutes}m : {countdownTicker.seconds}s
-              </span>
-              <span className="text-[10px] text-slate-300 font-sans font-normal ml-1">शेष</span>
-            </div>
-
+          <div className="flex items-center justify-end shrink-0">
             <button
               type="button"
               onClick={() => setShowPanchangModal(true)}
-              className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-400 to-orange-500 hover:brightness-110 text-slate-950 text-xs font-black shadow-md border border-yellow-200 active:scale-95 transition cursor-pointer flex items-center gap-1"
+              className="w-full xl:w-auto justify-center px-3 py-2 rounded-lg bg-gradient-to-r from-amber-400 to-orange-500 hover:brightness-110 text-slate-950 text-xs font-black shadow-md border border-yellow-200 active:scale-95 transition cursor-pointer flex items-center gap-1.5"
               title="सम्पूर्ण दैनिक पंचांग, शुभ मुहूर्त व चौघड़िया देखें"
             >
               <span>🕉️ सम्पूर्ण पंचांग</span>

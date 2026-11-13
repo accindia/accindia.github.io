@@ -9,6 +9,18 @@ export default defineConfig(() => {
     build: {
       outDir: 'dist',
       emptyOutDir: true,
+      chunkSizeWarningLimit: 1200,
+      rolldownOptions: {
+        output: {
+          codeSplitting: {
+            groups: [
+              { name: 'vendor-firebase', test: /[\\/]node_modules[\\/](firebase|@firebase)[\\/]/ },
+              { name: 'vendor-charts', test: /[\\/]node_modules[\\/](recharts|d3-.*)[\\/]/ },
+              { name: 'vendor-ui', test: /[\\/]node_modules[\\/](lucide-react|motion|canvas-confetti|qrcode)[\\/]/ },
+            ],
+          },
+        },
+      },
     },
     plugins: [react(), tailwindcss()],
     resolve: {
