@@ -72,12 +72,18 @@ export const HomeSliderManagerModal: React.FC<HomeSliderManagerModalProps> = ({
   const [isCompressing, setIsCompressing] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const wasOpenRef = useRef<boolean>(false);
 
   useEffect(() => {
-    setPhotos(siteConfig.homeSliderPhotos || []);
-    setPopupDisplayTarget(siteConfig.popupDisplayTarget || 'home');
-    setEnableCelebrationEffect(siteConfig.enableCelebrationEffect !== false);
-  }, [siteConfig.homeSliderPhotos, siteConfig.popupDisplayTarget, siteConfig.enableCelebrationEffect]);
+    if (isOpen && !wasOpenRef.current) {
+      setPhotos(siteConfig.homeSliderPhotos || []);
+      setPopupDisplayTarget(siteConfig.popupDisplayTarget || 'home');
+      setEnableCelebrationEffect(siteConfig.enableCelebrationEffect !== false);
+      setSaveSuccessMsg('');
+      setUploadErrorMsg('');
+    }
+    wasOpenRef.current = isOpen;
+  }, [isOpen, siteConfig.homeSliderPhotos, siteConfig.popupDisplayTarget, siteConfig.enableCelebrationEffect]);
 
   // Handle ESC key to close
   useEffect(() => {
@@ -105,7 +111,7 @@ export const HomeSliderManagerModal: React.FC<HomeSliderManagerModalProps> = ({
     setUploadErrorMsg('');
 
     try {
-      const compressed = await compressImage(file, 900, 900, 0.72);
+      const compressed = await compressImage(file, 760, 760, 0.68);
       setImageUrl(compressed);
     } catch (err) {
       console.error('Image compression error:', err);
@@ -305,13 +311,37 @@ export const HomeSliderManagerModal: React.FC<HomeSliderManagerModalProps> = ({
   const handleSaveAll = async () => {
     setIsSaving(true);
     setSaveSuccessMsg('');
+    setUploadErrorMsg('');
     try {
-      await onUpdateSiteConfig(photos, popupDisplayTarget, enableCelebrationEffect);
+      let nextList = photos;
+      if (imageUrl.trim() && photos.length < 7) {
+        const finalTargetUrl = actionUrl === 'custom' ? customActionUrl.trim() : actionUrl;
+        const draftPhoto: HomeSliderPhoto = {
+          id: `slide_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+          imageUrl: imageUrl.trim(),
+          title: title.trim() || undefined,
+          subtitle: subtitle.trim() || undefined,
+          category,
+          actionUrl: finalTargetUrl || 'register',
+          actionLabel: actionLabel.trim() || 'अभी देखें',
+          congratulationEffect,
+          order: photos.length,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        };
+        nextList = [...photos, draftPhoto];
+        setPhotos(nextList);
+        setImageUrl('');
+        setTitle('');
+        setSubtitle('');
+        setCustomActionUrl('');
+      }
+      await onUpdateSiteConfig(nextList, popupDisplayTarget, enableCelebrationEffect);
       setSaveSuccessMsg('✓ 7-स्लाइड सिस्टम सफलतापूर्वक सहेज व अपडेट कर दिया गया!');
       setTimeout(() => setSaveSuccessMsg(''), 4000);
     } catch (err) {
       console.error('Error saving slider photos:', err);
-      alert('स्लाइडर फोटो सहेजने में त्रुटि हुई।');
+      setUploadErrorMsg('स्लाइडर फोटो सहेजने में त्रुटि हुई, कृपया पुनः प्रयास करें।');
     } finally {
       setIsSaving(false);
     }
@@ -826,29 +856,37 @@ export const HomeSliderManagerModal: React.FC<HomeSliderManagerModalProps> = ({
         </div>
 
         {/* Modal Footer with Save and Close */}
-        <div className="px-4 sm:px-6 py-3 bg-slate-950 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="text-[11px] text-slate-400 flex items-center gap-2">
-            <span>💾 सहेजने पर चयनित लोकेशन ({popupDisplayTarget}) पर तुरंत लागू होगा।</span>
-          </div>
+        <div className="px-4 sm:px-6 py-3 bg-slate-950 border-t border-white/10 space-y-2">
+          {saveSuccessMsg && (
+            <div className="px-3 py-1.5 rounded-lg bg-emerald-950/90 border border-emerald-500/70 text-emerald-200 flex items-center gap-2 text-[11px] font-bold">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>{saveSuccessMsg}</span>
+            </div>
+          )}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="text-[11px] text-slate-400 flex items-center gap-2">
+              <span>💾 सहेजने पर चयनित लोकेशन ({popupDisplayTarget}) पर तुरंत लागू होगा।</span>
+            </div>
 
-          <div className="flex items-center gap-2.5 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs transition cursor-pointer"
-            >
-              बंद करें (Close)
-            </button>
+            <div className="flex items-center gap-2.5 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs transition cursor-pointer"
+              >
+                बंद करें (Close)
+              </button>
 
-            <button
-              type="button"
-              onClick={handleSaveAll}
-              disabled={isSaving}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-xs shadow-lg transition active:scale-95 disabled:opacity-50 cursor-pointer"
-            >
-              <Save className="w-4 h-4" />
-              <span>{isSaving ? 'सहेज रहे हैं...' : '7-स्लाइड सहेजें व लागू करें'}</span>
-            </button>
+              <button
+                type="button"
+                onClick={handleSaveAll}
+                disabled={isSaving}
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-xs shadow-lg transition active:scale-95 disabled:opacity-50 cursor-pointer"
+              >
+                <Save className="w-4 h-4" />
+                <span>{isSaving ? 'सहेज रहे हैं...' : '7-स्लाइड सहेजें व लागू करें'}</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

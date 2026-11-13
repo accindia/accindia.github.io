@@ -135,7 +135,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
     setFrameSuccessMsg('');
     try {
       const updated = StorageService.updateMemberWithAudit(currentUser.accId, { avatarFrame: newFrame }, 'USER');
-      await FirestoreService.updateMember(currentUser.accId, { avatarFrame: newFrame });
       if (updated) {
         onUpdateUser(updated);
       }
@@ -201,9 +200,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
       }
     });
     const unsubscribeSite = FirestoreService.subscribeToSiteConfig((cloudCfg) => {
-      if (cloudCfg) {
-        setSiteConfig(cloudCfg);
-        StorageService.saveSiteConfig(cloudCfg, true);
+      if (cloudCfg && StorageService.applyCloudSiteConfigIfNewer(cloudCfg)) {
+        setSiteConfig(StorageService.getSiteConfig());
       }
     });
     const unsubscribeSync = subscribeToSync(() => {
@@ -420,7 +418,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
       // Auto-save avatar directly to Firestore & local storage
       try {
         const updated = StorageService.updateMember(currentUser.accId, { avatarUrl: croppedBase64 });
-        await FirestoreService.updateMember(currentUser.accId, { avatarUrl: croppedBase64 });
         if (updated) onUpdateUser(updated);
         setProfileSaveSuccess('✓ प्रोफाइल DP सफलतापूर्वक WhatsApp स्टाइल में सेट हो गई!');
         setTimeout(() => setProfileSaveSuccess(''), 3500);
@@ -432,7 +429,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
       // Auto-save personal QR as well
       try {
         const updated = StorageService.updateMember(currentUser.accId, { personalQrUrl: croppedBase64 });
-        await FirestoreService.updateMember(currentUser.accId, { personalQrUrl: croppedBase64 });
         if (updated) onUpdateUser(updated);
         setProfileSaveSuccess('✓ पर्सनल QR कोड सफलतापूर्वक सेट हो गया!');
         setTimeout(() => setProfileSaveSuccess(''), 3500);
@@ -570,7 +566,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
       };
 
       const updated = StorageService.updateMember(currentUser.accId, updates);
-      await FirestoreService.updateMember(currentUser.accId, updates);
 
       if (updated) {
         onUpdateUser(updated);
@@ -688,7 +683,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
     setPrivacySaveSuccessMsg('');
     try {
       const localUpdated = StorageService.updateMember(currentUser.accId, { privacySettings: updated });
-      await FirestoreService.updateMember(currentUser.accId, { privacySettings: updated });
       if (localUpdated) onUpdateUser(localUpdated);
       setPrivacySettings(updated);
       setPrivacySaveSuccessMsg('✓ आपकी प्राइवेसी सेटिंग्स सफलतापूर्वक सुरक्षित हो गई हैं!');
@@ -6024,8 +6018,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
         />
       )}
 
-      {/* 7-Photo Popup Slider on Dashboard (when configured for dashboard or all, and no celebration popup active) */}
-      {dashboardCelebrationItems.length === 0 &&
+      {/* 7-Photo Popup Slider on Dashboard (when configured for dashboard or all, after celebration popup is dismissed) */}
+      {(dashboardCelebrationItems.length === 0 || !isDashboardCelebrationOpen) &&
         (siteConfig.popupDisplayTarget === 'dashboard' || siteConfig.popupDisplayTarget === 'all') &&
         siteConfig.homeSliderPhotos &&
         siteConfig.homeSliderPhotos.length > 0 && (

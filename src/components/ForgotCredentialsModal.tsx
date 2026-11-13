@@ -243,7 +243,6 @@ export const ForgotCredentialsModal: React.FC<ForgotCredentialsModalProps> = ({ 
     try {
       const updatedData = { password: newPassword.trim() };
       StorageService.updateMember(foundMember.accId, updatedData);
-      await FirestoreService.updateMember(foundMember.accId, updatedData);
 
       setSuccessMsg('पासवर्ड सफलतापूर्वक अपडेट कर दिया गया! पोर्टल में लॉगिन हो रहे हैं...');
       setTimeout(() => {

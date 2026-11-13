@@ -455,9 +455,8 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
         },
       };
 
-      // 3. Save new member directly to Firestore & local storage
-      console.log('Saving new member to Firestore and local storage...', newMember.accId);
-      await FirestoreService.saveMember(newMember);
+      // 3. Save new member to local cache & Firestore (addMemberAsync handles single Firestore write)
+      console.log('Saving new member to local storage and Firestore...', newMember.accId);
       await StorageService.addMemberAsync(newMember);
       StorageService.setCurrentUser(newMember);
       setCreatedMember(newMember);

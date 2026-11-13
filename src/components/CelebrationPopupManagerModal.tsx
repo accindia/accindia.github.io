@@ -19,6 +19,7 @@ import {
 import { CelebrationPopupItem, SiteConfig } from '../types';
 import { compressImage } from '../utils/imageCompressor';
 import { getTodayFestival } from '../utils/festivalPanchangEngine';
+import { FirestoreService } from '../services/firestore';
 
 interface CelebrationPopupManagerModalProps {
   isOpen: boolean;
@@ -63,12 +64,19 @@ export const CelebrationPopupManagerModal: React.FC<CelebrationPopupManagerModal
   const [errorMsg, setErrorMsg] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const wasOpenRef = useRef<boolean>(false);
 
   useEffect(() => {
-    setItems(siteConfig.celebrationPopups || []);
-    setTarget(siteConfig.celebrationPopupTarget || 'all');
-    setAutoRealTimeFestival(siteConfig.celebrationAutoRealTimeFestival !== false);
+    if (isOpen && !wasOpenRef.current) {
+      setItems(siteConfig.celebrationPopups || []);
+      setTarget(siteConfig.celebrationPopupTarget || 'all');
+      setAutoRealTimeFestival(siteConfig.celebrationAutoRealTimeFestival !== false);
+      setStatusMsg('');
+      setErrorMsg('');
+    }
+    wasOpenRef.current = isOpen;
   }, [
+    isOpen,
     siteConfig.celebrationPopups,
     siteConfig.celebrationPopupTarget,
     siteConfig.celebrationAutoRealTimeFestival,
@@ -100,8 +108,12 @@ export const CelebrationPopupManagerModal: React.FC<CelebrationPopupManagerModal
         celebrationPopupTarget: nextTarget,
         celebrationAutoRealTimeFestival: nextAuto,
       });
-      setStatusMsg(msg);
-      setTimeout(() => setStatusMsg(''), 4000);
+      if (FirestoreService.isWriteQuotaPaused()) {
+        setStatusMsg('✓ सेटिंग्स लोकल रूप से सेव हो गई हैं (नोट: Firebase फ्री डेली राइट कोटा आज पूरा हो चुका है; कल कोटा रीसेट होते ही क्लाउड सिंक अपने-आप शुरू होगा)।');
+      } else {
+        setStatusMsg(msg);
+      }
+      setTimeout(() => setStatusMsg(''), 5000);
     } catch (err) {
       console.error('Failed to save celebration popup settings:', err);
       setErrorMsg('सेव करने में त्रुटि हुई, कृपया पुनः प्रयास करें।');
@@ -121,7 +133,7 @@ export const CelebrationPopupManagerModal: React.FC<CelebrationPopupManagerModal
     setIsCompressing(true);
     setErrorMsg('');
     try {
-      const compressed = await compressImage(file, 900, 900, 0.72);
+      const compressed = await compressImage(file, 760, 760, 0.68);
       setImageUrl(compressed);
     } catch {
       setErrorMsg('फोटो प्रोसेस करने में समस्या आई।');
@@ -131,15 +143,9 @@ export const CelebrationPopupManagerModal: React.FC<CelebrationPopupManagerModal
     }
   };
 
-  const handleAddPopupItem = async () => {
-    if (!imageUrl.trim() && !title.trim() && !message.trim()) {
-      setErrorMsg('कृपया कम से कम फोटो, शीर्षक या शुभकामना संदेश दर्ज करें।');
-      return;
-    }
-
+  const buildDraftPopupItem = (): CelebrationPopupItem => {
     const finalActionUrl = actionUrl === 'none' ? '' : actionUrl === 'custom' ? customActionUrl.trim() : actionUrl;
-
-    const newItem: CelebrationPopupItem = {
+    return {
       id: `cel_popup_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       imageUrl: imageUrl.trim() || undefined,
       title: title.trim() || '🎉 हार्दिक बधाई एवं शुभकामनाएं!',
@@ -150,7 +156,15 @@ export const CelebrationPopupManagerModal: React.FC<CelebrationPopupManagerModal
       enableCelebrationEffect: enableEffect,
       createdAt: new Date().toISOString(),
     };
+  };
 
+  const handleAddPopupItem = async () => {
+    if (!imageUrl.trim() && !title.trim() && !message.trim()) {
+      setErrorMsg('कृपया कम से कम फोटो, शीर्षक या शुभकामना संदेश दर्ज करें।');
+      return;
+    }
+
+    const newItem = buildDraftPopupItem();
     const nextItems = [newItem, ...items];
     setItems(nextItems);
     setImageUrl('');
@@ -163,6 +177,24 @@ export const CelebrationPopupManagerModal: React.FC<CelebrationPopupManagerModal
       autoRealTimeFestival,
       '🎉 नया सेलिब्रेशन पॉप-अप जुड़ गया और चुनी हुई लोकेशन पर लाइव हो गया!'
     );
+  };
+
+  const handleSaveFooterAll = async () => {
+    const hasDraft = Boolean(imageUrl.trim() || title.trim() || message.trim());
+    let nextItems = items;
+    let msg = '✓ पॉप-अप सेटिंग्स सफलतापूर्वक सेव व लाइव हो गई हैं!';
+
+    if (hasDraft) {
+      const draftItem = buildDraftPopupItem();
+      nextItems = [draftItem, ...items];
+      setItems(nextItems);
+      setImageUrl('');
+      setTitle('');
+      setMessage('');
+      msg = '✓ नया पॉप-अप फोटो/संदेश जुड़ गया और सफलतापूर्वक सेव व लाइव हो गया!';
+    }
+
+    await persistImmediately(nextItems, target, autoRealTimeFestival, msg);
   };
 
   const handleDeleteItem = async (id: string) => {
@@ -620,34 +652,49 @@ export const CelebrationPopupManagerModal: React.FC<CelebrationPopupManagerModal
         </div>
 
         {/* Footer */}
-        <div className="px-4 sm:px-6 py-3 bg-slate-950 border-t border-white/10 flex flex-wrap items-center justify-between gap-2.5">
-          <button
-            type="button"
-            onClick={handleTestLive}
-            disabled={items.length === 0 && !imageUrl.trim() && !title.trim() && !message.trim() && !todayFestival}
-            className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md flex items-center gap-1.5 transition active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-          >
-            <Eye className="w-3.5 h-3.5" />
-            <span>लाइव पॉप-अप टेस्ट करें</span>
-          </button>
+        <div className="px-4 sm:px-6 py-3 bg-slate-950 border-t border-white/10 space-y-2">
+          {statusMsg && (
+            <div className="px-3 py-1.5 rounded-lg bg-emerald-950/90 border border-emerald-500/70 text-emerald-200 flex items-center gap-2 text-[11px] font-bold">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>{statusMsg}</span>
+            </div>
+          )}
+          {errorMsg && (
+            <div className="px-3 py-1.5 rounded-lg bg-rose-950/90 border border-rose-500/70 text-rose-200 flex items-center gap-2 text-[11px] font-bold">
+              <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
 
-          <div className="flex items-center gap-2 ml-auto">
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
             <button
               type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer"
+              onClick={handleTestLive}
+              disabled={items.length === 0 && !imageUrl.trim() && !title.trim() && !message.trim() && !todayFestival}
+              className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md flex items-center gap-1.5 transition active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
-              बंद करें
+              <Eye className="w-3.5 h-3.5" />
+              <span>लाइव पॉप-अप टेस्ट करें</span>
             </button>
-            <button
-              type="button"
-              disabled={isSaving}
-              onClick={() => persistImmediately(items, target, autoRealTimeFestival)}
-              className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500 hover:brightness-110 text-slate-950 font-black text-xs shadow-lg flex items-center gap-1.5 transition active:scale-95 cursor-pointer disabled:opacity-60"
-            >
-              <Save className="w-3.5 h-3.5" />
-              <span>{isSaving ? 'सेव हो रहा है...' : 'पॉप-अप सेटिंग्स सहेजें'}</span>
-            </button>
+
+            <div className="flex items-center gap-2 ml-auto">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer"
+              >
+                बंद करें
+              </button>
+              <button
+                type="button"
+                disabled={isSaving}
+                onClick={handleSaveFooterAll}
+                className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500 hover:brightness-110 text-slate-950 font-black text-xs shadow-lg flex items-center gap-1.5 transition active:scale-95 cursor-pointer disabled:opacity-60"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>{isSaving ? 'सेव हो रहा है...' : 'पॉप-अप सेटिंग्स सहेजें'}</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

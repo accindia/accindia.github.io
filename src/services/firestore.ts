@@ -21,6 +21,117 @@ const WITHDRAWALS_COL = 'withdrawals';
 const SETTINGS_COL = 'settings';
 const SITE_CONFIG_DOC = 'site_config';
 
+const QUOTA_STORAGE_KEY = 'acc_firestore_write_quota_utc_day';
+
+function getTodayUtcKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+let inMemoryQuotaPausedDay: string | null = null;
+let quotaLoggedOnce = false;
+const quotaListeners = new Set<(exhausted: boolean) => void>();
+
+// Bounded client timeout so Firestore WriteStream backoff never leaves UI Save buttons stuck forever
+function withTimeout<T>(promise: Promise<T>, ms = 4500, label = 'Firestore operation'): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms}ms`));
+    }, ms);
+    promise.then(
+      (val) => {
+        clearTimeout(timer);
+        resolve(val);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
+export function isFirestoreQuotaError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { code?: string; message?: string };
+  const code = String(e.code || '').toLowerCase();
+  const msg = String(e.message || '').toLowerCase();
+  return (
+    code === 'resource-exhausted' ||
+    msg.includes('resource-exhausted') ||
+    msg.includes('quota limit exceeded') ||
+    msg.includes('quota exceeded')
+  );
+}
+
+export function isFirestoreDocumentSizeError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { code?: string; message?: string };
+  const code = String(e.code || '').toLowerCase();
+  const msg = String(e.message || '').toLowerCase();
+  return (
+    code === 'invalid-argument' ||
+    msg.includes('exceeds the maximum allowed size') ||
+    msg.includes('longer than') ||
+    msg.includes('maximum size of 1,048,576')
+  );
+}
+
+export function isFirestoreWritePaused(): boolean {
+  const today = getTodayUtcKey();
+  if (inMemoryQuotaPausedDay === today) return true;
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem(QUOTA_STORAGE_KEY) === today) {
+      inMemoryQuotaPausedDay = today;
+      return true;
+    }
+    if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(QUOTA_STORAGE_KEY) === today) {
+      inMemoryQuotaPausedDay = today;
+      return true;
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return false;
+}
+
+export function markFirestoreWritePaused(err?: unknown): void {
+  const today = getTodayUtcKey();
+  inMemoryQuotaPausedDay = today;
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(QUOTA_STORAGE_KEY, today);
+    }
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(QUOTA_STORAGE_KEY, today);
+    }
+  } catch {
+    // ignore
+  }
+  if (!quotaLoggedOnce) {
+    quotaLoggedOnce = true;
+    console.warn(
+      '⚠️ Firestore daily free-tier write quota reached for today; cloud writes paused cleanly and saved locally until daily reset.',
+      err
+    );
+  }
+  quotaListeners.forEach((cb) => {
+    try {
+      cb(true);
+    } catch {
+      // ignore
+    }
+  });
+}
+
+// Shared listener registries to avoid duplicate parallel onSnapshot connections
+const siteConfigCallbacks = new Set<(config: SiteConfig) => void>();
+let siteConfigUnsub: (() => void) | null = null;
+let cachedSiteConfigSnapshot: SiteConfig | null = null;
+
+const membersCallbacks = new Set<(members: Member[]) => void>();
+let membersUnsub: (() => void) | null = null;
+let cachedMembersSnapshot: Member[] | null = null;
+
 // Helper to guarantee completely safe and non-null member objects from Firestore
 export function sanitizeMember(data: any, fallbackId?: string): Member {
   const d = data && typeof data === 'object' ? data : {};
@@ -65,6 +176,40 @@ export function sanitizeMember(data: any, fallbackId?: string): Member {
 }
 
 export const FirestoreService = {
+  isWriteQuotaPaused(): boolean {
+    return isFirestoreWritePaused();
+  },
+
+  clearQuotaPauseForRetry(): void {
+    inMemoryQuotaPausedDay = null;
+    quotaLoggedOnce = false;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(QUOTA_STORAGE_KEY);
+      }
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem(QUOTA_STORAGE_KEY);
+      }
+    } catch {
+      // ignore
+    }
+    quotaListeners.forEach((cb) => {
+      try {
+        cb(false);
+      } catch {
+        // ignore
+      }
+    });
+  },
+
+  subscribeToQuotaStatus(cb: (exhausted: boolean) => void): () => void {
+    quotaListeners.add(cb);
+    cb(isFirestoreWritePaused());
+    return () => {
+      quotaListeners.delete(cb);
+    };
+  },
+
   // Sync seed member or check if exists
   async initSeedData(
     seedMembers: Member[],
@@ -72,25 +217,34 @@ export const FirestoreService = {
     seedReferrals: ReferralRecord[],
     seedWithdrawals: WithdrawalRequest[]
   ) {
+    if (isFirestoreWritePaused()) return;
     try {
       const snap = await getDocs(collection(db, MEMBERS_COL));
       if (snap.empty) {
         console.log('Seeding initial members to Firestore...');
         for (const m of seedMembers) {
+          if (isFirestoreWritePaused()) return;
           const clean = JSON.parse(JSON.stringify(m));
           await setDoc(doc(db, MEMBERS_COL, m.accId), clean);
         }
         for (const tx of seedTransactions) {
+          if (isFirestoreWritePaused()) return;
           await setDoc(doc(db, TRANSACTIONS_COL, tx.id), JSON.parse(JSON.stringify(tx)));
         }
         for (const r of seedReferrals) {
+          if (isFirestoreWritePaused()) return;
           await setDoc(doc(db, REFERRALS_COL, r.id), JSON.parse(JSON.stringify(r)));
         }
         for (const w of seedWithdrawals) {
+          if (isFirestoreWritePaused()) return;
           await setDoc(doc(db, WITHDRAWALS_COL, w.id), JSON.parse(JSON.stringify(w)));
         }
       }
     } catch (err) {
+      if (isFirestoreQuotaError(err)) {
+        markFirestoreWritePaused(err);
+        return;
+      }
       console.warn('Firestore initial seeding error (will use local fallback):', err);
     }
   },
@@ -98,14 +252,21 @@ export const FirestoreService = {
   async getMembers(): Promise<Member[]> {
     try {
       const snap = await getDocs(collection(db, MEMBERS_COL));
-      return snap.docs.map((d) => sanitizeMember(d.data(), d.id));
+      const list = snap.docs.map((d) => sanitizeMember(d.data(), d.id));
+      cachedMembersSnapshot = list;
+      return list;
     } catch (err) {
-      console.warn('Error fetching members from Firestore:', err);
+      if (isFirestoreQuotaError(err)) {
+        markFirestoreWritePaused(err);
+      } else {
+        console.warn('Error fetching members from Firestore:', err);
+      }
       return [];
     }
   },
 
   async saveMember(member: Member): Promise<boolean> {
+    if (isFirestoreWritePaused()) return false;
     try {
       const cleanMember: Member = JSON.parse(JSON.stringify(member));
 
@@ -134,13 +295,19 @@ export const FirestoreService = {
         }
       }
 
-      await setDoc(doc(db, MEMBERS_COL, cleanMember.accId), cleanMember);
-      console.log('Member saved to Firestore successfully:', cleanMember.accId);
+      await withTimeout(setDoc(doc(db, MEMBERS_COL, cleanMember.accId), cleanMember), 5000, 'saveMember');
       return true;
     } catch (err) {
-      console.error('Error saving member to Firestore, attempting reduced size retry:', err);
+      if (isFirestoreQuotaError(err)) {
+        markFirestoreWritePaused(err);
+        return false;
+      }
+      if (!isFirestoreDocumentSizeError(err)) {
+        console.warn('Error saving member to Firestore (saved locally):', err);
+        return false;
+      }
+      console.warn('Member payload exceeded 1MB Firestore limit, attempting compact retry...');
       try {
-        // If image was too large for Firestore document, retry without heavy images
         const fallbackMember: Member = JSON.parse(JSON.stringify(member));
         if (fallbackMember.paymentScreenshotUrl && fallbackMember.paymentScreenshotUrl.length > 50000) {
           fallbackMember.paymentScreenshotUrl = '';
@@ -154,13 +321,15 @@ export const FirestoreService = {
         await setDoc(doc(db, MEMBERS_COL, fallbackMember.accId), fallbackMember);
         return true;
       } catch (retryErr) {
-        console.error('Final retry saving member to Firestore failed:', retryErr);
+        if (isFirestoreQuotaError(retryErr)) markFirestoreWritePaused(retryErr);
+        console.warn('Compact retry saving member to Firestore failed:', retryErr);
         return false;
       }
     }
   },
 
   async updateMember(accId: string, updates: Partial<Member>): Promise<boolean> {
+    if (isFirestoreWritePaused()) return false;
     try {
       const cleanUpdates: Partial<Member> = JSON.parse(JSON.stringify(updates));
       if (cleanUpdates.paymentScreenshotUrl && cleanUpdates.paymentScreenshotUrl.startsWith('data:image')) {
@@ -188,9 +357,13 @@ export const FirestoreService = {
       }
 
       const ref = doc(db, MEMBERS_COL, accId);
-      await updateDoc(ref, cleanUpdates);
+      await withTimeout(updateDoc(ref, cleanUpdates), 5000, 'updateMember');
       return true;
     } catch (err) {
+      if (isFirestoreQuotaError(err)) {
+        markFirestoreWritePaused(err);
+        return false;
+      }
       console.warn('Error updating member in Firestore:', err);
       return false;
     }
@@ -324,10 +497,12 @@ export const FirestoreService = {
   },
 
   async saveTransaction(tx: RechargeTransaction): Promise<void> {
+    if (isFirestoreWritePaused()) return;
     try {
       await setDoc(doc(db, TRANSACTIONS_COL, tx.id), JSON.parse(JSON.stringify(tx)));
     } catch (err) {
-      console.warn('Error saving transaction in Firestore:', err);
+      if (isFirestoreQuotaError(err)) markFirestoreWritePaused(err);
+      else console.warn('Error saving transaction in Firestore:', err);
     }
   },
 
@@ -342,10 +517,12 @@ export const FirestoreService = {
   },
 
   async saveReferral(refRecord: ReferralRecord): Promise<void> {
+    if (isFirestoreWritePaused()) return;
     try {
       await setDoc(doc(db, REFERRALS_COL, refRecord.id), JSON.parse(JSON.stringify(refRecord)));
     } catch (err) {
-      console.warn('Error saving referral in Firestore:', err);
+      if (isFirestoreQuotaError(err)) markFirestoreWritePaused(err);
+      else console.warn('Error saving referral in Firestore:', err);
     }
   },
 
@@ -360,39 +537,69 @@ export const FirestoreService = {
   },
 
   async saveWithdrawal(wd: WithdrawalRequest): Promise<void> {
+    if (isFirestoreWritePaused()) return;
     try {
       await setDoc(doc(db, WITHDRAWALS_COL, wd.id), JSON.parse(JSON.stringify(wd)));
     } catch (err) {
-      console.warn('Error saving withdrawal in Firestore:', err);
+      if (isFirestoreQuotaError(err)) markFirestoreWritePaused(err);
+      else console.warn('Error saving withdrawal in Firestore:', err);
     }
   },
 
   async updateWithdrawal(id: string, updates: Partial<WithdrawalRequest>): Promise<void> {
+    if (isFirestoreWritePaused()) return;
     try {
       const ref = doc(db, WITHDRAWALS_COL, id);
       await updateDoc(ref, JSON.parse(JSON.stringify(updates)));
     } catch (err) {
-      console.warn('Error updating withdrawal in Firestore:', err);
+      if (isFirestoreQuotaError(err)) markFirestoreWritePaused(err);
+      else console.warn('Error updating withdrawal in Firestore:', err);
     }
   },
 
-  // Real-time snapshot listener for multi-device instant updates
+  // Multiplexed real-time snapshot listener for multi-device instant updates
   subscribeToMembers(onUpdate: (members: Member[]) => void) {
-    try {
-      return onSnapshot(
-        collection(db, MEMBERS_COL),
-        (snapshot) => {
-          const list = snapshot.docs.map((d) => sanitizeMember(d.data(), d.id));
-          onUpdate(list);
-        },
-        (error) => {
-          console.warn('Firestore subscribeToMembers error:', error);
-        }
-      );
-    } catch (e) {
-      console.warn('Could not subscribe to members collection:', e);
-      return () => {};
+    membersCallbacks.add(onUpdate);
+    if (cachedMembersSnapshot) {
+      try {
+        onUpdate(cachedMembersSnapshot);
+      } catch {
+        // ignore
+      }
     }
+
+    if (!membersUnsub) {
+      try {
+        membersUnsub = onSnapshot(
+          collection(db, MEMBERS_COL),
+          (snapshot) => {
+            const list = snapshot.docs.map((d) => sanitizeMember(d.data(), d.id));
+            cachedMembersSnapshot = list;
+            membersCallbacks.forEach((cb) => {
+              try {
+                cb(list);
+              } catch {
+                // ignore
+              }
+            });
+          },
+          (error) => {
+            if (isFirestoreQuotaError(error)) markFirestoreWritePaused(error);
+            else console.warn('Firestore subscribeToMembers error:', error);
+          }
+        );
+      } catch (e) {
+        console.warn('Could not subscribe to members collection:', e);
+      }
+    }
+
+    return () => {
+      membersCallbacks.delete(onUpdate);
+      if (membersCallbacks.size === 0 && membersUnsub) {
+        membersUnsub();
+        membersUnsub = null;
+      }
+    };
   },
 
   // Real-time listener for a single member document (e.g. user dashboard live approval status)
@@ -408,7 +615,8 @@ export const FirestoreService = {
           }
         },
         (error) => {
-          console.warn('Firestore subscribeToSingleMember error:', error);
+          if (isFirestoreQuotaError(error)) markFirestoreWritePaused(error);
+          else console.warn('Firestore subscribeToSingleMember error:', error);
         }
       );
     } catch (e) {
@@ -427,7 +635,8 @@ export const FirestoreService = {
           onUpdate(list);
         },
         (error) => {
-          console.warn('Firestore subscribeToWithdrawals error:', error);
+          if (isFirestoreQuotaError(error)) markFirestoreWritePaused(error);
+          else console.warn('Firestore subscribeToWithdrawals error:', error);
         }
       );
     } catch (e) {
@@ -436,22 +645,31 @@ export const FirestoreService = {
     }
   },
 
-  // Get dynamic site config from Firestore
-  async getSiteConfig(): Promise<SiteConfig | null> {
+  // Get dynamic site config from Firestore distinguishing missing doc vs read error
+  async getSiteConfigDetailed(): Promise<{ exists: boolean; data: SiteConfig | null; error: boolean }> {
     try {
       const snap = await getDoc(doc(db, SETTINGS_COL, SITE_CONFIG_DOC));
       if (snap.exists()) {
-        return snap.data() as SiteConfig;
+        const cfg = snap.data() as SiteConfig;
+        cachedSiteConfigSnapshot = cfg;
+        return { exists: true, data: cfg, error: false };
       }
-      return null;
+      return { exists: false, data: null, error: false };
     } catch (err) {
-      console.warn('Firestore getSiteConfig error:', err);
-      return null;
+      if (isFirestoreQuotaError(err)) markFirestoreWritePaused(err);
+      else console.warn('Firestore getSiteConfig error:', err);
+      return { exists: false, data: null, error: true };
     }
+  },
+
+  async getSiteConfig(): Promise<SiteConfig | null> {
+    const res = await this.getSiteConfigDetailed();
+    return res.data;
   },
 
   // Save dynamic site config to Firestore with automatic compression for slider images
   async saveSiteConfig(config: SiteConfig): Promise<boolean> {
+    if (isFirestoreWritePaused()) return false;
     try {
       const clean: SiteConfig = JSON.parse(JSON.stringify(config));
 
@@ -479,10 +697,23 @@ export const FirestoreService = {
         }
       }
 
-      await setDoc(doc(db, SETTINGS_COL, SITE_CONFIG_DOC), clean, { merge: true });
+      await withTimeout(
+        setDoc(doc(db, SETTINGS_COL, SITE_CONFIG_DOC), clean, { merge: true }),
+        4500,
+        'saveSiteConfig'
+      );
+      cachedSiteConfigSnapshot = clean;
       return true;
     } catch (err) {
-      console.warn('Firestore saveSiteConfig error, attempting compact retry:', err);
+      if (isFirestoreQuotaError(err)) {
+        markFirestoreWritePaused(err);
+        return false;
+      }
+      if (!isFirestoreDocumentSizeError(err)) {
+        console.warn('Firestore saveSiteConfig error (saved locally):', err);
+        return false;
+      }
+      console.warn('SiteConfig exceeded 1MB Firestore limit, attempting compact retry...');
       try {
         const fallbackConfig: SiteConfig = JSON.parse(JSON.stringify(config));
         if (fallbackConfig.homeSliderPhotos && Array.isArray(fallbackConfig.homeSliderPhotos)) {
@@ -499,42 +730,77 @@ export const FirestoreService = {
             }
           }
         }
-        await setDoc(doc(db, SETTINGS_COL, SITE_CONFIG_DOC), fallbackConfig, { merge: true });
+        await withTimeout(
+          setDoc(doc(db, SETTINGS_COL, SITE_CONFIG_DOC), fallbackConfig, { merge: true }),
+          4500,
+          'saveSiteConfig fallback'
+        );
+        cachedSiteConfigSnapshot = fallbackConfig;
         return true;
       } catch (retryErr) {
-        console.error('Final Firestore saveSiteConfig failed:', retryErr);
+        if (isFirestoreQuotaError(retryErr)) markFirestoreWritePaused(retryErr);
+        console.warn('Compact Firestore saveSiteConfig failed:', retryErr);
         return false;
       }
     }
   },
 
-  // Subscribe to real-time site config updates across all browsers & devices
+  // Multiplexed real-time subscription to site config across all components
   subscribeToSiteConfig(onUpdate: (config: SiteConfig) => void): () => void {
-    try {
-      return onSnapshot(
-        doc(db, SETTINGS_COL, SITE_CONFIG_DOC),
-        (snapshot) => {
-          if (snapshot.exists()) {
-            onUpdate(snapshot.data() as SiteConfig);
-          }
-        },
-        (error) => {
-          console.warn('Firestore subscribeToSiteConfig error:', error);
-        }
-      );
-    } catch (e) {
-      console.warn('Could not subscribe to site config:', e);
-      return () => {};
+    siteConfigCallbacks.add(onUpdate);
+    if (cachedSiteConfigSnapshot) {
+      try {
+        onUpdate(cachedSiteConfigSnapshot);
+      } catch {
+        // ignore
+      }
     }
+
+    if (!siteConfigUnsub) {
+      try {
+        siteConfigUnsub = onSnapshot(
+          doc(db, SETTINGS_COL, SITE_CONFIG_DOC),
+          (snapshot) => {
+            if (snapshot.exists()) {
+              const cfg = snapshot.data() as SiteConfig;
+              cachedSiteConfigSnapshot = cfg;
+              siteConfigCallbacks.forEach((cb) => {
+                try {
+                  cb(cfg);
+                } catch {
+                  // ignore
+                }
+              });
+            }
+          },
+          (error) => {
+            if (isFirestoreQuotaError(error)) markFirestoreWritePaused(error);
+            else console.warn('Firestore subscribeToSiteConfig error:', error);
+          }
+        );
+      } catch (e) {
+        console.warn('Could not subscribe to site config:', e);
+      }
+    }
+
+    return () => {
+      siteConfigCallbacks.delete(onUpdate);
+      if (siteConfigCallbacks.size === 0 && siteConfigUnsub) {
+        siteConfigUnsub();
+        siteConfigUnsub = null;
+      }
+    };
   },
 
   // Save profile edit audit log
   async saveAuditLog(log: ProfileEditAuditLog): Promise<boolean> {
+    if (isFirestoreWritePaused()) return false;
     try {
       await setDoc(doc(db, 'profile_audit_logs', log.id), JSON.parse(JSON.stringify(log)));
       return true;
     } catch (err) {
-      console.warn('Firestore saveAuditLog error:', err);
+      if (isFirestoreQuotaError(err)) markFirestoreWritePaused(err);
+      else console.warn('Firestore saveAuditLog error:', err);
       return false;
     }
   },
@@ -564,7 +830,8 @@ export const FirestoreService = {
           onUpdate(logs);
         },
         (error) => {
-          console.warn('Firestore subscribeToAuditLogs error (permission or network):', error);
+          if (isFirestoreQuotaError(error)) markFirestoreWritePaused(error);
+          else console.warn('Firestore subscribeToAuditLogs error (permission or network):', error);
         }
       );
     } catch (e) {
@@ -575,6 +842,7 @@ export const FirestoreService = {
 
   // Save private message
   async savePrivateMessage(msg: PrivateMessage): Promise<boolean> {
+    if (isFirestoreWritePaused()) return false;
     try {
       const cleanMsg: PrivateMessage = JSON.parse(JSON.stringify(msg));
       if (cleanMsg.mediaUrl && cleanMsg.mediaUrl.startsWith('data:image')) {
@@ -587,7 +855,8 @@ export const FirestoreService = {
       await setDoc(doc(db, 'private_messages', msg.id), cleanMsg);
       return true;
     } catch (err) {
-      console.warn('Firestore savePrivateMessage error:', err);
+      if (isFirestoreQuotaError(err)) markFirestoreWritePaused(err);
+      else console.warn('Firestore savePrivateMessage error:', err);
       return false;
     }
   },
@@ -620,7 +889,8 @@ export const FirestoreService = {
           onUpdate(msgs);
         },
         (error) => {
-          console.warn('Firestore subscribeToPrivateMessages error:', error);
+          if (isFirestoreQuotaError(error)) markFirestoreWritePaused(error);
+          else console.warn('Firestore subscribeToPrivateMessages error:', error);
         }
       );
     } catch (e) {

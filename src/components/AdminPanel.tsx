@@ -444,14 +444,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
       }
     });
 
-    // 4. Real-time site config listener
+    // 4. Real-time site config listener (never overwrite newer local/IndexedDB edits with stale cloud snapshot)
     const unsubscribeSiteConfig = FirestoreService.subscribeToSiteConfig((cloudCfg) => {
-      if (cloudCfg) {
-        setSiteConfig(cloudCfg);
-        if (Array.isArray(cloudCfg.homeSliderPhotos)) {
-          setSliderPhotos(cloudCfg.homeSliderPhotos);
+      if (cloudCfg && StorageService.applyCloudSiteConfigIfNewer(cloudCfg)) {
+        const latest = StorageService.getSiteConfig();
+        setSiteConfig(latest);
+        if (Array.isArray(latest.homeSliderPhotos)) {
+          setSliderPhotos(latest.homeSliderPhotos);
         }
-        StorageService.saveSiteConfig(cloudCfg, true);
       }
     });
 
@@ -603,6 +603,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
     showPasswordModal ||
     linkModalMember
   );
+
+  const [isCloudQuotaPaused, setIsCloudQuotaPaused] = useState<boolean>(() =>
+    FirestoreService.isWriteQuotaPaused()
+  );
+
+  useEffect(() => {
+    const unsubQuota = FirestoreService.subscribeToQuotaStatus(setIsCloudQuotaPaused);
+    return () => unsubQuota();
+  }, []);
 
   // Clean Background Scroll Locking without position:fixed jumps
   useEffect(() => {
@@ -886,12 +895,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
     if (!commissionPayMember) return;
     const utr = commissionUtrInput.trim() || `COMM-${Date.now().toString().slice(-8)}`;
     StorageService.markCommissionPaid(commissionPayMember.accId, utr);
-    FirestoreService.updateMember(commissionPayMember.accId, {
-      sponsorCommissionStatus: 'paid',
-      sponsorCommissionPaidAt: new Date().toISOString(),
-      sponsorCommissionUtr: utr,
-      sponsorCommissionAmount: 150,
-    });
 
     if (screenshotModalMember && screenshotModalMember.accId === commissionPayMember.accId) {
       setScreenshotModalMember({
@@ -931,7 +934,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
     }
 
     StorageService.updateMember(memberSecurityModal.accId, { password: newPass });
-    FirestoreService.updateMember(memberSecurityModal.accId, { password: newPass });
     refreshData();
     setMemberSecurityMsg(`✓ सदस्य का पासवर्ड सफलतापूर्वक रीसेट हो गया: ${newPass}`);
     setActionSuccess(`सदस्य ${memberSecurityModal.accId} का नया पासवर्ड सेट हो गया!`);
@@ -973,7 +975,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
       };
 
       StorageService.updateMember(memberAccId, updates);
-      await FirestoreService.updateMember(memberAccId, updates);
 
       // Refresh members list and current modal view
       setMembers((prev) =>
@@ -1596,6 +1597,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
           </button>
         </div>
       </div>
+
+      {isCloudQuotaPaused && (
+        <div className="p-3 sm:p-3.5 bg-amber-50 border border-amber-300 text-amber-950 text-xs rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-xs animate-fadeIn">
+          <div className="flex items-start sm:items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5 sm:mt-0" />
+            <span>
+              <strong>Firebase फ्री डेली राइट कोटा आज पूरा हो चुका है:</strong> आपके सभी बदलाव (स्लाइडर, सेलिब्रेशन पॉप-अप, सदस्य अपडेट) सुरक्षित रूप से लोकल स्टोरेज में सेव हो रहे हैं। कोटा रीसेट होते ही आप नीचे से क्लाउड पर सिंक कर सकते हैं।
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              FirestoreService.clearQuotaPauseForRetry();
+              const ok = await FirestoreService.saveSiteConfig(siteConfig);
+              if (ok) {
+                setActionSuccess('✓ क्लाउड (Firestore) कनेक्शन पुनः सक्रिय हो गया और सभी सेटिंग्स सफलतापूर्वक सिंक हो गईं!');
+                setTimeout(() => setActionSuccess(''), 4000);
+              }
+            }}
+            className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[11px] shadow-xs transition cursor-pointer shrink-0 self-start sm:self-center"
+          >
+            🔄 कोटा रीसेट जांचें / क्लाउड पर भेजें
+          </button>
+        </div>
+      )}
 
       {actionSuccess && (
         <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-sm flex items-center gap-2 animate-fadeIn shadow-xs">
@@ -5124,10 +5150,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
                 type="checkbox"
                 checked={siteConfig.enableCelebrationEffect !== false}
                 onChange={(e) => {
-                  const updated = { ...siteConfig, enableCelebrationEffect: e.target.checked };
+                  const updated = StorageService.updateSiteConfig({ enableCelebrationEffect: e.target.checked });
                   setSiteConfig(updated);
-                  StorageService.updateSiteConfig({ enableCelebrationEffect: e.target.checked });
-                  FirestoreService.saveSiteConfig(updated);
                 }}
                 className="rounded text-amber-500"
               />
@@ -5147,10 +5171,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
                 key={tgt.id}
                 type="button"
                 onClick={() => {
-                  const updated = { ...siteConfig, popupDisplayTarget: tgt.id as any };
+                  const updated = StorageService.updateSiteConfig({ popupDisplayTarget: tgt.id as any });
                   setSiteConfig(updated);
-                  StorageService.updateSiteConfig({ popupDisplayTarget: tgt.id as any });
-                  FirestoreService.saveSiteConfig(updated);
                 }}
                 className={`p-2 rounded-lg border text-left transition cursor-pointer ${
                   (siteConfig.popupDisplayTarget || 'home') === tgt.id
@@ -10695,9 +10717,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
           if (displayTarget) updates.popupDisplayTarget = displayTarget;
           if (celebrationEffect !== undefined) updates.enableCelebrationEffect = celebrationEffect;
 
-          const updated = StorageService.updateSiteConfig(updates);
-          await FirestoreService.saveSiteConfig({ ...siteConfig, ...updates });
-          setSiteConfig(updated);
+          const mergedConfig: SiteConfig = {
+            ...siteConfig,
+            ...updates,
+            configUpdatedAt: new Date().toISOString(),
+          };
+          StorageService.saveSiteConfig(mergedConfig, true);
+          setSiteConfig(StorageService.getSiteConfig());
+          await FirestoreService.saveSiteConfig(mergedConfig).catch(() => false);
         }}
         onPreviewLivePopup={() => {
           setShowSliderStudioModal(false);
@@ -10722,9 +10749,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
         onClose={() => setShowCelebrationPopupModal(false)}
         siteConfig={siteConfig}
         onSaveCelebrationConfig={async (updates) => {
-          const updated = StorageService.updateSiteConfig(updates);
-          setSiteConfig(updated);
-          await FirestoreService.saveSiteConfig(updated);
+          const mergedConfig: SiteConfig = {
+            ...siteConfig,
+            ...updates,
+            configUpdatedAt: new Date().toISOString(),
+          };
+          StorageService.saveSiteConfig(mergedConfig, true);
+          setSiteConfig(StorageService.getSiteConfig());
+          await FirestoreService.saveSiteConfig(mergedConfig).catch(() => false);
         }}
         onPreviewPopup={(itemsToPreview) => setCelebrationPreviewItems(itemsToPreview)}
       />

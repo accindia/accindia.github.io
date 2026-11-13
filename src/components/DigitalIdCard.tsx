@@ -232,9 +232,6 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({
       const updated = StorageService.updateMember(member.accId, {
         privacySettings: privacyDraft,
       });
-      await FirestoreService.updateMember(member.accId, {
-        privacySettings: privacyDraft,
-      });
       if (updated && onUpdateMember) {
         onUpdateMember(updated);
       }

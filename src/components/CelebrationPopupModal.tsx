@@ -35,7 +35,7 @@ export function resolveActiveCelebrationPopups(
     target === 'all' ||
     (target === 'home' && pageContext === 'home') ||
     (target === 'dashboard' && pageContext === 'dashboard') ||
-    (target === 'visitors' && !isLoggedIn && pageContext === 'home');
+    (target === 'visitors' && !isLoggedIn && pageContext !== 'dashboard');
 
   if (!matchesTarget) return [];
 

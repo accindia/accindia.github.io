@@ -54,9 +54,8 @@ export const LegalPages: React.FC<LegalPagesProps> = ({
       setSiteConfig(StorageService.getSiteConfig());
     });
     const unsubCloud = FirestoreService.subscribeToSiteConfig((cloudCfg) => {
-      if (cloudCfg) {
-        setSiteConfig(cloudCfg);
-        StorageService.saveSiteConfig(cloudCfg, true);
+      if (cloudCfg && StorageService.applyCloudSiteConfigIfNewer(cloudCfg)) {
+        setSiteConfig(StorageService.getSiteConfig());
       }
     });
     return () => {

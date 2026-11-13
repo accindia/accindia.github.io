@@ -18,6 +18,9 @@ import {
   SocialNotification,
 } from '../types';
 import { FirestoreService } from './firestore';
+import { LocalDb } from './localDb';
+
+let inMemorySiteConfig: SiteConfig | null = null;
 
 const MEMBERS_KEY = 'acc_members_data_v2';
 const TRANSACTIONS_KEY = 'acc_transactions_data_v2';
@@ -617,56 +620,89 @@ export function subscribeToSync(callback: () => void): () => void {
   };
 }
 
+let activeFirestoreInitPromise: Promise<void> | null = null;
+let firestoreSyncedOnce = false;
+
 export const StorageService = {
-  // Sync with Firestore on startup
+  // Sync with Firestore on startup (single-flight to prevent duplicate reads/writes)
   async initFirestoreSync() {
-    try {
-      await FirestoreService.initSeedData(SEED_MEMBERS, SEED_TRANSACTIONS, SEED_REFERRALS, SEED_WITHDRAWALS);
-      const cloudMembers = await FirestoreService.getMembers();
-      if (cloudMembers.length > 0) {
-        // Merge or populate local cache
-        const local = this.getMembers();
-        const map = new Map<string, Member>();
-        local.forEach(m => {
-          if (m && (m.accId || m.id)) {
-            map.set((m.accId || m.id).toUpperCase(), m);
+    if (firestoreSyncedOnce) return;
+    if (activeFirestoreInitPromise) return activeFirestoreInitPromise;
+
+    activeFirestoreInitPromise = (async () => {
+      try {
+        // Strictly read-only sync on startup: never burn Firestore write units on visitor page loads.
+        // Local SEED_MEMBERS / DEFAULT_SITE_CONFIG act as instant defaults until admin/users save real updates.
+        const cloudMembers = await FirestoreService.getMembers();
+
+        if (cloudMembers.length > 0) {
+          // Merge or populate local cache
+          const local = this.getMembers();
+          const map = new Map<string, Member>();
+          local.forEach(m => {
+            if (m && (m.accId || m.id)) {
+              map.set((m.accId || m.id).toUpperCase(), m);
+            }
+          });
+          cloudMembers.forEach(m => {
+            if (m && (m.accId || m.id)) {
+              map.set((m.accId || m.id).toUpperCase(), m);
+            }
+          });
+          const merged = Array.from(map.values());
+          // Sort newest members first so admin immediately sees new registrations!
+          merged.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+          localStorage.setItem(MEMBERS_KEY, JSON.stringify(merged));
+          notifySync();
+        }
+
+        const cloudTxs = await FirestoreService.getTransactions();
+        if (cloudTxs.length > 0) {
+          localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(cloudTxs));
+          notifySync();
+        }
+
+        const cloudWithdrawals = await FirestoreService.getWithdrawals();
+        if (cloudWithdrawals.length > 0) {
+          localStorage.setItem(WITHDRAWALS_KEY, JSON.stringify(cloudWithdrawals));
+          notifySync();
+        }
+
+        // 0. Hydrate SiteConfig from IndexedDB first (large image store resilient to localStorage 5MB limits)
+        try {
+          const idbConfig = await LocalDb.get<SiteConfig>(SITE_CONFIG_KEY);
+          if (idbConfig) {
+            const currentLocal = this.getSiteConfig();
+            const idbTs = idbConfig.configUpdatedAt ? Date.parse(idbConfig.configUpdatedAt) : 0;
+            const localTs = currentLocal.configUpdatedAt ? Date.parse(currentLocal.configUpdatedAt) : 0;
+            if (!localTs || idbTs >= localTs) {
+              inMemorySiteConfig = this.normalizeSiteConfig(idbConfig);
+              try {
+                localStorage.setItem(SITE_CONFIG_KEY, JSON.stringify(inMemorySiteConfig));
+              } catch {
+                // IndexedDB + inMemory holds full media safely even if localStorage is full
+              }
+              notifySync();
+            }
           }
-        });
-        cloudMembers.forEach(m => {
-          if (m && (m.accId || m.id)) {
-            map.set((m.accId || m.id).toUpperCase(), m);
-          }
-        });
-        const merged = Array.from(map.values());
-        // Sort newest members first so admin immediately sees new registrations!
-        merged.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-        localStorage.setItem(MEMBERS_KEY, JSON.stringify(merged));
-        notifySync();
-      }
+        } catch {
+          // ignore IndexedDB read errors
+        }
 
-      const cloudTxs = await FirestoreService.getTransactions();
-      if (cloudTxs.length > 0) {
-        localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(cloudTxs));
-        notifySync();
+        // Read-only site configuration sync (respect newer local/IndexedDB timestamp)
+        const configRes = await FirestoreService.getSiteConfigDetailed();
+        if (configRes.exists && configRes.data) {
+          this.applyCloudSiteConfigIfNewer(configRes.data);
+        }
+        firestoreSyncedOnce = true;
+      } catch (err) {
+        console.warn('Firestore initial sync skipped or offline:', err);
+      } finally {
+        activeFirestoreInitPromise = null;
       }
+    })();
 
-      const cloudWithdrawals = await FirestoreService.getWithdrawals();
-      if (cloudWithdrawals.length > 0) {
-        localStorage.setItem(WITHDRAWALS_KEY, JSON.stringify(cloudWithdrawals));
-        notifySync();
-      }
-
-      // Sync site configuration
-      const cloudConfig = await FirestoreService.getSiteConfig();
-      if (cloudConfig) {
-        localStorage.setItem(SITE_CONFIG_KEY, JSON.stringify(cloudConfig));
-        notifySync();
-      } else {
-        await FirestoreService.saveSiteConfig(DEFAULT_SITE_CONFIG);
-      }
-    } catch (err) {
-      console.warn('Firestore initial sync skipped or offline:', err);
-    }
+    return activeFirestoreInitPromise;
   },
 
   getMembers(): Member[] {
@@ -1667,56 +1703,81 @@ export const StorageService = {
     return updated;
   },
 
+  normalizeSiteConfig(parsed: any): SiteConfig {
+    const safe = parsed && typeof parsed === 'object' ? parsed : {};
+    const email = (!safe.officialEmail || safe.officialEmail === 'santosh09patidar@gmail.com')
+      ? 'newuserhelpline@gmail.com'
+      : safe.officialEmail;
+    const telegram = (!safe.telegramLink || safe.telegramLink === 'https://t.me/achieversclub')
+      ? 'https://t.me/NEWUSERHELPLINE'
+      : safe.telegramLink;
+
+    const isWhatsAppActive = safe.showWhatsAppSupport === true;
+
+    return {
+      ...DEFAULT_SITE_CONFIG,
+      ...safe,
+      officialEmail: email,
+      telegramLink: telegram,
+      showWhatsAppSupport: isWhatsAppActive,
+      showHelplineWhatsAppButton: isWhatsAppActive,
+      showWhatsAppButton: isWhatsAppActive,
+      showTelegramSupport: safe.showTelegramSupport !== false,
+      showEmailSupport: safe.showEmailSupport !== false,
+      showCallSupport: Boolean(safe.showCallSupport || safe.showHelplineCallButton),
+      appDownloadUrl: safe.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk',
+      showAppDownload: safe.showAppDownload !== false,
+      appName: safe.appName || 'ACC Official Android APK',
+      appVersion: safe.appVersion || 'v2.4.0 (Latest)',
+      appFileSize: safe.appFileSize || '18.5 MB',
+      autoGrantAppLinkOnVerification: safe.autoGrantAppLinkOnVerification !== false,
+      appDownloadNotice:
+        safe.appDownloadNotice ||
+        'केवल अधिकृत ACC वेबसाइट से ही APK डाउनलोड करें। इंस्टालेशन के समय "Install from Unknown Sources" को अनुमति दें।',
+      services: Array.isArray(safe.services) ? safe.services : DEFAULT_SERVICES,
+      promotionalPosters:
+        Array.isArray(safe.promotionalPosters) && safe.promotionalPosters.some((p: PromotionalPoster) => Boolean(p.imageUrl))
+          ? safe.promotionalPosters
+          : DEFAULT_PROMOTIONAL_POSTERS,
+      homeSliderPhotos: Array.isArray(safe.homeSliderPhotos) ? safe.homeSliderPhotos : [],
+      celebrationPopups: Array.isArray(safe.celebrationPopups) ? safe.celebrationPopups : [],
+      celebrationPopupTarget: safe.celebrationPopupTarget || 'all',
+      celebrationAutoRealTimeFestival: safe.celebrationAutoRealTimeFestival !== false,
+    };
+  },
+
   getSiteConfig(): SiteConfig {
+    if (inMemorySiteConfig) {
+      return inMemorySiteConfig;
+    }
     try {
       const data = localStorage.getItem(SITE_CONFIG_KEY);
       if (!data) {
         localStorage.setItem(SITE_CONFIG_KEY, JSON.stringify(DEFAULT_SITE_CONFIG));
+        inMemorySiteConfig = DEFAULT_SITE_CONFIG;
         return DEFAULT_SITE_CONFIG;
       }
-      const parsed = JSON.parse(data);
-      const email = (!parsed.officialEmail || parsed.officialEmail === 'santosh09patidar@gmail.com')
-        ? 'newuserhelpline@gmail.com'
-        : parsed.officialEmail;
-      const telegram = (!parsed.telegramLink || parsed.telegramLink === 'https://t.me/achieversclub')
-        ? 'https://t.me/NEWUSERHELPLINE'
-        : parsed.telegramLink;
-
-      // WhatsApp is explicitly OFF by default unless admin toggles it ON in Admin Panel
-      const isWhatsAppActive = parsed.showWhatsAppSupport === true;
-
-      // Merge with defaults in case of missing keys
-      return {
-        ...DEFAULT_SITE_CONFIG,
-        ...parsed,
-        officialEmail: email,
-        telegramLink: telegram,
-        showWhatsAppSupport: isWhatsAppActive,
-        showHelplineWhatsAppButton: isWhatsAppActive,
-        showWhatsAppButton: isWhatsAppActive,
-        showTelegramSupport: parsed.showTelegramSupport !== false,
-        showEmailSupport: parsed.showEmailSupport !== false,
-        showCallSupport: Boolean(parsed.showCallSupport || parsed.showHelplineCallButton),
-        appDownloadUrl: parsed.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk',
-        showAppDownload: parsed.showAppDownload !== false,
-        appName: parsed.appName || 'ACC Official Android APK',
-        appVersion: parsed.appVersion || 'v2.4.0 (Latest)',
-        appFileSize: parsed.appFileSize || '18.5 MB',
-        autoGrantAppLinkOnVerification: parsed.autoGrantAppLinkOnVerification !== false,
-        appDownloadNotice: parsed.appDownloadNotice || 'केवल अधिकृत ACC वेबसाइट से ही APK डाउनलोड करें। इंस्टालेशन के समय "Install from Unknown Sources" को अनुमति दें।',
-        services: Array.isArray(parsed.services) ? parsed.services : DEFAULT_SERVICES,
-        promotionalPosters:
-          Array.isArray(parsed.promotionalPosters) && parsed.promotionalPosters.some((p: PromotionalPoster) => Boolean(p.imageUrl))
-            ? parsed.promotionalPosters
-            : DEFAULT_PROMOTIONAL_POSTERS,
-        homeSliderPhotos: Array.isArray(parsed.homeSliderPhotos) ? parsed.homeSliderPhotos : [],
-        celebrationPopups: Array.isArray(parsed.celebrationPopups) ? parsed.celebrationPopups : [],
-        celebrationPopupTarget: parsed.celebrationPopupTarget || 'all',
-        celebrationAutoRealTimeFestival: parsed.celebrationAutoRealTimeFestival !== false,
-      };
+      const normalized = this.normalizeSiteConfig(JSON.parse(data));
+      inMemorySiteConfig = normalized;
+      return normalized;
     } catch {
       return DEFAULT_SITE_CONFIG;
     }
+  },
+
+  applyCloudSiteConfigIfNewer(cloudCfg: SiteConfig): boolean {
+    if (!cloudCfg || typeof cloudCfg !== 'object') return false;
+    const current = this.getSiteConfig();
+    const localTs = current.configUpdatedAt ? Date.parse(current.configUpdatedAt) : 0;
+    const cloudTs = cloudCfg.configUpdatedAt ? Date.parse(cloudCfg.configUpdatedAt) : 0;
+
+    // Never allow an older (or un-timestamped) Firestore snapshot to clobber newer local edits
+    if (localTs > 0 && (cloudTs === 0 || cloudTs < localTs)) {
+      return false;
+    }
+
+    this.saveSiteConfig(cloudCfg, true, true);
+    return true;
   },
 
   grantAppLink(accId: string, customAppLink?: string): Member | null {
@@ -1754,31 +1815,44 @@ export const StorageService = {
     return count;
   },
 
-  saveSiteConfig(config: SiteConfig, skipCloudSync: boolean = false): void {
+  saveSiteConfig(config: SiteConfig, skipCloudSync: boolean = false, fromCloud: boolean = false): void {
+    const stamped: SiteConfig = {
+      ...config,
+      configUpdatedAt: fromCloud ? config.configUpdatedAt : (config.configUpdatedAt || new Date().toISOString()),
+    };
+    const normalized = this.normalizeSiteConfig(stamped);
+    inMemorySiteConfig = normalized;
+
+    // Always persist full uncorrupted config (including base64 media) into IndexedDB
+    LocalDb.set(SITE_CONFIG_KEY, normalized).catch((err) => {
+      console.warn('IndexedDB saveSiteConfig warning:', err);
+    });
+
     try {
-      localStorage.setItem(SITE_CONFIG_KEY, JSON.stringify(config));
+      localStorage.setItem(SITE_CONFIG_KEY, JSON.stringify(normalized));
     } catch (e) {
-      console.warn('localStorage saveSiteConfig error (quota exceeded?), attempting compact save:', e);
+      console.warn('localStorage saveSiteConfig quota tight; preserving full media in IndexedDB:', e);
       try {
-        const compact = {
-          ...config,
-          homeSliderPhotos: config.homeSliderPhotos?.map((p) => ({
+        // Save compact metadata to localStorage WITHOUT corrupting data URLs (IndexedDB restores full images)
+        const metadataOnly: SiteConfig = {
+          ...normalized,
+          homeSliderPhotos: normalized.homeSliderPhotos?.map((p) => ({
             ...p,
-            imageUrl: p.imageUrl.startsWith('data:') ? p.imageUrl.slice(0, 50000) : p.imageUrl,
+            imageUrl: p.imageUrl && p.imageUrl.startsWith('data:') && p.imageUrl.length > 60000 ? '' : p.imageUrl,
           })),
-          celebrationPopups: config.celebrationPopups?.map((p) => ({
+          celebrationPopups: normalized.celebrationPopups?.map((p) => ({
             ...p,
-            imageUrl: p.imageUrl && p.imageUrl.startsWith('data:') ? p.imageUrl.slice(0, 50000) : p.imageUrl,
+            imageUrl: p.imageUrl && p.imageUrl.startsWith('data:') && p.imageUrl.length > 60000 ? '' : p.imageUrl,
           })),
         };
-        localStorage.setItem(SITE_CONFIG_KEY, JSON.stringify(compact));
+        localStorage.setItem(SITE_CONFIG_KEY, JSON.stringify(metadataOnly));
       } catch (err2) {
-        console.warn('localStorage secondary compact save failed:', err2);
+        console.warn('localStorage secondary metadata save skipped (IndexedDB remains active):', err2);
       }
     }
     notifySync();
     if (!skipCloudSync) {
-      FirestoreService.saveSiteConfig(config).catch((e) => console.warn('Firestore saveSiteConfig error:', e));
+      FirestoreService.saveSiteConfig(normalized).catch((e) => console.warn('Firestore saveSiteConfig error:', e));
     }
   },
 
@@ -1787,6 +1861,7 @@ export const StorageService = {
     const updated: SiteConfig = {
       ...current,
       ...updates,
+      configUpdatedAt: new Date().toISOString(),
     };
     this.saveSiteConfig(updated);
     return updated;

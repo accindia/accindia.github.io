@@ -441,4 +441,5 @@ export interface SiteConfig {
   celebrationPopups?: CelebrationPopupItem[];
   celebrationPopupTarget?: 'home' | 'all' | 'dashboard' | 'visitors' | 'disabled';
   celebrationAutoRealTimeFestival?: boolean; // Only auto-show popup when no manual item exists AND today is a real-time festival
+  configUpdatedAt?: string; // ISO timestamp for resolving local IndexedDB vs cloud snapshot precedence
 }

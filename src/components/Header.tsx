@@ -165,9 +165,8 @@ export const Header: React.FC<HeaderProps> = ({
       setSiteConfig(StorageService.getSiteConfig());
     });
     const unsubscribeFirestore = FirestoreService.subscribeToSiteConfig((cloudConfig) => {
-      if (cloudConfig) {
-        setSiteConfig(cloudConfig);
-        StorageService.saveSiteConfig(cloudConfig, true);
+      if (cloudConfig && StorageService.applyCloudSiteConfigIfNewer(cloudConfig)) {
+        setSiteConfig(StorageService.getSiteConfig());
       }
     });
 

@@ -253,9 +253,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
       setLocalSiteConfig(StorageService.getSiteConfig());
     });
     const unsubscribeFirestore = FirestoreService.subscribeToSiteConfig((cloudConfig) => {
-      if (cloudConfig) {
-        setLocalSiteConfig(cloudConfig);
-        StorageService.saveSiteConfig(cloudConfig, true);
+      if (cloudConfig && StorageService.applyCloudSiteConfigIfNewer(cloudConfig)) {
+        setLocalSiteConfig(StorageService.getSiteConfig());
       }
     });
 
@@ -419,12 +418,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
         />
       )}
 
-      {/* 7-Photo Dynamic Popup Slider on Home Page (Shown when no separate Celebration Popup is active) */}
-      {activeCelebrationPopups.length === 0 &&
+      {/* 7-Photo Dynamic Popup Slider on Home Page (Shown sequentially once Celebration Popup is closed/absent, respecting visitors target) */}
+      {(activeCelebrationPopups.length === 0 || !isCelebrationPopupOpen) &&
         siteConfig.homeSliderPhotos &&
         siteConfig.homeSliderPhotos.length > 0 &&
         siteConfig.popupDisplayTarget !== 'disabled' &&
-        siteConfig.popupDisplayTarget !== 'dashboard' && (
+        siteConfig.popupDisplayTarget !== 'dashboard' &&
+        (siteConfig.popupDisplayTarget !== 'visitors' || !currentUser) && (
         <HomeSliderPopupModal
           photos={siteConfig.homeSliderPhotos}
           isOpen={isHomeSliderPopupOpen}

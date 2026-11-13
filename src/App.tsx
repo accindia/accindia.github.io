@@ -175,9 +175,8 @@ export default function App() {
 
     // 3. Real-time multi-device Firestore synchronization for site config
     const unsubscribeConfig = FirestoreService.subscribeToSiteConfig((cloudCfg) => {
-      if (cloudCfg) {
-        setSiteConfig(cloudCfg);
-        StorageService.saveSiteConfig(cloudCfg, true);
+      if (cloudCfg && StorageService.applyCloudSiteConfigIfNewer(cloudCfg)) {
+        setSiteConfig(StorageService.getSiteConfig());
       }
     });
 
