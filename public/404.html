@@ -4,22 +4,56 @@
     <meta charset="utf-8" />
     <title>Achievers Club Community (ACC)</title>
     <script type="text/javascript">
-      // Single Page Apps for GitHub Pages
-      // Accurately keep repository name in pathSegmentsToKeep for username.github.io/repo-name/
-      var l = window.location;
-      var pathSegments = l.pathname.split('/').filter(Boolean);
-      var isProjectPage = l.hostname.endsWith('github.io') && pathSegments.length > 0;
-      var pathSegmentsToKeep = isProjectPage ? 1 : 0;
-      
-      l.replace(
-        l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
-        (isProjectPage ? '/' + pathSegments[0] : '') + '/?/' +
-        pathSegments.slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
-        (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
-        l.hash
-      );
+      // Universal GitHub Pages SPA Redirect (Supports root domain accindia.github.io, /docs/, and /repo-name/)
+      (function () {
+        var l = window.location;
+        var origin = l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '');
+
+        // Loop guard: if we already redirected with ?/, go cleanly to root to avoid infinite loop
+        if (l.search && l.search.indexOf('?/') === 0) {
+          l.replace(origin + '/' + l.hash);
+          return;
+        }
+
+        var pathSegments = l.pathname.split('/').filter(Boolean);
+        if (pathSegments.length === 0) {
+          l.replace(origin + '/' + l.search + l.hash);
+          return;
+        }
+
+        function redirectToBase(keepCount) {
+          var base = keepCount > 0 ? '/' + pathSegments.slice(0, keepCount).join('/') : '';
+          var route = pathSegments.slice(keepCount).join('/').replace(/&/g, '~and~');
+          var query = l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '';
+          l.replace(origin + base + '/?/' + route + query + l.hash);
+        }
+
+        // If hosted under /docs/ directly
+        if (pathSegments[0] === 'docs') {
+          redirectToBase(1);
+          return;
+        }
+
+        // Probe whether /<firstSegment>/index.html exists (project repo or /docs) vs root domain route (accindia.github.io)
+        try {
+          fetch(origin + '/' + pathSegments[0] + '/acc_logo.svg', { method: 'HEAD', cache: 'no-store' })
+            .then(function (res) {
+              if (res.ok) {
+                redirectToBase(1);
+              } else {
+                redirectToBase(0);
+              }
+            })
+            .catch(function () {
+              redirectToBase(0);
+            });
+        } catch (e) {
+          redirectToBase(0);
+        }
+      })();
     </script>
   </head>
   <body>
+    <noscript>Achievers Club Community (ACC) - Loading...</noscript>
   </body>
 </html>

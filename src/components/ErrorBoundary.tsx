@@ -39,7 +39,7 @@ export class ErrorBoundary extends Component<Props, State> {
         // Clear any potentially corrupted navigation or temporary state
         sessionStorage.clear();
       } catch {}
-      window.location.href = '/';
+      window.location.href = './';
     }
   };
 

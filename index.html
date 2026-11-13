@@ -31,16 +31,17 @@
       })();
     </script>
     <script type="text/javascript">
-      // 2. Decode redirected query parameters from 404.html for GitHub Pages
+      // 2. Decode redirected query parameters from 404.html while preserving app root path for ./assets/
       (function(l) {
-        if (l.search && l.search[1] === '/' ) {
-          var decoded = l.search.slice(1).split('&').map(function(s) { 
+        if (l.search && l.search.indexOf('?/') === 0) {
+          var raw = l.search.slice(2);
+          var parts = raw.split('&');
+          var queryParts = parts.slice(1).map(function(s) {
             return s.replace(/~and~/g, '&');
-          }).join('?');
-          var basePath = l.pathname.endsWith('/') ? l.pathname.slice(0, -1) : l.pathname;
-          window.history.replaceState(null, null,
-            basePath + decoded + l.hash
-          );
+          }).filter(Boolean);
+          var basePath = l.pathname.endsWith('/') ? l.pathname : (l.pathname + '/');
+          var restoredSearch = queryParts.length > 0 ? '?' + queryParts.join('&') : '';
+          window.history.replaceState(null, '', basePath + restoredSearch + l.hash);
         }
       }(window.location));
     </script>
@@ -49,7 +50,7 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      // 3. Fallback: If uncompiled source index.html is served directly on GitHub Pages (/root), redirect to /docs/ where the compiled bundle resides
+      // 3. Fallback: If uncompiled source index.html is served directly on GitHub Pages (/root), redirect cleanly to /docs/
       (function() {
         if (typeof window === 'undefined') return;
         var l = window.location;
@@ -57,9 +58,13 @@
           var unbuiltScript = document.querySelector('script[src*="main.tsx"]');
           if (unbuiltScript && !l.pathname.includes('/docs/')) {
             var origin = l.origin || (l.protocol + '//' + l.host);
-            var cleanPath = l.pathname.replace(/\/index\.html$/, '');
-            if (!cleanPath.endsWith('/')) cleanPath += '/';
-            window.location.replace(origin + cleanPath + 'docs/' + l.search + l.hash);
+            var segs = l.pathname.split('/').filter(Boolean);
+            // If root org/user site (accindia.github.io) redirect directly to /docs/
+            // If project site (user.github.io/repo), probe or redirect cleanly
+            var targetBase = (l.hostname.toLowerCase() === 'accindia.github.io' || segs.length === 0)
+              ? '/'
+              : ('/' + segs[0] + '/');
+            window.location.replace(origin + targetBase + 'docs/' + l.search + l.hash);
           }
         }
       })();
