@@ -32,28 +32,37 @@ export const HomeSliderPopupModal: React.FC<HomeSliderPopupModalProps> = ({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isClosing, setIsClosing] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // If no photos uploaded by admin, do not render any popup
-  if (!photos || photos.length === 0) {
-    return null;
-  }
+  const safePhotos = Array.isArray(photos) ? photos : [];
 
-  // Active photo
-  const currentPhoto = photos[currentIndex] || photos[0];
+  // Keep currentIndex within bounds when photos list updates
+  useEffect(() => {
+    if (safePhotos.length > 0 && currentIndex >= safePhotos.length) {
+      setCurrentIndex(0);
+    }
+  }, [safePhotos.length, currentIndex]);
 
   // Auto-slide every 4.5 seconds unless paused
   useEffect(() => {
-    if (!isOpen || isPaused || photos.length <= 1) return;
+    if (!isOpen || isPaused || safePhotos.length <= 1) return;
 
     timerRef.current = setTimeout(() => {
-      setCurrentIndex((prev) => (prev + 1) % photos.length);
+      setCurrentIndex((prev) => (prev + 1) % safePhotos.length);
     }, 4500);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [currentIndex, isOpen, isPaused, photos.length]);
+  }, [currentIndex, isOpen, isPaused, safePhotos.length]);
+
+  const handleCloseWithAnimation = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsClosing(false);
+      onClose();
+    }, 220);
+  };
 
   // Handle ESC key to close
   useEffect(() => {
@@ -66,22 +75,22 @@ export const HomeSliderPopupModal: React.FC<HomeSliderPopupModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen]);
 
+  // If no photos uploaded by admin or modal is closed, do not render any popup
+  if (!isOpen || safePhotos.length === 0) {
+    return null;
+  }
+
+  // Active photo
+  const currentPhoto = safePhotos[currentIndex] || safePhotos[0];
+
   const handleNext = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    setCurrentIndex((prev) => (prev + 1) % photos.length);
+    setCurrentIndex((prev) => (prev + 1) % safePhotos.length);
   };
 
   const handlePrev = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    setCurrentIndex((prev) => (prev - 1 + photos.length) % photos.length);
-  };
-
-  const handleCloseWithAnimation = () => {
-    setIsClosing(true);
-    setTimeout(() => {
-      setIsClosing(false);
-      onClose();
-    }, 220);
+    setCurrentIndex((prev) => (prev - 1 + safePhotos.length) % safePhotos.length);
   };
 
   const handleActionClick = (actionUrl?: string) => {
@@ -93,8 +102,6 @@ export const HomeSliderPopupModal: React.FC<HomeSliderPopupModalProps> = ({
       onNavigate(actionUrl);
     }
   };
-
-  if (!isOpen) return null;
 
   const isCelebrationActive =
     enableCelebrationEffect ||

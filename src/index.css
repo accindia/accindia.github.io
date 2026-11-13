@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
 @layer base {
+  :root {
+    --acc-header-height: 155px;
+  }
+
   *, ::before, ::after {
     box-sizing: border-box;
   }

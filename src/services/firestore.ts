@@ -450,15 +450,43 @@ export const FirestoreService = {
     }
   },
 
-  // Save dynamic site config to Firestore
+  // Save dynamic site config to Firestore with automatic compression for slider images
   async saveSiteConfig(config: SiteConfig): Promise<boolean> {
     try {
-      const clean = JSON.parse(JSON.stringify(config));
+      const clean: SiteConfig = JSON.parse(JSON.stringify(config));
+
+      // Safeguard slider photos: compress each image to keep whole document well within 1MB Firestore limit
+      if (clean.homeSliderPhotos && Array.isArray(clean.homeSliderPhotos)) {
+        for (const p of clean.homeSliderPhotos) {
+          if (p.imageUrl && p.imageUrl.startsWith('data:image') && p.imageUrl.length > 80000) {
+            try {
+              p.imageUrl = await ensureSafeFirestoreSize(p.imageUrl, 700, 0.62);
+            } catch {
+              // ignore
+            }
+          }
+        }
+      }
+
       await setDoc(doc(db, SETTINGS_COL, SITE_CONFIG_DOC), clean, { merge: true });
       return true;
     } catch (err) {
-      console.warn('Firestore saveSiteConfig error:', err);
-      return false;
+      console.warn('Firestore saveSiteConfig error, attempting compact retry:', err);
+      try {
+        const fallbackConfig: SiteConfig = JSON.parse(JSON.stringify(config));
+        if (fallbackConfig.homeSliderPhotos && Array.isArray(fallbackConfig.homeSliderPhotos)) {
+          for (const p of fallbackConfig.homeSliderPhotos) {
+            if (p.imageUrl && p.imageUrl.length > 50000) {
+              p.imageUrl = await ensureSafeFirestoreSize(p.imageUrl, 450, 0.5);
+            }
+          }
+        }
+        await setDoc(doc(db, SETTINGS_COL, SITE_CONFIG_DOC), fallbackConfig, { merge: true });
+        return true;
+      } catch (retryErr) {
+        console.error('Final Firestore saveSiteConfig failed:', retryErr);
+        return false;
+      }
     }
   },
 

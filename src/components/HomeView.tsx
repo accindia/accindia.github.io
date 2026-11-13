@@ -232,6 +232,7 @@ interface HomeViewProps {
   currentUser: Member | null;
   referralSponsor?: Member | null;
   onNavigateToIdCard?: () => void;
+  siteConfig?: SiteConfig;
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({
@@ -239,18 +240,19 @@ export const HomeView: React.FC<HomeViewProps> = ({
   currentUser,
   referralSponsor,
   onNavigateToIdCard,
+  siteConfig: propSiteConfig,
 }) => {
   // Dynamic Site Config with Real-time Sync
-  const [siteConfig, setSiteConfig] = useState<SiteConfig>(() => StorageService.getSiteConfig());
+  const [localSiteConfig, setLocalSiteConfig] = useState<SiteConfig>(() => StorageService.getSiteConfig());
 
   useEffect(() => {
     const unsubscribeSync = subscribeToSync(() => {
-      setSiteConfig(StorageService.getSiteConfig());
+      setLocalSiteConfig(StorageService.getSiteConfig());
     });
     const unsubscribeFirestore = FirestoreService.subscribeToSiteConfig((cloudConfig) => {
       if (cloudConfig) {
-        setSiteConfig(cloudConfig);
-        StorageService.saveSiteConfig(cloudConfig);
+        setLocalSiteConfig(cloudConfig);
+        StorageService.saveSiteConfig(cloudConfig, true);
       }
     });
 
@@ -259,6 +261,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
       unsubscribeFirestore();
     };
   }, []);
+
+  const siteConfig = propSiteConfig || localSiteConfig;
 
   // Dynamic Real-time Hindu Panchang & 7-Slide Festival/Suvichar Engine
   const [dynamicSlides, setDynamicSlides] = useState<DynamicSlide[]>(() => generateDynamicHomeSlides());
@@ -342,8 +346,35 @@ export const HomeView: React.FC<HomeViewProps> = ({
   // 7-Photo Dynamic Popup Slider Modal State (Configured strictly via Admin Panel)
   const [isHomeSliderPopupOpen, setIsHomeSliderPopupOpen] = useState<boolean>(true);
 
+  // Automatically re-open popup whenever admin saves photos or updates the slider list
+  const photosSignature = (siteConfig.homeSliderPhotos || []).map((p) => p.id || p.imageUrl).join(',');
+  useEffect(() => {
+    if (siteConfig.homeSliderPhotos && siteConfig.homeSliderPhotos.length > 0) {
+      setIsHomeSliderPopupOpen(true);
+    }
+  }, [photosSignature]);
+
   return (
     <div className="space-y-5 sm:space-y-6 max-w-7xl mx-auto px-1 sm:px-0">
+      {/* Logged in member indicator bar when viewing Home page */}
+      {currentUser && (
+        <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white px-3.5 py-2.5 rounded-2xl border border-blue-400/40 shadow-sm flex flex-col xs:flex-row items-center justify-between gap-2.5 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+            <span className="text-slate-200">
+              आप <strong>{currentUser.fullName}</strong> ({currentUser.accId}) के रूप में लॉगिन हैं।
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => onNavigate(currentUser.role === 'admin' ? 'admin' : 'dashboard')}
+            className="px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition shadow-xs cursor-pointer shrink-0"
+          >
+            {currentUser.role === 'admin' ? 'एडमिन पैनल में जाएं →' : 'विद्यार्थी डैशबोर्ड में जाएं →'}
+          </button>
+        </div>
+      )}
+
       {/* 7-Photo Dynamic Popup Slider on Home Page (Natural Aspect Auto-Fit + Zoom In/Out Animation + Celebration Confetti) */}
       {siteConfig.homeSliderPhotos &&
         siteConfig.homeSliderPhotos.length > 0 &&

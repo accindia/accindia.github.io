@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Clock,
   Calendar,
@@ -74,6 +75,37 @@ export const Header: React.FC<HeaderProps> = ({
   const [currentGreetingPeriod, setCurrentGreetingPeriod] = useState<GreetingPeriod>(() => detectCurrentGreetingPeriod());
   const [headerMessages, setHeaderMessages] = useState<PrivateMessage[]>([]);
 
+  // Pinned rock-solid locked header ref for exact height calculation
+  const headerRef = React.useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const updateHeaderHeight = () => {
+      if (headerRef.current) {
+        // Calculate the height of the fixed navigation header
+        const h = headerRef.current.offsetHeight;
+        if (h > 0) {
+          document.documentElement.style.setProperty('--acc-header-height', `${h}px`);
+        }
+      }
+    };
+
+    updateHeaderHeight();
+
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && headerRef.current) {
+      ro = new ResizeObserver(() => {
+        updateHeaderHeight();
+      });
+      ro.observe(headerRef.current);
+    }
+
+    window.addEventListener('resize', updateHeaderHeight);
+    return () => {
+      if (ro) ro.disconnect();
+      window.removeEventListener('resize', updateHeaderHeight);
+    };
+  }, []);
+
   // Standout Website Features & Highlights (वेबसाइट की खासियतें)
   const websiteFeatures = [
     {
@@ -135,7 +167,7 @@ export const Header: React.FC<HeaderProps> = ({
     const unsubscribeFirestore = FirestoreService.subscribeToSiteConfig((cloudConfig) => {
       if (cloudConfig) {
         setSiteConfig(cloudConfig);
-        StorageService.saveSiteConfig(cloudConfig);
+        StorageService.saveSiteConfig(cloudConfig, true);
       }
     });
 
@@ -351,7 +383,11 @@ export const Header: React.FC<HeaderProps> = ({
   const cleanWhatsApp = (siteConfig.whatsappNumber || '+91 8877490845').replace(/[^0-9]/g, '');
 
   return (
-    <header className={`fixed top-0 left-0 right-0 ${mobileMenuOpen ? 'z-[60]' : 'z-50'} w-full shadow-md bg-[#2874f0] select-none`}>
+    <header
+      ref={headerRef}
+      className={`fixed top-0 left-0 right-0 ${mobileMenuOpen ? 'z-[75]' : 'z-[70]'} w-full shadow-lg bg-[#2874f0] select-none`}
+      style={{ position: 'fixed', top: 0, left: 0, right: 0 }}
+    >
       {/* ------------------------------------------------------------- */}
       {/* 1. Top Yellow Announcement Banner - Highlights & Features     */}
       {/* ------------------------------------------------------------- */}
@@ -902,16 +938,19 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* MORE Dropdown Popover (Placed OUTSIDE overflow-x-auto container so it is NEVER clipped) */}
-        {moreMenuOpen && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center sm:justify-end max-w-7xl mx-auto px-4 pt-[144px] sm:pt-[150px] pointer-events-none">
+        {/* MORE Dropdown Popover (Portaled to document.body so it sits cleanly over locked header & never gets clipped) */}
+        {moreMenuOpen && typeof document !== 'undefined' && createPortal(
+          <div
+            className="fixed inset-0 z-[120] flex items-start justify-center sm:justify-end max-w-7xl mx-auto px-4 pointer-events-none"
+            style={{ paddingTop: 'calc(var(--acc-header-height, 148px) + 6px)' }}
+          >
             {/* Clickable backdrop */}
             <div
-              className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs z-40 pointer-events-auto animate-fadeIn"
+              className="fixed inset-0 bg-slate-950/45 backdrop-blur-xs z-[119] pointer-events-auto animate-fadeIn"
               onClick={() => setMoreMenuOpen(false)}
             />
             {/* Dropdown Card */}
-            <div className="relative w-full max-w-xs sm:w-72 bg-white rounded-2xl shadow-2xl border-2 border-blue-400/40 p-2 z-50 pointer-events-auto animate-scaleUp overflow-hidden">
+            <div className="relative w-full max-w-xs sm:w-72 bg-white rounded-2xl shadow-2xl border-2 border-blue-400/40 p-2 z-[120] pointer-events-auto animate-scaleUp overflow-hidden">
               <div className="px-3 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100 rounded-xl mb-1.5 flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <div className="w-5 h-5 rounded-md bg-gradient-to-b from-amber-400 to-amber-600 text-white flex items-center justify-center shadow-xs">
@@ -962,7 +1001,8 @@ export const Header: React.FC<HeaderProps> = ({
                 })}
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
 
@@ -1233,9 +1273,15 @@ export const Header: React.FC<HeaderProps> = ({
       {/* ========================================================================= */}
       {/* 6. HEADER NOTIFICATIONS DRAWER / POPUP                                    */}
       {/* ========================================================================= */}
-      {showNotificationDrawer && (
-        <div className="fixed inset-0 z-[150] flex items-start sm:items-center justify-center p-3 sm:p-4 pt-16 sm:pt-4 bg-black/85 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-[#17212b] text-white border-2 border-[#2481cc]/60 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+      {showNotificationDrawer && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[150] flex items-start sm:items-center justify-center p-3 sm:p-4 pt-16 sm:pt-4 bg-black/85 backdrop-blur-xs animate-fadeIn"
+          onClick={() => setShowNotificationDrawer(false)}
+        >
+          <div
+            className="bg-[#17212b] text-white border-2 border-[#2481cc]/60 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[85vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="bg-gradient-to-r from-[#17212b] via-[#202b36] to-[#0e1621] p-4 border-b border-[#2481cc]/40 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-rose-600 to-amber-500 flex items-center justify-center shadow-md">
@@ -1343,15 +1389,22 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ========================================================================= */}
       {/* 7. HEADER ADMIN & SPONSOR LIVE CHAT MODAL                                  */}
       {/* ========================================================================= */}
-      {showAdminChatModal && currentUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/80 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-white rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] border-2 border-blue-400/50">
+      {showAdminChatModal && currentUser && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[150] flex items-center justify-center p-2.5 sm:p-4 bg-black/80 backdrop-blur-xs animate-fadeIn"
+          onClick={() => setShowAdminChatModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] border-2 border-blue-400/50"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-[#2874f0] text-white p-3.5 sm:p-4 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center shadow-inner">
@@ -1388,7 +1441,8 @@ export const Header: React.FC<HeaderProps> = ({
               />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </header>
   );

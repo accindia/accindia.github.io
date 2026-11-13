@@ -92,6 +92,7 @@ import {
   PassbookEntry,
   PassbookCategory,
   HomeSliderPhoto,
+  ActiveWindow,
 } from '../types';
 import { StorageService, subscribeToSync, SEED_MEMBERS } from '../services/storage';
 import { FirestoreService } from '../services/firestore';
@@ -104,9 +105,10 @@ import { HomeSliderManagerModal } from './HomeSliderManagerModal';
 
 interface AdminPanelProps {
   onRefresh: () => void;
+  onNavigate?: (view: ActiveWindow) => void;
 }
 
-export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
+export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate }) => {
   // Admin password gate state - Secured with storage password (Default: ACCADMIN)
   const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(() => {
     return sessionStorage.getItem('acc_admin_authenticated') === 'true';
@@ -292,12 +294,39 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
     setSliderNewTitle('');
     setSliderNewSubtitle('');
     if (sliderUploadFileRef.current) sliderUploadFileRef.current.value = '';
+
+    // Auto-save immediately to Storage and Firestore!
+    const updated = StorageService.updateSiteConfig({
+      homeSliderPhotos: nextList,
+      popupDisplayTarget: siteConfig.popupDisplayTarget || 'home',
+      enableCelebrationEffect: siteConfig.enableCelebrationEffect !== false,
+    });
+    FirestoreService.saveSiteConfig({
+      ...siteConfig,
+      homeSliderPhotos: nextList,
+      popupDisplayTarget: siteConfig.popupDisplayTarget || 'home',
+      enableCelebrationEffect: siteConfig.enableCelebrationEffect !== false,
+    });
+    setSiteConfig(updated);
+    setSliderSaveSuccess('✓ फ़ोटो जुड़ गई और होमपेज पॉप-अप में तुरंत लाइव हो गई!');
+    setTimeout(() => setSliderSaveSuccess(''), 4000);
   };
 
   const handleDeleteSliderPhoto = (id: string) => {
     if (window.confirm('क्या आप इस फोटो को स्लाइडर से हटाना चाहते हैं?')) {
       const nextList = sliderPhotos.filter((p) => p.id !== id);
       setSliderPhotos(nextList);
+
+      const updated = StorageService.updateSiteConfig({
+        homeSliderPhotos: nextList,
+      });
+      FirestoreService.saveSiteConfig({
+        ...siteConfig,
+        homeSliderPhotos: nextList,
+      });
+      setSiteConfig(updated);
+      setSliderSaveSuccess('✓ फ़ोटो हटाई गई और सेटिंग्स अपडेट हो गई!');
+      setTimeout(() => setSliderSaveSuccess(''), 3000);
     }
   };
 
@@ -309,6 +338,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
     copy[index] = copy[targetIdx];
     copy[targetIdx] = temp;
     setSliderPhotos(copy);
+
+    const updated = StorageService.updateSiteConfig({
+      homeSliderPhotos: copy,
+    });
+    FirestoreService.saveSiteConfig({
+      ...siteConfig,
+      homeSliderPhotos: copy,
+    });
+    setSiteConfig(updated);
   };
 
   const handleSaveSliderPhotos = async () => {
@@ -328,7 +366,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
       });
       setSiteConfig(updated);
       setSliderSaveSuccess('✓ 7-फोटो होमपेज स्लाइडर व सेटिंग्स सफलतापूर्वक सहेज दिया गया!');
-      setTimeout(() => setSliderSaveSuccess(''), 3000);
+      setTimeout(() => setSliderSaveSuccess(''), 4000);
     } catch (err) {
       console.error('Error saving slider photos:', err);
       alert('स्लाइडर फोटो सहेजने में त्रुटि हुई!');
@@ -404,7 +442,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
     const unsubscribeSiteConfig = FirestoreService.subscribeToSiteConfig((cloudCfg) => {
       if (cloudCfg) {
         setSiteConfig(cloudCfg);
-        StorageService.saveSiteConfig(cloudCfg);
+        if (Array.isArray(cloudCfg.homeSliderPhotos)) {
+          setSliderPhotos(cloudCfg.homeSliderPhotos);
+        }
+        StorageService.saveSiteConfig(cloudCfg, true);
       }
     });
 
@@ -426,7 +467,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
     const unsubscribeSync = subscribeToSync(() => {
       setMembers(StorageService.getMembers());
       setWithdrawals(StorageService.getWithdrawals());
-      setSiteConfig(StorageService.getSiteConfig());
+      const freshCfg = StorageService.getSiteConfig();
+      setSiteConfig(freshCfg);
+      if (Array.isArray(freshCfg.homeSliderPhotos)) {
+        setSliderPhotos(freshCfg.homeSliderPhotos);
+      }
       setAuditLogs(StorageService.getAuditLogs());
       setTransactions(StorageService.getTransactions());
       setReferrals(StorageService.getReferrals());
@@ -5016,7 +5061,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
+            {onNavigate && (
+              <button
+                type="button"
+                onClick={() => onNavigate('home')}
+                className="px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:brightness-110 text-white font-black text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+                title="होमपेज पर जाकर तुरंत लाइव पॉप-अप देखें"
+              >
+                <Globe className="w-4 h-4 text-white" />
+                <span>🏠 होमपेज पर पॉप-अप देखें ➔</span>
+              </button>
+            )}
+
             {sliderPhotos.length > 0 && (
               <button
                 type="button"
@@ -5025,7 +5082,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
                 title="होमपेज पॉप-अप का लाइव प्रिव्यू देखें"
               >
                 <Eye className="w-4 h-4" />
-                <span>लाइव पॉप-अप प्रिव्यू</span>
+                <span>लाइव प्रिव्यू</span>
               </button>
             )}
 
@@ -5359,14 +5416,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
           )}
         </div>
 
-        {/* Live Preview Modal for Admin */}
-        {sliderLivePreviewOpen && sliderPhotos.length > 0 && (
-          <HomeSliderPopupModal
-            photos={sliderPhotos}
-            isOpen={sliderLivePreviewOpen}
-            onClose={() => setSliderLivePreviewOpen(false)}
-          />
-        )}
       </div>
     </div>
   )}
@@ -10633,6 +10682,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
         isOpen={showSliderStudioModal}
         onClose={() => setShowSliderStudioModal(false)}
         siteConfig={siteConfig}
+        onNavigate={onNavigate}
         onUpdateSiteConfig={async (newPhotos, displayTarget, celebrationEffect) => {
           setSliderPhotos(newPhotos);
           const updates: Partial<SiteConfig> = { homeSliderPhotos: newPhotos };
@@ -10648,6 +10698,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh }) => {
           setSliderLivePreviewOpen(true);
         }}
       />
+
+      {/* Global Live Popup Preview Modal for Admin (Works from any tab) */}
+      {sliderLivePreviewOpen && sliderPhotos.length > 0 && (
+        <HomeSliderPopupModal
+          photos={sliderPhotos}
+          isOpen={sliderLivePreviewOpen}
+          onClose={() => setSliderLivePreviewOpen(false)}
+          enableCelebrationEffect={siteConfig.enableCelebrationEffect !== false}
+          onNavigate={onNavigate ? (target) => onNavigate(target as ActiveWindow) : undefined}
+        />
+      )}
     </div>
   );
 };

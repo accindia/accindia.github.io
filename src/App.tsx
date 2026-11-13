@@ -70,10 +70,9 @@ export default function App() {
   const [deviceKickoutAlertOpen, setDeviceKickoutAlertOpen] = useState(false);
   const [showForgotCredentialsModal, setShowForgotCredentialsModal] = useState(false);
 
-  // CRITICAL: Any user who has joined ACC (logged-in member) must NEVER see the Home page!
-  // The Home page is strictly for visitors. Direct them to Dashboard.
+  // When a user logs in for the first time or from outside, default to dashboard if on login/register
   useEffect(() => {
-    if (currentUser && activeWindow === 'home') {
+    if (currentUser && (activeWindow === 'login' || activeWindow === 'register')) {
       setActiveWindow('dashboard');
     }
   }, [currentUser, activeWindow]);
@@ -165,7 +164,7 @@ export default function App() {
     const unsubscribeConfig = FirestoreService.subscribeToSiteConfig((cloudCfg) => {
       if (cloudCfg) {
         setSiteConfig(cloudCfg);
-        StorageService.saveSiteConfig(cloudCfg);
+        StorageService.saveSiteConfig(cloudCfg, true);
       }
     });
 
@@ -206,9 +205,9 @@ export default function App() {
   };
 
   const handleNavigateWithScroll = (windowName: ActiveWindow) => {
-    // If user is already logged in, never let them open public login, register, or visitor home page
+    // If user is already logged in, redirect auth forms
     if (currentUser) {
-      if (windowName === 'home' || windowName === 'login') {
+      if (windowName === 'login') {
         setActiveWindow('dashboard');
         scrollToTopSection(false);
         return;
@@ -267,14 +266,19 @@ export default function App() {
         onNavigateToIdCard={handleNavigateToIdCard}
       />
 
-      {/* Spacer ensuring page content starts completely below the permanently fixed header on any screen */}
-      <div className="h-[200px] xs:h-[195px] sm:h-[154px] md:h-[156px] w-full shrink-0" aria-hidden="true" />
+      {/* Spacer ensuring page content starts completely below the permanently locked header on any screen */}
+      <div
+        className="w-full shrink-0 pointer-events-none transition-all duration-150 min-h-[148px] xs:min-h-[155px] sm:min-h-[130px] md:min-h-[125px]"
+        style={{ height: 'var(--acc-header-height, 155px)' }}
+        aria-hidden="true"
+      />
 
       {/* Main Container - 100% Mobile Fluid Fit with Zero Header Overlap */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-2 sm:p-4 md:p-6 pb-24 overflow-x-hidden pt-1 sm:pt-2">
-        {/* VIEW: HOME - STRICTLY AND EXCLUSIVELY FOR VISITORS (!currentUser) */}
-        {!currentUser && activeWindow === 'home' && (
+        {/* VIEW: HOME - Accessible to all (visitors and members/admin preview) */}
+        {activeWindow === 'home' && (
           <HomeView
+            siteConfig={siteConfig}
             onNavigate={(view) => {
               if (view === 'idcard') {
                 handleNavigateToIdCard();
@@ -475,7 +479,7 @@ export default function App() {
         )}
 
         {/* VIEW: USER DASHBOARD (Direct Digital Command Center for Logged-In Members) */}
-        {currentUser && (activeWindow === 'dashboard' || activeWindow === 'home') && (
+        {currentUser && activeWindow === 'dashboard' && (
           <UserDashboard
             currentUser={currentUser}
             onUpdateUser={(updated) => setCurrentUser(updated)}
@@ -559,6 +563,7 @@ export default function App() {
                 const cur = StorageService.getCurrentUser();
                 if (cur) setCurrentUser(cur);
               }}
+              onNavigate={handleNavigateWithScroll}
             />
           </WindowFrame>
         )}

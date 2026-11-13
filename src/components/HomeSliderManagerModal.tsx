@@ -116,7 +116,7 @@ export const HomeSliderManagerModal: React.FC<HomeSliderManagerModalProps> = ({
     }
   };
 
-  const handleAddPhoto = () => {
+  const handleAddPhoto = async () => {
     if (photos.length >= 7) {
       alert('अधिकतम 7 फोटो सीमा पूर्ण हो चुकी है। नई फोटो जोड़ने के लिए पहले किसी फोटो को हटाएं।');
       return;
@@ -143,7 +143,8 @@ export const HomeSliderManagerModal: React.FC<HomeSliderManagerModalProps> = ({
       createdAt: new Date().toISOString(),
     };
 
-    setPhotos((prev) => [...prev, newPhoto]);
+    const nextList = [...photos, newPhoto];
+    setPhotos(nextList);
     // Reset form
     setImageUrl('');
     setTitle('');
@@ -153,10 +154,27 @@ export const HomeSliderManagerModal: React.FC<HomeSliderManagerModalProps> = ({
     setCustomActionUrl('');
     setActionLabel('अभी जॉइन करें (₹249)');
     setUploadErrorMsg('');
+
+    // Auto-save immediately!
+    try {
+      await onUpdateSiteConfig(nextList, popupDisplayTarget, enableCelebrationEffect);
+      setSaveSuccessMsg('✓ फोटो 7-स्लाइडर में जुड़ गई और तुरंत लाइव हो गई!');
+      setTimeout(() => setSaveSuccessMsg(''), 4000);
+    } catch {
+      // ignore
+    }
   };
 
-  const handleRemovePhoto = (id: string) => {
-    setPhotos((prev) => prev.filter((p) => p.id !== id));
+  const handleRemovePhoto = async (id: string) => {
+    const nextList = photos.filter((p) => p.id !== id);
+    setPhotos(nextList);
+    try {
+      await onUpdateSiteConfig(nextList, popupDisplayTarget, enableCelebrationEffect);
+      setSaveSuccessMsg('✓ फोटो हटाई गई और सेटिंग्स अपडेट हो गई!');
+      setTimeout(() => setSaveSuccessMsg(''), 3000);
+    } catch {
+      // ignore
+    }
   };
 
   const handleMoveUp = (index: number) => {
@@ -442,6 +460,21 @@ export const HomeSliderManagerModal: React.FC<HomeSliderManagerModalProps> = ({
                   <Eye className="w-3.5 h-3.5 text-indigo-200" />
                   <span>लाइव पॉप-अप टेस्ट करें</span>
                 </button>
+
+                {onNavigate && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onNavigate('home');
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md transition active:scale-95 cursor-pointer"
+                    title="होमपेज पर जाकर तुरंत लाइव पॉप-अप देखें"
+                  >
+                    <Globe className="w-3.5 h-3.5 text-white" />
+                    <span>होमपेज पर देखें ➔</span>
+                  </button>
+                )}
 
                 {onNavigate && (
                   <button

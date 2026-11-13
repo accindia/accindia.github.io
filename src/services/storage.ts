@@ -1748,10 +1748,28 @@ export const StorageService = {
     return count;
   },
 
-  saveSiteConfig(config: SiteConfig): void {
-    localStorage.setItem(SITE_CONFIG_KEY, JSON.stringify(config));
+  saveSiteConfig(config: SiteConfig, skipCloudSync: boolean = false): void {
+    try {
+      localStorage.setItem(SITE_CONFIG_KEY, JSON.stringify(config));
+    } catch (e) {
+      console.warn('localStorage saveSiteConfig error (quota exceeded?), attempting compact save:', e);
+      try {
+        const compact = {
+          ...config,
+          homeSliderPhotos: config.homeSliderPhotos?.map((p) => ({
+            ...p,
+            imageUrl: p.imageUrl.startsWith('data:') ? p.imageUrl.slice(0, 50000) : p.imageUrl,
+          })),
+        };
+        localStorage.setItem(SITE_CONFIG_KEY, JSON.stringify(compact));
+      } catch (err2) {
+        console.warn('localStorage secondary compact save failed:', err2);
+      }
+    }
     notifySync();
-    FirestoreService.saveSiteConfig(config).catch((e) => console.warn('Firestore saveSiteConfig error:', e));
+    if (!skipCloudSync) {
+      FirestoreService.saveSiteConfig(config).catch((e) => console.warn('Firestore saveSiteConfig error:', e));
+    }
   },
 
   updateSiteConfig(updates: Partial<SiteConfig>): SiteConfig {
