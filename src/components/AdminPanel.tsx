@@ -212,13 +212,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
   const [showEmailToggle, setShowEmailToggle] = useState<boolean>(siteConfig.showEmailSupport !== false);
 
   // Real App APK Download & Delivery Settings
-  const [appDownloadUrlInput, setAppDownloadUrlInput] = useState(siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk');
+  const [appDownloadUrlInput, setAppDownloadUrlInput] = useState(
+    siteConfig.appDownloadUrl && siteConfig.appDownloadUrl !== 'https://achieversclub.in/download/acc-official-v2.apk'
+      ? siteConfig.appDownloadUrl
+      : ''
+  );
   const [showAppDownloadToggle, setShowAppDownloadToggle] = useState<boolean>(siteConfig.showAppDownload !== false);
-  const [appNameInput, setAppNameInput] = useState(siteConfig.appName || 'ACC Official Android APK');
+  const [appNameInput, setAppNameInput] = useState(siteConfig.appName || 'ACC Official Android App');
   const [appVersionInput, setAppVersionInput] = useState(siteConfig.appVersion || 'v2.4.0 (Latest)');
   const [appFileSizeInput, setAppFileSizeInput] = useState(siteConfig.appFileSize || '18.5 MB');
-  const [autoGrantAppLinkToggle, setAutoGrantAppLinkToggle] = useState<boolean>(siteConfig.autoGrantAppLinkOnVerification !== false);
-  const [appDownloadNoticeInput, setAppDownloadNoticeInput] = useState(siteConfig.appDownloadNotice || 'केवल अधिकृत ACC वेबसाइट से ही APK डाउनलोड करें। इंस्टालेशन के समय "Install from Unknown Sources" को अनुमति दें।');
+  const [autoGrantAppLinkToggle, setAutoGrantAppLinkToggle] = useState<boolean>(siteConfig.autoGrantAppLinkOnVerification === true);
+  const [appDownloadNoticeInput, setAppDownloadNoticeInput] = useState(siteConfig.appDownloadNotice || 'केवल एडमिन द्वारा दिए गए आधिकारिक लिंक से ही Real App डाउनलोड करें।');
   const [bulkGrantSuccessMsg, setBulkGrantSuccessMsg] = useState('');
 
   // Address & Legal settings form
@@ -515,9 +519,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
   const [rejectionReasonInput, setRejectionReasonInput] = useState<string>('अमान्य या गलत UPI UTR नंबर');
   const [customReasonText, setCustomReasonText] = useState<string>('');
 
-  // Modal for sharing Real App Link to approved user
+  // Modal & inline drafts for editing/sharing Real App Link to user
   const [linkModalMember, setLinkModalMember] = useState<Member | null>(null);
-  const [customAppLink, setCustomAppLink] = useState(siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk');
+  const [customAppLink, setCustomAppLink] = useState(
+    siteConfig.appDownloadUrl && siteConfig.appDownloadUrl !== 'https://achieversclub.in/download/acc-official-v2.apk'
+      ? siteConfig.appDownloadUrl
+      : ''
+  );
+  const [perMemberAppLinkDrafts, setPerMemberAppLinkDrafts] = useState<Record<string, string>>({});
   const [linkShareSuccess, setLinkShareSuccess] = useState('');
 
   // Change Admin Password Modal
@@ -592,10 +601,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
   const [isCloudQuotaPaused, setIsCloudQuotaPaused] = useState<boolean>(() =>
     FirestoreService.isWriteQuotaPaused()
   );
+  const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
+  const [cloudMemberCount, setCloudMemberCount] = useState<number | null>(null);
+  const [lastCloudSyncAt, setLastCloudSyncAt] = useState<string>('');
 
   useEffect(() => {
     const unsubQuota = FirestoreService.subscribeToQuotaStatus(setIsCloudQuotaPaused);
-    return () => unsubQuota();
+    const unsubPending = FirestoreService.subscribeToPendingSyncCount(setPendingSyncCount);
+    return () => {
+      unsubQuota();
+      unsubPending();
+    };
   }, []);
 
   // Clean Background Scroll Locking without position:fixed jumps
@@ -739,9 +755,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
 
   const [isCloudSyncing, setIsCloudSyncing] = useState(false);
 
-  const refreshData = async () => {
+  const refreshData = async (manualForce: boolean = false) => {
     setIsCloudSyncing(true);
     try {
+      if (manualForce) {
+        FirestoreService.clearQuotaPauseForRetry();
+      }
       // Flush any queued offline/quota-paused writes first if quota allows
       if (!FirestoreService.isWriteQuotaPaused()) {
         await FirestoreService.flushPendingSyncQueue();
@@ -756,9 +775,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
         FirestoreService.getPassbookEntries(),
       ]);
 
+      // Push any local-only real members created on this device straight into Firestore
+      const backfill = await StorageService.syncUnsyncedLocalMembersToCloud(cloudMembers, manualForce);
+      const latestCloudMembers =
+        backfill.pushed > 0 ? await FirestoreService.getMembers() : cloudMembers;
+
+      setCloudMemberCount(latestCloudMembers.length);
+      setLastCloudSyncAt(
+        new Date().toLocaleTimeString('hi-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      );
+
       setMembers(
-        cloudMembers.length > 0
-          ? StorageService.mergeMembersWithCloud(cloudMembers, true)
+        latestCloudMembers.length > 0
+          ? StorageService.mergeMembersWithCloud(latestCloudMembers, true)
           : StorageService.getMembers()
       );
       setWithdrawals(
@@ -787,8 +816,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
           : StorageService.getPassbookEntries()
       );
 
-      setActionSuccess('क्लाउड डेटाबेस (Firestore) से ताज़ा यूजर रिकॉर्ड सुरक्षित मर्ज व लोड हो गए!');
-      setTimeout(() => setActionSuccess(''), 3000);
+      if (manualForce) {
+        setActionSuccess(
+          `✓ क्लाउड (Firestore) लाइव सिंक पूर्ण: ${latestCloudMembers.length} सदस्य लाइव मिले${
+            backfill.pushed > 0 ? ` व ${backfill.pushed} लंबित सदस्य क्लाउड पर भेजे गए` : ''
+          }!`
+        );
+        setTimeout(() => setActionSuccess(''), 4000);
+      }
     } catch (e) {
       console.warn('refreshData error:', e);
       setMembers(StorageService.getMembers());
@@ -810,29 +845,68 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
     setTimeout(() => setActionSuccess(''), 2500);
   };
 
+  const getPersonalReferralUrl = (accId: string) => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://achieversclub.in';
+    return `${origin}/?sponsor=${accId}`;
+  };
+
+  const getCleanRealAppLink = (member?: Member | null) => {
+    const mLink = (member?.realAppLink || '').trim();
+    if (mLink && mLink !== 'https://achieversclub.in/download/acc-official-v2.apk') return mLink;
+    const cfgLink = (siteConfig.appDownloadUrl || '').trim();
+    if (cfgLink && cfgLink !== 'https://achieversclub.in/download/acc-official-v2.apk') return cfgLink;
+    return '';
+  };
+
+  const openAppLinkEditorModal = (member: Member) => {
+    const existing =
+      (member.realAppLink && member.realAppLink !== 'https://achieversclub.in/download/acc-official-v2.apk'
+        ? member.realAppLink
+        : '') ||
+      (siteConfig.appDownloadUrl && siteConfig.appDownloadUrl !== 'https://achieversclub.in/download/acc-official-v2.apk'
+        ? siteConfig.appDownloadUrl
+        : '');
+    setCustomAppLink(existing);
+    setLinkShareSuccess('');
+    setLinkModalMember(member);
+  };
+
   // Direct 1-Click Approve Member
   const handleApproveMember = (member: Member) => {
-    const defaultLink = siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk';
-    const autoGrant = siteConfig.autoGrantAppLinkOnVerification !== false;
-    
-    StorageService.approveMember(member.accId, defaultLink);
-    if (!autoGrant) {
+    const globalRealLink =
+      siteConfig.appDownloadUrl && siteConfig.appDownloadUrl !== 'https://achieversclub.in/download/acc-official-v2.apk'
+        ? siteConfig.appDownloadUrl.trim()
+        : '';
+    const autoGrant = siteConfig.autoGrantAppLinkOnVerification === true && Boolean(globalRealLink);
+    const existingCustomLink =
+      member.realAppLink && member.realAppLink !== 'https://achieversclub.in/download/acc-official-v2.apk'
+        ? member.realAppLink.trim()
+        : '';
+    const finalLink = existingCustomLink || (autoGrant ? globalRealLink : '');
+
+    StorageService.approveMember(member.accId, finalLink || undefined);
+    if (!autoGrant && !existingCustomLink) {
       StorageService.revokeAppLink(member.accId);
     }
     refreshData();
-    setActionSuccess(`सदस्य ${member.fullName} (${member.accId}) का ₹249 भुगतान स्वीकृत व 🆔 सत्यापित हो गई! ${autoGrant ? '📱 Real App Link भी स्वतः स्वीकृत हो गया।' : ''}`);
-    
-    // Update active modal member if open
+    setActionSuccess(
+      `सदस्य ${member.fullName} (${member.accId}) का ₹249 भुगतान स्वीकृत व 🆔 सत्यापित हो गई! ${
+        autoGrant || existingCustomLink
+          ? '📱 Real App Link भी सक्रिय हो गया।'
+          : '🔗 यूजर डैशबोर्ड पर उनका व्यक्तिगत रेफरल लिंक सक्रिय है (आप चाहें तो कस्टम Real App Link दे सकते हैं)।'
+      }`
+    );
+
     if (screenshotModalMember && screenshotModalMember.accId === member.accId) {
       setScreenshotModalMember({
         ...screenshotModalMember,
         status: 'verified',
         verifiedAt: new Date().toISOString(),
-        realAppLinkApproved: autoGrant,
-        realAppLink: defaultLink,
+        realAppLinkApproved: Boolean(finalLink),
+        realAppLink: finalLink,
       });
     }
-    setTimeout(() => setActionSuccess(''), 3500);
+    setTimeout(() => setActionSuccess(''), 4000);
   };
 
   // Trigger Reject Modal
@@ -847,7 +921,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
     e.preventDefault();
     if (!rejectionModalMember) return;
 
-    const finalReason = rejectionReasonInput === 'अन्य कारण (Custom)' 
+    const finalReason = rejectionReasonInput === 'अन्य कारण (Custom)'
       ? (customReasonText.trim() || 'एडमिन द्वारा अस्वीकृत: अमान्य भुगतान विवरण')
       : rejectionReasonInput;
 
@@ -868,18 +942,86 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
     setTimeout(() => setActionSuccess(''), 3500);
   };
 
-  // Admin approves real app link for verified user
-  const handleApproveAndSendAppLink = (member: Member) => {
-    StorageService.updateMember(member.accId, {
-      realAppLink: customAppLink.trim(),
-      realAppLinkApproved: true,
+  // Send Real App Link into User's In-App Admin Chat Inbox
+  const handleSendAppLinkToUserChat = (member: Member, linkToSend: string) => {
+    const cleanUrl = linkToSend.trim();
+    if (!cleanUrl) {
+      alert('कृपया भेजने से पहले वैध Real App Link दर्ज करें!');
+      return;
+    }
+    StorageService.sendPrivateMessage({
+      userAccId: member.accId,
+      recipientAccId: member.accId,
+      recipientName: member.fullName,
+      chatType: 'admin',
+      senderRole: 'admin',
+      senderAccId: 'ADMIN',
+      senderName: 'Achievers Club Admin',
+      mediaType: 'link',
+      linkUrl: cleanUrl,
+      linkTitle: `📱 ${member.fullName} जी, आपका ऑफिशियल Real App Link`,
+      text: `नमस्ते ${member.fullName} जी,\nएडमिन द्वारा आपका ऑफिशियल Real App Link जारी कर दिया गया है। नीचे दिए गए लिंक से ऐप खोलें/डाउनलोड करें:\n${cleanUrl}`,
     });
-    refreshData();
-    setLinkShareSuccess(`Real App Link सदस्य ${member.accId} के खाते में सफलतापूर्वक लिंक हो गया!`);
-    setTimeout(() => {
-      setLinkShareSuccess('');
-      setLinkModalMember(null);
-    }, 2000);
+    setAdminMessages(StorageService.getPrivateMessages());
+    setLinkShareSuccess(`💬 Real App Link सदस्य ${member.fullName} (${member.accId}) के इन-ऐप एडमिन चैट इनबॉक्स में भी भेज दिया गया!`);
+    setActionSuccess(`💬 ${member.fullName} (${member.accId}) को इन-ऐप चैट में Real App Link भेजा गया!`);
+    setTimeout(() => setActionSuccess(''), 4000);
+  };
+
+  // Admin edits, saves & publishes Real App Link to User Dashboard (with optional In-App Chat push)
+  const handleSaveAndSendMemberAppLink = async (
+    member: Member,
+    explicitUrl?: string,
+    alsoSendChat = false
+  ) => {
+    const cleanUrl = (explicitUrl ?? customAppLink).trim();
+    if (!cleanUrl) {
+      alert('कृपया पहले Real App Link दर्ज करें (या डिफ़ॉल्ट Referral पर रखने के लिए "Referral पर वापस करें" बटन दबाएं)।');
+      return;
+    }
+    const nowIso = new Date().toISOString();
+    const updated = StorageService.grantAppLink(member.accId, cleanUrl);
+    await FirestoreService.updateMember(
+      member.accId,
+      { realAppLink: cleanUrl, realAppLinkApproved: true, lastEditedAt: nowIso },
+      updated || member
+    ).catch((e) => console.warn('Firestore updateMember link err:', e));
+
+    const nextMember: Member = updated || {
+      ...member,
+      realAppLink: cleanUrl,
+      realAppLinkApproved: true,
+      lastEditedAt: nowIso,
+    };
+
+    setMembers((prev) => prev.map((m) => (m.accId === member.accId ? nextMember : m)));
+    if (selectedMemberFor360 && selectedMemberFor360.accId === member.accId) {
+      setSelectedMemberFor360(nextMember);
+    }
+    if (selectedMember && selectedMember.accId === member.accId) {
+      setSelectedMember(nextMember);
+    }
+    if (screenshotModalMember && screenshotModalMember.accId === member.accId) {
+      setScreenshotModalMember(nextMember);
+    }
+    if (linkModalMember && linkModalMember.accId === member.accId) {
+      setLinkModalMember(nextMember);
+    }
+    setPerMemberAppLinkDrafts((prev) => ({ ...prev, [member.accId]: cleanUrl }));
+
+    if (alsoSendChat) {
+      handleSendAppLinkToUserChat(nextMember, cleanUrl);
+    } else {
+      setLinkShareSuccess(`✓ Real App Link सदस्य ${member.fullName} (${member.accId}) के डैशबोर्ड में तुरंत लाइव हो गया!`);
+      setActionSuccess(`✓ ${member.fullName} (${member.accId}) के डैशबोर्ड में नया Real App Link अपडेट व लाइव हो गया!`);
+      setTimeout(() => setActionSuccess(''), 4000);
+    }
+    onRefresh();
+  };
+
+  // Admin approves real app link for verified user from modal
+  const handleApproveAndSendAppLink = (member: Member) => {
+    handleSaveAndSendMemberAppLink(member, customAppLink, false);
   };
 
   // Commission Payment Confirmation Handler
@@ -1176,14 +1318,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
       alert('कोई सत्यापित (Verified) सदस्य उपलब्ध नहीं है।');
       return;
     }
-    const targetLink = appDownloadUrlInput.trim() || siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk';
+    const rawLink = (appDownloadUrlInput || siteConfig.appDownloadUrl || '').trim();
+    const targetLink = rawLink !== 'https://achieversclub.in/download/acc-official-v2.apk' ? rawLink : '';
+    if (!targetLink) {
+      alert('कृपया पहले ऊपर दिए गए बॉक्स में अपना असली Real App Link दर्ज करके सहेजें, या किसी एक सदस्य कार्ड पर "📱 App Link दें / एडिट करें" दबाकर व्यक्तिगत लिंक शेयर करें।');
+      return;
+    }
     const confirmed = window.confirm(
-      `क्या आप सभी ${verifiedMembers.length} सत्यापित सदस्यों को आधिकारिक Real App APK लिंक (${targetLink}) जारी/स्वीकृत करना चाहते हैं?`
+      `क्या आप सभी ${verifiedMembers.length} सत्यापित सदस्यों को आधिकारिक Real App लिंक (${targetLink}) जारी/स्वीकृत करना चाहते हैं?`
     );
     if (!confirmed) return;
     const count = StorageService.bulkGrantAppLinkToVerified(targetLink);
     refreshData();
-    setBulkGrantSuccessMsg(`🎉 सभी ${count} सत्यापित सदस्यों के खाते में Real App APK लिंक सफलतापूर्वक सक्रिय हो गया!`);
+    setBulkGrantSuccessMsg(`🎉 सभी ${count} सत्यापित सदस्यों के खाते में Real App लिंक सफलतापूर्वक सक्रिय हो गया!`);
     setActionSuccess(`सभी ${count} सत्यापित सदस्यों को ऐप लिंक दिया गया!`);
     setTimeout(() => {
       setBulkGrantSuccessMsg('');
@@ -1192,26 +1339,56 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
   };
 
   const handleGrantMemberAppLink = (accId: string, customLink?: string) => {
-    const link = customLink || appDownloadUrlInput.trim() || siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk';
-    const updated = StorageService.grantAppLink(accId, link);
-    refreshData();
-    if (updated) {
-      setSelectedMember(updated);
+    const candidate = (customLink ?? perMemberAppLinkDrafts[accId] ?? appDownloadUrlInput ?? siteConfig.appDownloadUrl ?? '').trim();
+    const link = candidate !== 'https://achieversclub.in/download/acc-official-v2.apk' ? candidate : '';
+    if (!link) {
+      const target = members.find((m) => m.accId === accId);
+      if (target) openAppLinkEditorModal(target);
+      else alert('कृपया पहले वैध Real App Link दर्ज करें!');
+      return;
     }
-    setActionSuccess(`सदस्य ${accId} को Real App Link सफलतापूर्वक प्रदान किया गया!`);
-    setTimeout(() => setActionSuccess(''), 3500);
+    const target = members.find((m) => m.accId === accId);
+    if (target) {
+      handleSaveAndSendMemberAppLink(target, link, false);
+    } else {
+      const updated = StorageService.grantAppLink(accId, link);
+      refreshData();
+      if (updated) setSelectedMember(updated);
+      setActionSuccess(`सदस्य ${accId} को Real App Link सफलतापूर्वक प्रदान किया गया!`);
+      setTimeout(() => setActionSuccess(''), 3500);
+    }
   };
 
-  const handleRevokeMemberAppLink = (accId: string) => {
-    const confirmed = window.confirm(`क्या आप सदस्य ${accId} का Real App Link एक्सेस निष्क्रिय (Revoke) करना चाहते हैं?`);
+  const handleRevokeMemberAppLink = async (accId: string) => {
+    const confirmed = window.confirm(`क्या आप सदस्य ${accId} का कस्टम Real App Link हटाकर डैशबोर्ड को डिफ़ॉल्ट रेफरल लिंक पर वापस करना चाहते हैं?`);
     if (!confirmed) return;
+    const nowIso = new Date().toISOString();
     const updated = StorageService.revokeAppLink(accId);
-    refreshData();
-    if (updated) {
+    const existingTarget = members.find((m) => m.accId === accId);
+    await FirestoreService.updateMember(
+      accId,
+      { realAppLink: '', realAppLinkApproved: false, lastEditedAt: nowIso },
+      updated || existingTarget
+    ).catch((e) => console.warn('Firestore revokeAppLink err:', e));
+
+    setMembers((prev) =>
+      prev.map((m) => (m.accId === accId ? { ...m, realAppLink: '', realAppLinkApproved: false, lastEditedAt: nowIso } : m))
+    );
+    if (updated && selectedMember && selectedMember.accId === accId) {
       setSelectedMember(updated);
     }
-    setActionSuccess(`सदस्य ${accId} का App Link एक्सेस रिवोक कर दिया गया।`);
+    if (selectedMemberFor360 && selectedMemberFor360.accId === accId) {
+      setSelectedMemberFor360({ ...selectedMemberFor360, realAppLink: '', realAppLinkApproved: false, lastEditedAt: nowIso });
+    }
+    if (linkModalMember && linkModalMember.accId === accId) {
+      setLinkModalMember({ ...linkModalMember, realAppLink: '', realAppLinkApproved: false, lastEditedAt: nowIso });
+      setCustomAppLink('');
+    }
+    setPerMemberAppLinkDrafts((prev) => ({ ...prev, [accId]: '' }));
+    setLinkShareSuccess(`🔗 कस्टम लिंक हटाया गया — अब ${accId} के डैशबोर्ड में डिफ़ॉल्ट रूप से उनका अपना रेफरल लिंक दिखेगा।`);
+    setActionSuccess(`सदस्य ${accId} का कस्टम App Link हटाया गया (डिफ़ॉल्ट रेफरल लिंक सक्रिय)।`);
     setTimeout(() => setActionSuccess(''), 3500);
+    onRefresh();
   };
 
   const handleOpenAddServiceModal = () => {
@@ -1365,38 +1542,44 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
     setSiteConfig(updated);
   };
 
-  // Filtered members
-  const filteredMembers = members.filter((m) => {
-    if (!m) return false;
-    const q = searchQuery.toLowerCase().trim();
-    const matchesSearch =
-      !q ||
-      (m.fullName || '').toLowerCase().includes(q) ||
-      (m.accId || '').toLowerCase().includes(q) ||
-      String(m.mobile || '').includes(q) ||
-      String(m.utrNumber || '').toLowerCase().includes(q) ||
-      (m.sponsorName || '').toLowerCase().includes(q) ||
-      (m.sponsorId || '').toLowerCase().includes(q) ||
-      (m.email || '').toLowerCase().includes(q) ||
-      (m.city || '').toLowerCase().includes(q);
+  // Filtered members (Sorted newest registration first so newly registered users appear at the very top)
+  const filteredMembers = members
+    .filter((m) => {
+      if (!m) return false;
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        (m.fullName || '').toLowerCase().includes(q) ||
+        (m.accId || '').toLowerCase().includes(q) ||
+        String(m.mobile || '').includes(q) ||
+        String(m.utrNumber || '').toLowerCase().includes(q) ||
+        (m.sponsorName || '').toLowerCase().includes(q) ||
+        (m.sponsorId || '').toLowerCase().includes(q) ||
+        (m.email || '').toLowerCase().includes(q) ||
+        (m.city || '').toLowerCase().includes(q);
 
-    const matchesPlan = filterPlan === 'ALL' || m.plan === filterPlan;
-    const matchesStatus = filterStatus === 'ALL' || m.status === filterStatus;
+      const matchesPlan = filterPlan === 'ALL' || m.plan === filterPlan;
+      const matchesStatus = filterStatus === 'ALL' || m.status === filterStatus;
 
-    let matchesSponsor = true;
-    const hasSponsor = Boolean(m.sponsorId && m.sponsorId !== 'DIRECT' && m.sponsorId !== 'ADMIN');
-    if (filterSponsor === 'WITH_SPONSOR') {
-      matchesSponsor = hasSponsor;
-    } else if (filterSponsor === 'COMMISSION_PENDING') {
-      matchesSponsor = hasSponsor && m.sponsorCommissionStatus !== 'paid';
-    } else if (filterSponsor === 'COMMISSION_PAID') {
-      matchesSponsor = hasSponsor && m.sponsorCommissionStatus === 'paid';
-    } else if (filterSponsor === 'DIRECT') {
-      matchesSponsor = !hasSponsor;
-    }
+      let matchesSponsor = true;
+      const hasSponsor = Boolean(m.sponsorId && m.sponsorId !== 'DIRECT' && m.sponsorId !== 'ADMIN');
+      if (filterSponsor === 'WITH_SPONSOR') {
+        matchesSponsor = hasSponsor;
+      } else if (filterSponsor === 'COMMISSION_PENDING') {
+        matchesSponsor = hasSponsor && m.sponsorCommissionStatus !== 'paid';
+      } else if (filterSponsor === 'COMMISSION_PAID') {
+        matchesSponsor = hasSponsor && m.sponsorCommissionStatus === 'paid';
+      } else if (filterSponsor === 'DIRECT') {
+        matchesSponsor = !hasSponsor;
+      }
 
-    return matchesSearch && matchesPlan && matchesStatus && matchesSponsor;
-  });
+      return matchesSearch && matchesPlan && matchesStatus && matchesSponsor;
+    })
+    .sort((a, b) => {
+      const tA = a.createdAt ? Date.parse(a.createdAt) : 0;
+      const tB = b.createdAt ? Date.parse(b.createdAt) : 0;
+      return (isNaN(tB) ? 0 : tB) - (isNaN(tA) ? 0 : tA);
+    });
 
   // System stats
   const pendingMembers = members.filter((m) => m && m.status === 'pending');
@@ -1538,9 +1721,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
           </button>
 
           <button
-            onClick={refreshData}
+            onClick={() => refreshData(true)}
             disabled={isCloudSyncing}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-sm shadow-xs transition disabled:opacity-75"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-sm shadow-xs transition disabled:opacity-75 cursor-pointer"
             title="क्लाउड डेटाबेस (Firestore) से ताज़ा यूजर फेच करें"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isCloudSyncing ? 'animate-spin' : ''}`} />
@@ -1964,6 +2147,93 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
           </div>
         </div>
 
+        {/* Quick Status Filter Pills + Instant Cloud Sync */}
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 border border-gray-200 rounded-lg p-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setFilterStatus('ALL')}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition cursor-pointer ${
+                filterStatus === 'ALL'
+                  ? 'bg-[#2874f0] text-white shadow-xs'
+                  : 'bg-white text-slate-700 border border-gray-300 hover:bg-slate-100'
+              }`}
+            >
+              सभी ({members.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterStatus('pending')}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition cursor-pointer ${
+                filterStatus === 'pending'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100'
+              }`}
+            >
+              🆕 नए व लंबित ({pendingMembers.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterStatus('verified')}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition cursor-pointer ${
+                filterStatus === 'verified'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100'
+              }`}
+            >
+              ✓ सत्यापित ({verifiedMembers.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterStatus('rejected')}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition cursor-pointer ${
+                filterStatus === 'rejected'
+                  ? 'bg-red-600 text-white shadow-xs'
+                  : 'bg-red-50 text-red-700 border border-red-300 hover:bg-red-100'
+              }`}
+            >
+              ✕ अस्वीकृत ({rejectedMembers.length})
+            </button>
+            {(searchQuery || filterPlan !== 'ALL' || filterStatus !== 'ALL' || filterSponsor !== 'ALL') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setFilterPlan('ALL');
+                  setFilterStatus('ALL');
+                  setFilterSponsor('ALL');
+                }}
+                className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-slate-200 hover:bg-slate-300 text-slate-800 cursor-pointer"
+              >
+                ✕ फिल्टर रीसेट
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {cloudMemberCount !== null && (
+              <span className="text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-md">
+                ☁️ क्लाउड लाइव: {cloudMemberCount} सदस्य{lastCloudSyncAt ? ` • ${lastCloudSyncAt}` : ''}
+              </span>
+            )}
+            {pendingSyncCount > 0 && (
+              <span className="text-[11px] font-bold bg-amber-100 text-amber-950 border border-amber-300 px-2.5 py-1 rounded-md animate-pulse">
+                ⏳ {pendingSyncCount} लंबित सिंक
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => refreshData(true)}
+              disabled={isCloudSyncing}
+              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[11px] font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer disabled:opacity-60"
+              title="क्लाउड (Firestore) से तुरंत सभी नए रजिस्ट्रेशन लोड करें"
+            >
+              <RefreshCw className={`w-3 h-3 ${isCloudSyncing ? 'animate-spin' : ''}`} />
+              <span>{isCloudSyncing ? 'सिंक हो रहा...' : 'अभी क्लाउड सिंक करें'}</span>
+            </button>
+          </div>
+        </div>
+
         {/* Filters and Search Bar */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="relative">
@@ -2267,6 +2537,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
                         <span>पासवर्ड सहायता</span>
                       </button>
                     </div>
+
+                    {/* Real App Link Edit & Share Quick Action Button */}
+                    <button
+                      type="button"
+                      onClick={() => openAppLinkEditorModal(m)}
+                      className={`w-full py-1.5 px-2.5 rounded-lg text-xs font-bold flex items-center justify-between gap-1.5 border transition cursor-pointer ${
+                        m.realAppLinkApproved && m.realAppLink && m.realAppLink !== 'https://achieversclub.in/download/acc-official-v2.apk'
+                          ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
+                          : 'bg-sky-50 hover:bg-sky-100 text-[#2874f0] border-sky-200'
+                      }`}
+                      title="इस यूजर को अपना असली Real App Link दें, एडिट करें या शेयर करें"
+                    >
+                      <span className="flex items-center gap-1.5 truncate">
+                        <Smartphone className="w-3.5 h-3.5 shrink-0" />
+                        <span>📱 Real App Link दें / एडिट करें</span>
+                      </span>
+                      <span className="text-[10px] font-mono-acc px-1.5 py-0.5 rounded bg-white border border-current/20 shrink-0">
+                        {m.realAppLinkApproved && m.realAppLink && m.realAppLink !== 'https://achieversclub.in/download/acc-official-v2.apk'
+                          ? '✓ कस्टम लिंक सेट'
+                          : '🔗 Default: Referral'}
+                      </span>
+                    </button>
 
                     {/* Approve / Reject Row if pending */}
                     {m.status !== 'verified' && (
@@ -2807,16 +3099,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
                           <Lock className="w-3.5 h-3.5" />
                         </button>
 
-                        {/* Share App Link Button if verified */}
-                        {m.status === 'verified' && (
-                          <button
-                            onClick={() => setLinkModalMember(m)}
-                            className="p-1.5 bg-blue-50 hover:bg-blue-100 text-[#2874f0] rounded border border-blue-200 transition cursor-pointer"
-                            title="Real App Link प्रेषित करें"
-                          >
-                            <Share2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                        {/* Edit & Share Real App Link Button (Always available for Admin) */}
+                        <button
+                          type="button"
+                          onClick={() => openAppLinkEditorModal(m)}
+                          className={`px-2 py-1 rounded border text-[10px] font-bold flex items-center gap-1 transition cursor-pointer whitespace-nowrap ${
+                            m.realAppLinkApproved && m.realAppLink && m.realAppLink !== 'https://achieversclub.in/download/acc-official-v2.apk'
+                              ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
+                              : 'bg-blue-50 hover:bg-blue-100 text-[#2874f0] border-blue-200'
+                          }`}
+                          title="Real App Link दें / एडिट करें व शेयर करें"
+                        >
+                          <Share2 className="w-3 h-3" />
+                          <span>App Link</span>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -4651,32 +4947,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
         <form onSubmit={handleSaveAppDownloadSettings} className="space-y-4">
           {/* Primary APK Download Link URL */}
           <div>
-            <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center justify-between">
-              <span>ऑफिशियल Real App डाउनलोड लिंक (Primary APK Download URL):</span>
-              <span className="text-[10px] text-[#2874f0] font-semibold">उपयोगकर्ता को यही लिंक मिलता है</span>
+            <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center justify-between flex-wrap gap-1">
+              <span>ऑफिशियल ग्लोबल Real App लिंक (Optional Global App URL):</span>
+              <span className="text-[10px] text-[#2874f0] font-semibold">खाली छोड़ने पर यूजर डैशबोर्ड में उसका अपना रेफरल लिंक दिखेगा</span>
             </label>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Download className="w-3.5 h-3.5 absolute left-3 top-3 text-[#2874f0]" />
                 <input
-                  type="url"
+                  type="text"
                   value={appDownloadUrlInput}
                   onChange={(e) => setAppDownloadUrlInput(e.target.value)}
-                  placeholder="https://achieversclub.in/download/acc-official-v2.apk"
+                  placeholder="https://play.google.com/store/apps/... या अपना Real App लिंक दर्ज करें (वैकल्पिक)"
                   className="w-full bg-white border border-gray-300 rounded-xl pl-8 pr-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0] font-mono-acc font-bold"
-                  required
                 />
               </div>
-              <a
-                href={appDownloadUrlInput}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-gray-300 flex items-center gap-1 cursor-pointer shrink-0"
-                title="लिंक टेस्ट करें"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                <span>टेस्ट करें</span>
-              </a>
+              {appDownloadUrlInput.trim() && (
+                <a
+                  href={appDownloadUrlInput.trim()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-gray-300 flex items-center gap-1 cursor-pointer shrink-0"
+                  title="लिंक टेस्ट करें"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>टेस्ट करें</span>
+                </a>
+              )}
             </div>
           </div>
 
@@ -6754,7 +7051,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
                   <a
                     href={`https://api.whatsapp.com/send?phone=91${screenshotModalMember.mobile}&text=${encodeURIComponent(
                       screenshotModalMember.status === 'verified'
-                        ? `नमस्ते ${screenshotModalMember.fullName} ji,\nबधाई हो! आपकी Achievers Club Community (ACC) 🆔: ${screenshotModalMember.accId} का ₹249 सत्यापन स्वीकृत हो चुका है।\nआपका Real App Download Link:\nhttps://achieversclub.in/download/acc-official-v2.apk\n\nशुभकामनाएं, Start Young Retire Young!`
+                        ? `नमस्ते ${screenshotModalMember.fullName} ji,\nबधाई हो! आपकी Achievers Club Community (ACC) 🆔: ${screenshotModalMember.accId} का ₹249 सत्यापन स्वीकृत हो चुका है।\n${
+                            getCleanRealAppLink(screenshotModalMember)
+                              ? `आपका Real App Link:\n${getCleanRealAppLink(screenshotModalMember)}`
+                              : `आपका व्यक्तिगत रेफरल लिंक:\n${getPersonalReferralUrl(screenshotModalMember.accId)}`
+                          }\n\nशुभकामनाएं, Start Young Retire Young!`
                         : screenshotModalMember.status === 'rejected'
                         ? `नमस्ते ${screenshotModalMember.fullName} ji,\nAchievers Club Community (ACC) में आपका ₹249 का आवेदन (ID: ${screenshotModalMember.accId}) सत्यापित नहीं हो सका।\nकारण: ${screenshotModalMember.rejectionReason || 'अमान्य UTR या रसीद'}\nकृपया सही पेमेंट रसीद भेजें।`
                         : `नमस्ते ${screenshotModalMember.fullName} ji,\nAchievers Club Community (ACC) में आपका ₹249 का रजिस्ट्रेशन प्राप्त हुआ है (ID: ${screenshotModalMember.accId}, UTR: ${screenshotModalMember.utrNumber})। एडमिन द्वारा सत्यापन प्रक्रियाधीन है।`
@@ -6766,6 +7067,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
                     <MessageCircle className="w-3.5 h-3.5" />
                     <span>WhatsApp पर छात्र को सूचित करें</span>
                   </a>
+
+                  <button
+                    type="button"
+                    onClick={() => openAppLinkEditorModal(screenshotModalMember)}
+                    className="w-full py-2 bg-blue-50 hover:bg-blue-100 text-[#2874f0] border border-blue-200 text-xs font-bold rounded-sm flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Smartphone className="w-3.5 h-3.5" />
+                    <span>📱 Real App Link एडिट व शेयर करें</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -6937,67 +7247,159 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
         document.body
       )}
 
-      {/* Real App Link Share Modal */}
+      {/* Real App Link Edit & Share Studio Modal */}
       {linkModalMember && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[99999] bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-gray-200 rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl animate-scaleUp">
+        <div className="fixed inset-0 z-[99999] bg-black/55 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-gray-200 rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto p-5 space-y-4 shadow-2xl animate-scaleUp">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2">
-                <Send className="w-5 h-5 text-[#2874f0]" />
-                <h3 className="text-sm font-bold text-slate-900">Real App Link शेयर करें</h3>
+                <div className="w-8 h-8 rounded-lg bg-[#2874f0] text-white flex items-center justify-center">
+                  <Smartphone className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">Real App Link एडिट व शेयर स्टूडियो</h3>
+                  <p className="text-[11px] text-slate-500">यहाँ से आप यूजर को अपना असली Real App Link दे व एडिट कर सकते हैं</p>
+                </div>
               </div>
               <button
+                type="button"
                 onClick={() => setLinkModalMember(null)}
-                className="text-slate-400 hover:text-slate-700"
+                className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <div className="bg-[#f1f2f4] p-3 rounded-lg border border-gray-200 text-xs space-y-1">
-              <p className="text-slate-500">अनुमोदित सदस्य:</p>
-              <p className="text-slate-900 font-bold text-sm">{linkModalMember.fullName}</p>
+            <div className="bg-[#f1f2f4] p-3 rounded-xl border border-gray-200 text-xs space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-slate-900 font-bold text-sm">{linkModalMember.fullName}</span>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    linkModalMember.realAppLinkApproved &&
+                    linkModalMember.realAppLink &&
+                    linkModalMember.realAppLink !== 'https://achieversclub.in/download/acc-official-v2.apk'
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                      : 'bg-blue-100 text-[#2874f0] border border-blue-200'
+                  }`}
+                >
+                  {linkModalMember.realAppLinkApproved &&
+                  linkModalMember.realAppLink &&
+                  linkModalMember.realAppLink !== 'https://achieversclub.in/download/acc-official-v2.apk'
+                    ? '✓ Admin Real App Link लाइव'
+                    : '🔗 Default: यूजर का अपना Referral Link'}
+                </span>
+              </div>
               <div className="flex items-center gap-2 text-slate-600">
                 <span className="font-mono-acc text-[#2874f0] font-bold">{linkModalMember.accId}</span>
                 <span>•</span>
                 <span>{linkModalMember.mobile}</span>
               </div>
+              <div className="text-[11px] text-slate-600 pt-1 border-t border-gray-200 break-all">
+                <span className="font-bold text-slate-700">यूजर का अपना डिफ़ॉल्ट रेफरल लिंक: </span>
+                <span className="font-mono-acc text-[#2874f0]">{getPersonalReferralUrl(linkModalMember.accId)}</span>
+              </div>
             </div>
 
             {linkShareSuccess && (
-              <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-sm flex items-center gap-2">
+              <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-lg flex items-center gap-2 font-semibold">
                 <Check className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>{linkShareSuccess}</span>
               </div>
             )}
 
-            <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1">
-                Real Application Download / APK URL:
-              </label>
-              <input
-                type="text"
-                value={customAppLink}
-                onChange={(e) => setCustomAppLink(e.target.value)}
-                placeholder="https://achieversclub.in/app.apk"
-                className="w-full bg-white border border-gray-300 rounded-sm px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0] focus:ring-1 focus:ring-[#2874f0] font-mono-acc"
-              />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <label className="block text-xs font-bold text-slate-800">
+                  Real Application Link (Play Store / Drive / Website / APK URL):
+                </label>
+                {siteConfig.appDownloadUrl &&
+                  siteConfig.appDownloadUrl !== 'https://achieversclub.in/download/acc-official-v2.apk' && (
+                    <button
+                      type="button"
+                      onClick={() => setCustomAppLink(siteConfig.appDownloadUrl || '')}
+                      className="text-[10px] font-bold text-[#2874f0] bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded border border-blue-200 cursor-pointer"
+                    >
+                      ग्लोबल लिंक भरें
+                    </button>
+                  )}
+              </div>
+
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  value={customAppLink}
+                  onChange={(e) => setCustomAppLink(e.target.value)}
+                  placeholder="अपना असली Real App Link यहाँ लिखें या पेस्ट करें (https://...)"
+                  className="flex-1 bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-[#2874f0] focus:ring-1 focus:ring-[#2874f0] font-mono-acc font-semibold"
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const text = await navigator.clipboard.readText();
+                      if (text) setCustomAppLink(text.trim());
+                    } catch {
+                      alert('कृपया बॉक्स में सीधे पेस्ट (Ctrl+V / Long Press Paste) करें।');
+                    }
+                  }}
+                  className="px-2.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg border border-gray-300 cursor-pointer shrink-0"
+                  title="क्लिपबोर्ड से पेस्ट करें"
+                >
+                  📋 पेस्ट
+                </button>
+                {customAppLink.trim() && (
+                  <a
+                    href={customAppLink.trim()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg border border-gray-300 flex items-center gap-1 shrink-0"
+                    title="लिंक टेस्ट करें"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-500">
+                यदि आप कोई लिंक नहीं देते या क्लियर कर देते हैं, तो यूजर के डैशबोर्ड में डिफ़ॉल्ट रूप से उसका अपना रेफरल लिंक दिखेगा (कोई रैंडम लिंक नहीं)।
+              </p>
             </div>
 
+            {/* Save & In-App Push Actions */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => handleSaveAndSendMemberAppLink(linkModalMember, customAppLink, false)}
+                className="py-2.5 px-3 bg-gradient-to-b from-[#fb641b] via-[#ea580c] to-[#c2410c] hover:from-[#ff752b] hover:to-[#b03608] text-white text-xs font-black rounded-xl shadow-[0_3px_0_#7c2d12] active:translate-y-0.5 active:shadow-none transition flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>💾 सेव व यूजर डैशबोर्ड पर लाइव करें</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSaveAndSendMemberAppLink(linkModalMember, customAppLink, true)}
+                className="py-2.5 px-3 bg-gradient-to-b from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-800 text-white text-xs font-black rounded-xl shadow-[0_3px_0_#065f46] active:translate-y-0.5 active:shadow-none transition flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>💬 सेव + यूजर चैट इनबॉक्स में भेजें</span>
+              </button>
+            </div>
+
+            {/* Direct External Share Buttons */}
             <div className="text-[11px] text-slate-600 bg-slate-50 p-3.5 rounded-xl border border-gray-200 space-y-2">
-              <p className="font-bold text-slate-800">प्रत्यक्ष शेयर विकल्प (Direct Delivery Options):</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {/* Telegram Delivery */}
+              <p className="font-bold text-slate-800">बाहरी माध्यम से सीधे लिंक शेयर करें (External Share):</p>
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => {
+                    const linkToShare = customAppLink.trim() || getPersonalReferralUrl(linkModalMember.accId);
                     const text = encodeURIComponent(
                       `नमस्ते ${linkModalMember.fullName} जी,\n` +
-                      `Achievers Club Community (ACC) में आपका 🆔 ${linkModalMember.accId} verify ho chuka hai!\n\n` +
-                      `📱 आपकी ऑफिशियल Real App डाउनलोड लिंक:\n${customAppLink}\n\n` +
-                      `Start Young, Retire Young!`
+                        `Achievers Club Community (ACC) में आपकी ID ${linkModalMember.accId} सक्रिय है!\n\n` +
+                        `📱 आपका ऑफिशियल ऐप / रेफरल लिंक:\n${linkToShare}\n\n` +
+                        `Start Young, Retire Young!`
                     );
-                    window.open(`https://t.me/share/url?url=${encodeURIComponent(customAppLink)}&text=${text}`, '_blank');
+                    window.open(`https://t.me/share/url?url=${encodeURIComponent(linkToShare)}&text=${text}`, '_blank');
                   }}
                   className="p-2.5 bg-gradient-to-b from-[#229ed9] to-[#0088cc] hover:from-[#2eb0ee] hover:to-[#0077b3] text-white font-black text-xs rounded-xl shadow-[0_2px_0_#005580] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer"
                 >
@@ -7005,16 +7407,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
                   <span>Telegram पर भेजें</span>
                 </button>
 
-                {/* Email Delivery */}
                 <button
                   type="button"
                   onClick={() => {
-                    const subject = encodeURIComponent(`Achievers Club Community - Official Real App Download Link (${linkModalMember.accId})`);
+                    const linkToShare = customAppLink.trim() || getPersonalReferralUrl(linkModalMember.accId);
+                    const subject = encodeURIComponent(`Achievers Club Community - Official Real App Link (${linkModalMember.accId})`);
                     const body = encodeURIComponent(
-                      `Hello ${linkModalMember.fullName},\n\n` +
-                      `Congratulations! Your ACC Account ${linkModalMember.accId} has been successfully verified.\n\n` +
-                      `Here is your official Real App Download Link:\n${customAppLink}\n\n` +
-                      `Best Regards,\nAchievers Club Community Team`
+                      `Namaste ${linkModalMember.fullName},\n\n` +
+                        `Your ACC Account ${linkModalMember.accId} link details:\n${linkToShare}\n\n` +
+                        `Best Regards,\nAchievers Club Community Team`
                     );
                     window.open(`mailto:${linkModalMember.email}?subject=${subject}&body=${body}`, '_blank');
                   }}
@@ -7024,41 +7425,35 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
                   <span>Email पर प्रेषित करें</span>
                 </button>
 
-                {/* WhatsApp Delivery (if active) */}
-                {siteConfig.showWhatsAppSupport === true && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const msg = encodeURIComponent(
-                        `Namaste ${linkModalMember.fullName} ji,\n` +
-                        `Aapka Achievers Club Community (ACC) ID: ${linkModalMember.accId} verify ho chuka hai!\n` +
-                        `Aapka official Real Application Download Link ye hai:\n` +
-                        `${customAppLink}\n\n` +
-                        `Shubhkaamnaayein, Start Young Retire Young!`
-                      );
-                      window.open(`https://api.whatsapp.com/send?phone=91${linkModalMember.whatsapp || linkModalMember.mobile}&text=${msg}`, '_blank');
-                    }}
-                    className="p-2.5 bg-gradient-to-b from-[#25D366] to-[#128C7E] hover:from-[#2be66f] hover:to-[#0f7267] text-white font-black text-xs rounded-xl shadow-[0_2px_0_#075E54] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer"
-                  >
-                    <MessageCircle className="w-3.5 h-3.5" />
-                    <span>WhatsApp पर भेजें</span>
-                  </button>
-                )}
-
-                {/* Copy Complete Welcome & Link Message */}
                 <button
                   type="button"
                   onClick={() => {
-                    const fullMsg = 
-                      `🎉 बधाई हो! Achievers Club Community (ACC) में आपका स्वागत है।\n\n` +
-                      `👤 सदस्य का नाम: ${linkModalMember.fullName}\n` +
-                      `🆔 Member ID: ${linkModalMember.accId}\n` +
+                    const linkToShare = customAppLink.trim() || getPersonalReferralUrl(linkModalMember.accId);
+                    const msg = encodeURIComponent(
+                      `Namaste ${linkModalMember.fullName} ji,\n` +
+                        `Aapka Achievers Club Community (ACC) ID: ${linkModalMember.accId}\n` +
+                        `Aapka official link:\n${linkToShare}\n\n` +
+                        `Shubhkaamnaayein, Start Young Retire Young!`
+                    );
+                    window.open(`https://api.whatsapp.com/send?phone=91${linkModalMember.whatsapp || linkModalMember.mobile}&text=${msg}`, '_blank');
+                  }}
+                  className="p-2.5 bg-gradient-to-b from-[#25D366] to-[#128C7E] hover:from-[#2be66f] hover:to-[#0f7267] text-white font-black text-xs rounded-xl shadow-[0_2px_0_#075E54] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>WhatsApp पर भेजें</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const linkToShare = customAppLink.trim() || getPersonalReferralUrl(linkModalMember.accId);
+                    const fullMsg =
+                      `🎉 Achievers Club Community (ACC)\n\n` +
+                      `👤 सदस्य: ${linkModalMember.fullName} (${linkModalMember.accId})\n` +
                       `📱 मोबाइल: ${linkModalMember.mobile}\n` +
-                      `💼 प्लान: ${linkModalMember.plan} System (सत्यापित)\n\n` +
-                      `📲 ऑफिशियल Real App APK डाउनलोड लिंक:\n${customAppLink}\n\n` +
-                      `Start Young, Retire Young!`;
+                      `📲 आपका लिंक:\n${linkToShare}`;
                     navigator.clipboard.writeText(fullMsg);
-                    alert('✅ क्रेडेंशियल्स व Real App लिंक संदेश क्लिपबोर्ड में कॉपी हो गया!');
+                    alert('✅ क्रेडेंशियल्स व लिंक संदेश क्लिपबोर्ड में कॉपी हो गया!');
                   }}
                   className="p-2.5 bg-gradient-to-b from-slate-800 to-slate-900 hover:from-slate-700 hover:to-black text-white font-black text-xs rounded-xl shadow-[0_2px_0_#0f172a] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer"
                 >
@@ -7068,21 +7463,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
               </div>
             </div>
 
-            <div className="flex gap-2 pt-2 border-t border-gray-100">
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100">
+              {linkModalMember.realAppLinkApproved ? (
+                <button
+                  type="button"
+                  onClick={() => handleRevokeMemberAppLink(linkModalMember.accId)}
+                  className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl border border-rose-200 transition cursor-pointer"
+                >
+                  🔗 क्लियर / Referral पर वापस करें
+                </button>
+              ) : (
+                <span className="text-[11px] text-slate-500">डिफ़ॉल्ट: यूजर का अपना रेफरल लिंक</span>
+              )}
+
               <button
                 type="button"
                 onClick={() => setLinkModalMember(null)}
-                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-gray-200 transition"
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-gray-200 transition cursor-pointer"
               >
-                रद्द करें
-              </button>
-              <button
-                type="button"
-                onClick={() => handleApproveAndSendAppLink(linkModalMember)}
-                className="flex-1 py-2.5 bg-gradient-to-b from-[#fb641b] via-[#ea580c] to-[#c2410c] hover:from-[#ff752b] hover:to-[#b03608] text-white text-xs font-black rounded-xl shadow-[0_3px_0_#7c2d12] active:translate-y-0.5 active:shadow-none transition flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>पोर्टल में लिंक स्वीकृत करें</span>
+                बंद करें
               </button>
             </div>
           </div>
@@ -7357,10 +7756,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
               <div className="flex gap-2">
                 <button
                   onClick={() => {
-                    setLinkModalMember(selectedMember);
+                    const target = selectedMember;
                     setSelectedMember(null);
+                    openAppLinkEditorModal(target);
                   }}
-                  className="px-4 py-2 bg-[#fb641b] hover:bg-[#e85a14] text-white text-xs font-bold rounded-sm flex items-center gap-1.5 shadow-sm"
+                  className="px-4 py-2 bg-[#fb641b] hover:bg-[#e85a14] text-white text-xs font-bold rounded-sm flex items-center gap-1.5 shadow-sm cursor-pointer"
                 >
                   <Share2 className="w-3.5 h-3.5" />
                   <span>Real App Link</span>
@@ -9297,183 +9697,206 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
                     </div>
                   </div>
 
-                  {/* REAL APP LINK DELIVERY & STATUS HUB FOR THIS MEMBER */}
-                  <div className="bg-gradient-to-r from-blue-50 via-sky-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-4 sm:p-5 shadow-xs space-y-3">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-blue-200 pb-2.5">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-[#2874f0] text-white flex items-center justify-center font-bold shadow-xs shrink-0">
-                          <Smartphone className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <h4 className="text-xs sm:text-sm font-black text-slate-900 flex items-center gap-2 flex-wrap">
-                            <span>📱 {activeM.fullName} का Real App APK लिंक व डिलीवरी हब</span>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                              activeM.realAppLinkApproved
-                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                : 'bg-amber-100 text-amber-800 border border-amber-300'
-                            }`}>
-                              {activeM.realAppLinkApproved ? '✓ लिंक सक्रिय व स्वीकृत' : '○ अप्रूव नहीं है'}
-                            </span>
-                          </h4>
-                          <p className="text-[11px] text-slate-600">
-                            इस सदस्य को आधिकारिक Real App लिंक प्रदान करें, व्यक्तिगत डिलीवरी करें या लिंक की स्थिति बदलें
-                          </p>
-                        </div>
-                      </div>
+                  {/* REAL APP LINK EDITOR, DELIVERY & REFERRAL DEFAULT HUB FOR THIS MEMBER */}
+                  {(() => {
+                    const savedCleanLink =
+                      activeM.realAppLink && activeM.realAppLink !== 'https://achieversclub.in/download/acc-official-v2.apk'
+                        ? activeM.realAppLink
+                        : '';
+                    const draftLink =
+                      perMemberAppLinkDrafts[activeM.accId] !== undefined
+                        ? perMemberAppLinkDrafts[activeM.accId]
+                        : savedCleanLink;
+                    const personalRefUrl = getPersonalReferralUrl(activeM.accId);
+                    const effectiveShareUrl = draftLink.trim() || savedCleanLink || personalRefUrl;
 
-                      {/* Status Badges & Quick Action */}
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {activeM.realAppLinkApproved ? (
-                          <button
-                            type="button"
-                            onClick={() => handleRevokeMemberAppLink(activeM.accId)}
-                            className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition cursor-pointer"
-                            title="ऐप लिंक रिवोक करें"
-                          >
-                            ❌ लिंक रिवोक करें
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleGrantMemberAppLink(activeM.accId, siteConfig.appDownloadUrl)}
-                            className="px-3.5 py-1.5 bg-gradient-to-b from-emerald-600 via-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-800 text-white rounded-lg text-xs font-black shadow-[0_2px_0_#065f46] active:translate-y-0.5 active:shadow-none transition cursor-pointer flex items-center gap-1.5"
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>✓ ऐप लिंक स्वीकृत करें</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                    return (
+                      <div className="bg-gradient-to-r from-blue-50 via-sky-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-4 sm:p-5 shadow-xs space-y-3">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-blue-200 pb-2.5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-lg bg-[#2874f0] text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+                              <Smartphone className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <h4 className="text-xs sm:text-sm font-black text-slate-900 flex items-center gap-2 flex-wrap">
+                                <span>📱 {activeM.fullName} का Real App Link एडिट व शेयर हब</span>
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                    activeM.realAppLinkApproved && savedCleanLink
+                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                      : 'bg-blue-100 text-[#2874f0] border border-blue-200'
+                                  }`}
+                                >
+                                  {activeM.realAppLinkApproved && savedCleanLink
+                                    ? '✓ कस्टम Real App Link सक्रिय'
+                                    : '🔗 Default: यूजर का अपना Referral Link'}
+                                </span>
+                              </h4>
+                              <p className="text-[11px] text-slate-600">
+                                यहाँ से आप इस सदस्य के लिए असली Real App Link लिखकर सीधे डैशबोर्ड व चैट इनबॉक्स में भेज सकते हैं
+                              </p>
+                            </div>
+                          </div>
 
-                    {/* Assigned App Link Display */}
-                    <div className="bg-white p-3 rounded-lg border border-blue-200 space-y-2">
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                        <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
-                          <Download className="w-3.5 h-3.5 text-[#2874f0]" />
-                          <span>सदस्य का अधिकृत Real App APK लिंक:</span>
-                        </span>
-                        <div className="flex items-center gap-2">
+                          {activeM.realAppLinkApproved && savedCleanLink && (
+                            <button
+                              type="button"
+                              onClick={() => handleRevokeMemberAppLink(activeM.accId)}
+                              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition cursor-pointer shrink-0"
+                              title="कस्टम लिंक हटाकर डिफ़ॉल्ट रेफरल लिंक पर वापस करें"
+                            >
+                              ❌ हटाएं (Referral पर वापस)
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Inline Editable Real App Link Box */}
+                        <div className="bg-white p-3.5 rounded-xl border border-blue-200 space-y-2.5">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                              <Download className="w-3.5 h-3.5 text-[#2874f0]" />
+                              <span>Real App Link एडिट करें (Custom URL):</span>
+                            </label>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(effectiveShareUrl);
+                                  alert('लिंक क्लिपबोर्ड में कॉपी हो गया!');
+                                }}
+                                className="text-[#2874f0] hover:underline text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                              >
+                                <Copy className="w-3 h-3" />
+                                <span>कॉपी लिंक</span>
+                              </button>
+                              <a
+                                href={effectiveShareUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-slate-600 hover:text-slate-900 text-[11px] font-bold flex items-center gap-1"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                <span>टेस्ट/ओपन</span>
+                              </a>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <input
+                              type="text"
+                              value={draftLink}
+                              onChange={(e) =>
+                                setPerMemberAppLinkDrafts((prev) => ({
+                                  ...prev,
+                                  [activeM.accId]: e.target.value,
+                                }))
+                              }
+                              placeholder="अपना असली Real App Link यहाँ लिखें या पेस्ट करें (https://...)"
+                              className="flex-1 bg-slate-50 border border-gray-300 rounded-lg px-3 py-2 text-xs text-slate-900 font-mono-acc font-semibold focus:outline-none focus:border-[#2874f0] focus:bg-white"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleSaveAndSendMemberAppLink(activeM, draftLink, false)}
+                              className="px-3.5 py-2 bg-gradient-to-b from-[#fb641b] to-[#c2410c] hover:from-[#ff752b] hover:to-[#b03608] text-white rounded-lg text-xs font-black shadow-xs transition cursor-pointer whitespace-nowrap flex items-center justify-center gap-1"
+                            >
+                              <Save className="w-3.5 h-3.5" />
+                              <span>सेव व डैशबोर्ड पर लाइव करें</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSaveAndSendMemberAppLink(activeM, draftLink, true)}
+                              className="px-3.5 py-2 bg-gradient-to-b from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-800 text-white rounded-lg text-xs font-black shadow-xs transition cursor-pointer whitespace-nowrap flex items-center justify-center gap-1"
+                            >
+                              <Send className="w-3.5 h-3.5" />
+                              <span>चैट इनबॉक्स में भेजें</span>
+                            </button>
+                          </div>
+
+                          {!savedCleanLink && (
+                            <div className="p-2 bg-blue-50/70 rounded border border-blue-200 text-[11px] text-slate-700">
+                              <strong className="text-[#2874f0]">डिफ़ॉल्ट स्थिति:</strong> अभी कोई कस्टम Real App Link सेट नहीं है, इसलिए यूजर के डैशबोर्ड में उसका अपना व्यक्तिगत रेफरल लिंक (<span className="font-mono-acc font-bold text-[#2874f0]">{personalRefUrl}</span>) दिखाई दे रहा है।
+                            </div>
+                          )}
+                        </div>
+
+                        {/* External Delivery Options Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 pt-1 text-xs">
                           <button
                             type="button"
                             onClick={() => {
-                              const link = activeM.realAppLink || siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk';
-                              navigator.clipboard.writeText(link);
-                              alert('Real App Link क्लिपबोर्ड में कॉपी हो गया!');
+                              const text = encodeURIComponent(
+                                `नमस्ते ${activeM.fullName} जी,\n` +
+                                  `Achievers Club Community (ACC) में आपकी 🆔 ${activeM.accId} सक्रिय है!\n\n` +
+                                  `📱 आपका ऑफिशियल लिंक:\n${effectiveShareUrl}\n\n` +
+                                  `Start Young, Retire Young!`
+                              );
+                              window.open(`https://t.me/share/url?url=${encodeURIComponent(effectiveShareUrl)}&text=${text}`, '_blank');
                             }}
-                            className="text-[#2874f0] hover:underline text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                            className="p-2.5 bg-gradient-to-b from-[#229ed9] to-[#0088cc] hover:from-[#2eb0ee] hover:to-[#0077b3] text-white font-bold rounded-xl shadow-[0_2px_0_#005580] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap"
                           >
-                            <Copy className="w-3 h-3" />
-                            <span>कॉपी लिंक</span>
+                            <Send className="w-3.5 h-3.5" />
+                            <span>Telegram पर भेजें</span>
                           </button>
-                          <a
-                            href={activeM.realAppLink || siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk'}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-slate-600 hover:text-slate-900 text-[11px] font-bold flex items-center gap-1"
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const subject = encodeURIComponent(`Achievers Club Community - Official Link (${activeM.accId})`);
+                              const body = encodeURIComponent(
+                                `नमस्ते ${activeM.fullName},\n\n` +
+                                  `🆔 आपकी Member ID: ${activeM.accId}\n` +
+                                  `📱 आपका ऑफिशियल लिंक:\n${effectiveShareUrl}\n\n` +
+                                  `किसी भी सहायता के लिए: ${siteConfig.officialEmail || 'newuserhelpline@gmail.com'}\n\n` +
+                                  `शुभकामनाएँ,\nAchievers Club Community टीम`
+                              );
+                              window.open(`mailto:${activeM.email}?subject=${subject}&body=${body}`, '_blank');
+                            }}
+                            className="p-2.5 bg-gradient-to-b from-[#2874f0] to-[#1258c7] hover:from-[#367ff5] hover:to-[#0f4eb8] text-white font-bold rounded-xl shadow-[0_2px_0_#0a3782] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap"
                           >
-                            <ExternalLink className="w-3 h-3" />
-                            <span>ओपन</span>
-                          </a>
+                            <Mail className="w-3.5 h-3.5" />
+                            <span>ईमेल पर भेजें</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const msg = encodeURIComponent(
+                                `नमस्ते ${activeM.fullName} जी,\n` +
+                                  `Aapka Achievers Club Community (ACC) ID: ${activeM.accId}\n` +
+                                  `Aapka official link:\n${effectiveShareUrl}\n\n` +
+                                  `Shubhkaamnaayein, Start Young Retire Young!`
+                              );
+                              window.open(`https://api.whatsapp.com/send?phone=91${activeM.whatsapp || activeM.mobile}&text=${msg}`, '_blank');
+                            }}
+                            className="p-2.5 bg-gradient-to-b from-[#25D366] to-[#128C7E] hover:from-[#2be66f] hover:to-[#0f7267] text-white font-bold rounded-xl shadow-[0_2px_0_#075E54] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                            <span>WhatsApp पर भेजें</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const fullMsg =
+                                `🎉 Achievers Club Community (ACC)\n\n` +
+                                `👤 सदस्य: ${activeM.fullName}\n` +
+                                `🆔 Member ID: ${activeM.accId}\n` +
+                                `📱 मोबाइल: ${activeM.mobile}\n` +
+                                `💼 प्लान: ${activeM.plan} System\n\n` +
+                                `📲 ऑफिशियल लिंक:\n${effectiveShareUrl}\n\n` +
+                                `Start Young, Retire Young!`;
+                              navigator.clipboard.writeText(fullMsg);
+                              alert('✅ पूर्ण वेलकम व लिंक संदेश क्लिपबोर्ड में कॉपी हो गया!');
+                            }}
+                            className="p-2.5 bg-gradient-to-b from-slate-800 to-slate-900 hover:from-slate-700 hover:to-black text-white font-bold rounded-xl shadow-[0_2px_0_#0f172a] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>क्रेडेंशियल्स + लिंक कॉपी</span>
+                          </button>
                         </div>
                       </div>
-                      <div className="p-2 bg-slate-50 rounded border border-gray-200 font-mono-acc text-xs text-[#2874f0] break-all font-semibold select-all">
-                        {activeM.realAppLink || siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk'}
-                      </div>
-                    </div>
-
-                    {/* Delivery Options Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 pt-1 text-xs">
-                      {/* Telegram Share */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const link = activeM.realAppLink || siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk';
-                          const text = encodeURIComponent(
-                            `नमस्ते ${activeM.fullName} जी,\n` +
-                            `Achievers Club Community (ACC) में आपका 🆔 ${activeM.accId} वेरीफाई हो गया है!\n\n` +
-                            `📱 आपकी ऑफिशियल Real App डाउनलोड लिंक:\n${link}\n\n` +
-                            `Start Young, Retire Young!`
-                          );
-                          window.open(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${text}`, '_blank');
-                        }}
-                        className="p-2.5 bg-gradient-to-b from-[#229ed9] to-[#0088cc] hover:from-[#2eb0ee] hover:to-[#0077b3] text-white font-bold rounded-xl shadow-[0_2px_0_#005580] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap"
-                      >
-                        <Send className="w-3.5 h-3.5" />
-                        <span>Telegram पर लिंक भेजें</span>
-                      </button>
-
-                      {/* Email Send */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const link = activeM.realAppLink || siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk';
-                          const subject = encodeURIComponent(`Achievers Club Community - Official Real App Download Link (${activeM.accId})`);
-                          const body = encodeURIComponent(
-                            `नमस्ते ${activeM.fullName},\n\n` +
-                            `बधाई हो! आपका Achievers Club Community (ACC) खाता सत्यापित हो गया है।\n\n` +
-                            `🆔 आपकी Member ID: ${activeM.accId}\n` +
-                            `🔑 पासवर्ड: ${activeM.password || 'आपकी गुप्त कुंजी'}\n` +
-                            `💼 प्लान: ${activeM.plan} System\n` +
-                            `📱 ऑफिशियल Real App APK डाउनलोड लिंक:\n${link}\n\n` +
-                            `किसी भी सहायता के लिए: ${siteConfig.officialEmail || 'newuserhelpline@gmail.com'}\n\n` +
-                            `शुभकामनाएँ,\nAchievers Club Community टीम`
-                          );
-                          window.open(`mailto:${activeM.email}?subject=${subject}&body=${body}`, '_blank');
-                        }}
-                        className="p-2.5 bg-gradient-to-b from-[#2874f0] to-[#1258c7] hover:from-[#367ff5] hover:to-[#0f4eb8] text-white font-bold rounded-xl shadow-[0_2px_0_#0a3782] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap"
-                      >
-                        <Mail className="w-3.5 h-3.5" />
-                        <span>ईमेल पर लिंक भेजें</span>
-                      </button>
-
-                      {/* WhatsApp (if active) */}
-                      {siteConfig.showWhatsAppSupport === true && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const link = activeM.realAppLink || siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk';
-                            const msg = encodeURIComponent(
-                              `नमस्ते ${activeM.fullName} जी,\n` +
-                              `Aapka Achievers Club Community (ACC) ID: ${activeM.accId} verify ho chuka hai!\n` +
-                              `Aapka official Real Application Download Link ye hai:\n` +
-                              `${link}\n\n` +
-                              `Shubhkaamnaayein, Start Young Retire Young!`
-                            );
-                            window.open(`https://api.whatsapp.com/send?phone=91${activeM.whatsapp || activeM.mobile}&text=${msg}`, '_blank');
-                          }}
-                          className="p-2.5 bg-gradient-to-b from-[#25D366] to-[#128C7E] hover:from-[#2be66f] hover:to-[#0f7267] text-white font-bold rounded-xl shadow-[0_2px_0_#075E54] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap"
-                        >
-                          <MessageCircle className="w-3.5 h-3.5" />
-                          <span>WhatsApp पर भेजें</span>
-                        </button>
-                      )}
-
-                      {/* Copy Complete Welcome & App Delivery Text */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const link = activeM.realAppLink || siteConfig.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk';
-                          const fullMsg = 
-                            `🎉 बधाई हो! Achievers Club Community (ACC) में आपका स्वागत है।\n\n` +
-                            `👤 सदस्य का नाम: ${activeM.fullName}\n` +
-                            `🆔 Member ID: ${activeM.accId}\n` +
-                            `📱 मोबाइल: ${activeM.mobile}\n` +
-                            `💼 प्लान: ${activeM.plan} System (सत्यापित)\n` +
-                            `🤝 स्पॉन्सर: ${activeM.sponsorName || 'कंपनी डायरेक्ट'} (${activeM.sponsorId || 'DIRECT'})\n\n` +
-                            `📲 ऑफिशियल Real App APK डाउनलोड लिंक:\n${link}\n\n` +
-                            `📧 सहायता केंद्र: ${siteConfig.officialEmail || 'newuserhelpline@gmail.com'}\n` +
-                            `✈️ टेलीग्राम हेल्प: ${siteConfig.telegramLink || 'https://t.me/NEWUSERHELPLINE'}\n\n` +
-                            `Start Young, Retire Young!`;
-                          navigator.clipboard.writeText(fullMsg);
-                          alert('✅ पूर्ण वेलकम व Real App डिलीवरी संदेश क्लिपबोर्ड में कॉपी हो गया!');
-                        }}
-                        className="p-2.5 bg-gradient-to-b from-slate-800 to-slate-900 hover:from-slate-700 hover:to-black text-white font-bold rounded-xl shadow-[0_2px_0_#0f172a] active:translate-y-0.5 active:shadow-none flex items-center justify-center gap-1.5 transition cursor-pointer whitespace-nowrap"
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                        <span>क्रेडेंशियल्स + लिंक कॉपी</span>
-                      </button>
-                    </div>
-                  </div>
+                    );
+                  })()}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Personal Information */}

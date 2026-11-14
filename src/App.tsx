@@ -143,6 +143,8 @@ export default function App() {
           prev.totalEarnings === nextUser.totalEarnings &&
           prev.avatarFrame === nextUser.avatarFrame &&
           prev.avatarUrl === nextUser.avatarUrl &&
+          prev.realAppLink === nextUser.realAppLink &&
+          prev.realAppLinkApproved === nextUser.realAppLinkApproved &&
           prev.activeSessionId === nextUser.activeSessionId &&
           prev.lastEditedAt === nextUser.lastEditedAt &&
           prev.isActive === nextUser.isActive
@@ -174,6 +176,7 @@ export default function App() {
       if (cloudMembers && cloudMembers.length > 0) {
         StorageService.mergeMembersWithCloud(cloudMembers, true);
       }
+      StorageService.syncUnsyncedLocalMembersToCloud(cloudMembers).catch(() => {});
       const current = StorageService.getCurrentUser();
       if (current) {
         const found = cloudMembers.find((m) => m.accId.toUpperCase() === current.accId.toUpperCase());

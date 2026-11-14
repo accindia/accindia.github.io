@@ -97,6 +97,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       member.activeSessionId = sessionId;
 
       StorageService.setCurrentUser(member);
+      StorageService.syncUnsyncedLocalMembersToCloud().catch(() => {});
       onLoginSuccess(member);
     } catch (err) {
       console.error('Login error:', err);

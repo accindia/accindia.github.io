@@ -4,6 +4,7 @@ import {
   setDoc,
   getDoc,
   getDocs,
+  getDocsFromServer,
   updateDoc,
   query,
   where,
@@ -415,28 +416,156 @@ export function sanitizeMember(data: any, fallbackId?: string): Member {
   };
 }
 
-async function prepareCleanMember(member: Member): Promise<Member> {
+function normalizeValidPlan(raw?: string): 'SWIS' | 'TWIS' | 'COMBO' {
+  if (raw === 'TWIS' || raw === 'SWIS' || raw === 'COMBO') return raw;
+  return 'COMBO';
+}
+
+function normalizeValidStatus(raw?: string): 'verified' | 'pending' | 'rejected' {
+  if (raw === 'verified' || raw === 'pending' || raw === 'rejected') return raw;
+  return 'pending';
+}
+
+function clampNonNegNumber(val: unknown, maxVal = 10000000): number {
+  const num = Number(val);
+  if (!Number.isFinite(num) || num < 0) return 0;
+  return Math.min(num, maxVal);
+}
+
+async function compressOrCapMediaField(rawVal: string | undefined, maxDim: number, quality: number, maxChars: number): Promise<string> {
+  if (!rawVal || typeof rawVal !== 'string') return '';
+  const trimmed = rawVal.trim();
+  if (!trimmed) return '';
+
+  // Try image compression whenever it looks like a data URI (even non-standard Android MIME like data:application/octet-stream)
+  if (trimmed.startsWith('data:')) {
+    let result = trimmed;
+    if (trimmed.startsWith('data:image') || trimmed.length > 100000) {
+      try {
+        result = await ensureSafeFirestoreSize(trimmed, maxDim, quality);
+      } catch {
+        // fallback below
+      }
+    }
+    if (result && result.length <= maxChars) return result;
+    // Second pass aggressive compression
+    if (trimmed.startsWith('data:image')) {
+      try {
+        const harder = await ensureSafeFirestoreSize(trimmed, Math.min(maxDim, 420), 0.4);
+        if (harder && harder.length <= maxChars) return harder;
+      } catch {
+        // ignore
+      }
+    }
+    return result && result.length <= maxChars ? result : '';
+  }
+
+  return trimmed.length <= maxChars ? trimmed : '';
+}
+
+async function prepareCleanMember(member: Member, stripHeavyMedia: boolean = false): Promise<Member> {
   const cleanMember: Member = JSON.parse(JSON.stringify(member));
 
-  if (cleanMember.paymentScreenshotUrl && cleanMember.paymentScreenshotUrl.startsWith('data:image')) {
-    try {
-      cleanMember.paymentScreenshotUrl = await ensureSafeFirestoreSize(cleanMember.paymentScreenshotUrl, 600, 0.65);
-    } catch {
-      // ignore
+  cleanMember.accId = sanitizeDocId(cleanMember.accId || cleanMember.id || 'ACC249MEMBER').slice(0, 64);
+  if (cleanMember.accId.length < 3) {
+    cleanMember.accId = `ACC_${cleanMember.accId}`.slice(0, 64);
+  }
+  cleanMember.id = String(cleanMember.id || cleanMember.accId).trim().slice(0, 128) || cleanMember.accId;
+  cleanMember.fullName = String(cleanMember.fullName || 'Member').trim().slice(0, 120) || 'Member';
+  cleanMember.mobile = String(cleanMember.mobile || '').trim().slice(0, 24);
+  cleanMember.whatsapp = String(cleanMember.whatsapp || cleanMember.mobile || '').trim().slice(0, 24);
+  cleanMember.plan = normalizeValidPlan(cleanMember.plan);
+  cleanMember.status = normalizeValidStatus(cleanMember.status);
+  cleanMember.createdAt = String(cleanMember.createdAt || new Date().toISOString()).slice(0, 64);
+
+  if (cleanMember.email !== undefined) {
+    cleanMember.email = String(cleanMember.email || '').trim().slice(0, 200);
+  }
+  if (cleanMember.sponsorId !== undefined) {
+    cleanMember.sponsorId = String(cleanMember.sponsorId || '').trim().slice(0, 64);
+  }
+  if (cleanMember.sponsorName !== undefined) {
+    cleanMember.sponsorName = String(cleanMember.sponsorName || '').trim().slice(0, 120);
+  }
+  if (cleanMember.utrNumber !== undefined) {
+    cleanMember.utrNumber = String(cleanMember.utrNumber || '').trim().slice(0, 64);
+  }
+  if (cleanMember.realAppLink !== undefined && cleanMember.realAppLink !== null) {
+    cleanMember.realAppLink = String(cleanMember.realAppLink).trim().slice(0, 2000);
+  }
+  if (cleanMember.realAppLinkApproved !== undefined && cleanMember.realAppLinkApproved !== null) {
+    cleanMember.realAppLinkApproved = Boolean(cleanMember.realAppLinkApproved);
+  }
+
+  cleanMember.isActive = cleanMember.isActive !== undefined && cleanMember.isActive !== null ? Boolean(cleanMember.isActive) : true;
+  cleanMember.walletBalance = clampNonNegNumber(cleanMember.walletBalance);
+  cleanMember.totalEarnings = clampNonNegNumber(cleanMember.totalEarnings);
+  cleanMember.swisEarnings = clampNonNegNumber(cleanMember.swisEarnings);
+  cleanMember.twisEarnings = clampNonNegNumber(cleanMember.twisEarnings);
+  cleanMember.rechargesCount = clampNonNegNumber(cleanMember.rechargesCount, 1000000);
+  cleanMember.referralsCount = clampNonNegNumber(cleanMember.referralsCount, 1000000);
+  if (cleanMember.activationCharge !== undefined) {
+    cleanMember.activationCharge = clampNonNegNumber(cleanMember.activationCharge || 249, 100000);
+  }
+
+  // Prevent doubling payload size by removing duplicate base64 inside originalFormData
+  if (cleanMember.originalFormData) {
+    if (
+      typeof cleanMember.originalFormData.paymentScreenshotUrl === 'string' &&
+      cleanMember.originalFormData.paymentScreenshotUrl.length > 200
+    ) {
+      cleanMember.originalFormData.paymentScreenshotUrl = '';
+    }
+    if (stripHeavyMedia) {
+      delete cleanMember.originalFormData;
     }
   }
-  if (cleanMember.avatarUrl && cleanMember.avatarUrl.startsWith('data:image')) {
-    try {
-      cleanMember.avatarUrl = await ensureSafeFirestoreSize(cleanMember.avatarUrl, 300, 0.7);
-    } catch {
-      // ignore
+
+  if (stripHeavyMedia) {
+    if (cleanMember.paymentScreenshotUrl && cleanMember.paymentScreenshotUrl.length > 400) {
+      cleanMember.paymentScreenshotUrl = '';
     }
-  }
-  if (cleanMember.personalQrUrl && cleanMember.personalQrUrl.startsWith('data:image')) {
-    try {
-      cleanMember.personalQrUrl = await ensureSafeFirestoreSize(cleanMember.personalQrUrl, 300, 0.7);
-    } catch {
-      // ignore
+    if (cleanMember.avatarUrl && cleanMember.avatarUrl.length > 400) {
+      cleanMember.avatarUrl = '';
+    }
+    if (cleanMember.personalQrUrl && cleanMember.personalQrUrl.length > 400) {
+      cleanMember.personalQrUrl = '';
+    }
+  } else {
+    if (cleanMember.paymentScreenshotUrl) {
+      cleanMember.paymentScreenshotUrl = await compressOrCapMediaField(
+        cleanMember.paymentScreenshotUrl,
+        600,
+        0.58,
+        550000
+      );
+    }
+    if (cleanMember.avatarUrl) {
+      cleanMember.avatarUrl = await compressOrCapMediaField(cleanMember.avatarUrl, 300, 0.65, 320000);
+    }
+    if (cleanMember.personalQrUrl) {
+      cleanMember.personalQrUrl = await compressOrCapMediaField(cleanMember.personalQrUrl, 300, 0.65, 320000);
+    }
+
+    // Total document byte budget guard (< 880KB to stay safely under 1MB Firestore cap)
+    const totalSize = JSON.stringify(cleanMember).length;
+    if (totalSize > 880000) {
+      if (cleanMember.personalQrUrl && cleanMember.personalQrUrl.length > 1000) cleanMember.personalQrUrl = '';
+      if (JSON.stringify(cleanMember).length > 880000 && cleanMember.avatarUrl && cleanMember.avatarUrl.length > 1000) {
+        cleanMember.avatarUrl = '';
+      }
+      if (
+        JSON.stringify(cleanMember).length > 880000 &&
+        cleanMember.paymentScreenshotUrl &&
+        cleanMember.paymentScreenshotUrl.length > 1000
+      ) {
+        cleanMember.paymentScreenshotUrl = await compressOrCapMediaField(
+          cleanMember.paymentScreenshotUrl,
+          400,
+          0.35,
+          350000
+        );
+      }
     }
   }
   return cleanMember;
@@ -614,7 +743,12 @@ export const FirestoreService = {
 
   async getMembers(): Promise<Member[]> {
     try {
-      const snap = await getDocs(collection(db, MEMBERS_COL));
+      let snap;
+      try {
+        snap = await withTimeout(getDocsFromServer(collection(db, MEMBERS_COL)), 8000, 'getMembers server');
+      } catch {
+        snap = await getDocs(collection(db, MEMBERS_COL));
+      }
       const list = snap.docs.map((d) => sanitizeMember(d.data(), d.id));
       cachedMembersSnapshot = list;
       return list;
@@ -630,76 +764,90 @@ export const FirestoreService = {
     }
   },
 
-  async saveMember(member: Member): Promise<boolean> {
-    const cleanMember = await prepareCleanMember(member);
+  async saveMemberDetailed(member: Member): Promise<{ ok: boolean; reason?: string; usedCompactFallback?: boolean }> {
+    const cleanMember = await prepareCleanMember(member, false);
     const docId = sanitizeDocId(cleanMember.accId);
 
-    if (isFirestoreWritePaused()) {
-      await enqueuePendingWrite(MEMBERS_COL, docId, 'set', cleanMember);
-      return false;
-    }
+    const clearPauseIfAny = () => {
+      if (isFirestoreWritePaused()) {
+        inMemoryQuotaPausedDay = null;
+        quotaLoggedOnce = false;
+        try {
+          if (typeof localStorage !== 'undefined') localStorage.removeItem(QUOTA_STORAGE_KEY);
+          if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(QUOTA_STORAGE_KEY);
+        } catch {
+          // ignore
+        }
+        quotaListeners.forEach((cb) => {
+          try {
+            cb(false);
+          } catch {
+            // ignore
+          }
+        });
+      }
+    };
+
     try {
-      await withTimeout(setDoc(doc(db, MEMBERS_COL, docId), cleanMember), 5000, 'saveMember');
-      return true;
+      await withTimeout(setDoc(doc(db, MEMBERS_COL, docId), cleanMember), 15000, 'saveMember');
+      clearPauseIfAny();
+      return { ok: true };
     } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+
       if (isFirestoreQuotaError(err)) {
         markFirestoreWritePaused(err);
         await enqueuePendingWrite(MEMBERS_COL, docId, 'set', cleanMember);
-        return false;
+        return { ok: false, reason: 'Firebase दैनिक राइट कोटा अस्थायी रूप से व्यस्त है (कतार में सुरक्षित)' };
       }
-      if (isFirestorePermissionError(err)) {
-        handleFirestoreError(err, OperationType.WRITE, `${MEMBERS_COL}/${docId}`);
-        return false;
-      }
-      if (!isFirestoreDocumentSizeError(err)) {
-        console.warn('Error saving member to Firestore (queued safely for retry):', err);
-        await enqueuePendingWrite(MEMBERS_COL, docId, 'set', cleanMember);
-        return false;
-      }
-      console.warn('Member payload exceeded 1MB Firestore limit, attempting compact retry...');
-      try {
-        const fallbackMember: Member = JSON.parse(JSON.stringify(member));
-        if (fallbackMember.paymentScreenshotUrl && fallbackMember.paymentScreenshotUrl.length > 50000) {
-          fallbackMember.paymentScreenshotUrl = '';
+
+      // If permission-denied OR size/invalid-argument error occurred, immediately retry once with stripped compact payload
+      if (isFirestorePermissionError(err) || isFirestoreDocumentSizeError(err)) {
+        if (isFirestorePermissionError(err)) {
+          handleFirestoreError(err, OperationType.WRITE, `${MEMBERS_COL}/${docId}`);
+        } else {
+          console.warn('Member payload exceeded Firestore limit, attempting compact retry...');
         }
-        if (fallbackMember.avatarUrl && fallbackMember.avatarUrl.length > 50000) {
-          fallbackMember.avatarUrl = '';
+        try {
+          const compactMember = await prepareCleanMember(cleanMember, true);
+          await withTimeout(setDoc(doc(db, MEMBERS_COL, docId), compactMember), 10000, 'saveMember compact');
+          clearPauseIfAny();
+          return { ok: true, usedCompactFallback: true };
+        } catch (retryErr) {
+          const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
+          if (isFirestoreQuotaError(retryErr)) markFirestoreWritePaused(retryErr);
+          console.warn('Compact retry saving member to Firestore failed:', retryErr);
+          await enqueuePendingWrite(MEMBERS_COL, docId, 'set', await prepareCleanMember(cleanMember, true));
+          return { ok: false, reason: retryMsg };
         }
-        if (fallbackMember.personalQrUrl && fallbackMember.personalQrUrl.length > 50000) {
-          fallbackMember.personalQrUrl = '';
-        }
-        await withTimeout(setDoc(doc(db, MEMBERS_COL, docId), fallbackMember), 4500, 'saveMember fallback');
-        return true;
-      } catch (retryErr) {
-        if (isFirestoreQuotaError(retryErr)) markFirestoreWritePaused(retryErr);
-        console.warn('Compact retry saving member to Firestore failed:', retryErr);
-        return false;
       }
+
+      console.warn('Error saving member to Firestore (queued safely for retry):', err);
+      await enqueuePendingWrite(MEMBERS_COL, docId, 'set', cleanMember);
+      return { ok: false, reason: errMsg };
     }
+  },
+
+  async saveMember(member: Member): Promise<boolean> {
+    const res = await this.saveMemberDetailed(member);
+    return res.ok;
   },
 
   async updateMember(accId: string, updates: Partial<Member>, fullMemberFallback?: Member): Promise<boolean> {
     const cleanUpdates: Partial<Member> = JSON.parse(JSON.stringify(updates));
-    if (cleanUpdates.paymentScreenshotUrl && cleanUpdates.paymentScreenshotUrl.startsWith('data:image')) {
-      try {
-        cleanUpdates.paymentScreenshotUrl = await ensureSafeFirestoreSize(cleanUpdates.paymentScreenshotUrl, 600, 0.65);
-      } catch {
-        // ignore
-      }
+    if (cleanUpdates.paymentScreenshotUrl) {
+      cleanUpdates.paymentScreenshotUrl = await compressOrCapMediaField(
+        cleanUpdates.paymentScreenshotUrl,
+        600,
+        0.6,
+        550000
+      );
     }
-    if (cleanUpdates.avatarUrl && cleanUpdates.avatarUrl.startsWith('data:image')) {
-      try {
-        cleanUpdates.avatarUrl = await ensureSafeFirestoreSize(cleanUpdates.avatarUrl, 300, 0.7);
-      } catch {
-        // ignore
-      }
+    if (cleanUpdates.avatarUrl) {
+      cleanUpdates.avatarUrl = await compressOrCapMediaField(cleanUpdates.avatarUrl, 300, 0.65, 320000);
     }
-    if (cleanUpdates.personalQrUrl && cleanUpdates.personalQrUrl.startsWith('data:image')) {
-      try {
-        cleanUpdates.personalQrUrl = await ensureSafeFirestoreSize(cleanUpdates.personalQrUrl, 300, 0.7);
-      } catch {
-        // ignore
-      }
+    if (cleanUpdates.personalQrUrl) {
+      cleanUpdates.personalQrUrl = await compressOrCapMediaField(cleanUpdates.personalQrUrl, 300, 0.65, 320000);
     }
 
     const docId = sanitizeDocId(accId);
@@ -715,10 +863,10 @@ export const FirestoreService = {
 
     try {
       const ref = doc(db, MEMBERS_COL, docId);
-      await withTimeout(updateDoc(ref, cleanUpdates), 5000, 'updateMember');
+      await withTimeout(updateDoc(ref, cleanUpdates), 6000, 'updateMember');
       return true;
     } catch (err) {
-      if (isFirestoreNotFoundError(err) && fullMemberFallback) {
+      if ((isFirestoreNotFoundError(err) || isFirestorePermissionError(err)) && fullMemberFallback) {
         return this.saveMember({ ...fullMemberFallback, ...cleanUpdates });
       }
       if (isFirestoreQuotaError(err)) {

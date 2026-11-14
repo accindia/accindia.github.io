@@ -61,6 +61,9 @@ export const SponsorRegisterMemberModal: React.FC<SponsorRegisterMemberModalProp
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [createdMember, setCreatedMember] = useState<Member | null>(null);
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<'idle' | 'synced' | 'queued'>('idle');
+  const [cloudSyncError, setCloudSyncError] = useState<string>('');
+  const [isRetryingCloudSync, setIsRetryingCloudSync] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
   const [copiedPass, setCopiedPass] = useState(false);
 
@@ -115,21 +118,31 @@ export const SponsorRegisterMemberModal: React.FC<SponsorRegisterMemberModalProp
     setIsSubmitting(true);
 
     try {
-      // 1. Duplicate check locally
-      const existingMembers = StorageService.getMembers();
-      if (existingMembers.some((m) => m.mobile.trim() === cleanMobile)) {
+      // 1. Fetch & merge latest Firestore members first so duplicate check & ID sequence match cloud
+      let existingMembers = StorageService.getMembers();
+      try {
+        const cloudMembers = await FirestoreService.getMembers();
+        if (cloudMembers.length > 0) {
+          existingMembers = StorageService.mergeMembersWithCloud(cloudMembers, true);
+        }
+      } catch {
+        // continue with local list
+      }
+
+      const cleanEmail = email.trim().toLowerCase();
+      if (existingMembers.some((m) => (m.mobile || '').trim() === cleanMobile)) {
         setErrorMessage(`⚠️ यह मोबाइल नंबर (${cleanMobile}) पहले से सिस्टम में पंजीकृत है!`);
         setIsSubmitting(false);
         return;
       }
-      if (existingMembers.some((m) => m.email.trim().toLowerCase() === email.trim().toLowerCase())) {
-        setErrorMessage(`⚠️ यह ईमेल (${email}) पहले से पंजीकृत है!`);
+      if (existingMembers.some((m) => (m.email || '').trim().toLowerCase() === cleanEmail)) {
+        setErrorMessage(`⚠️ यह ईमेल (${cleanEmail}) पहले से पंजीकृत है!`);
         setIsSubmitting(false);
         return;
       }
 
       // 2. Duplicate check in Firestore
-      const dupCheck = await FirestoreService.checkDuplicate(cleanMobile, email.trim(), utrNumber.trim());
+      const dupCheck = await FirestoreService.checkDuplicate(cleanMobile, cleanEmail, utrNumber.trim());
       if (dupCheck.isDuplicate) {
         setErrorMessage(dupCheck.reason || 'यह विवरण पहले से पंजीकृत है!');
         setIsSubmitting(false);
@@ -137,11 +150,11 @@ export const SponsorRegisterMemberModal: React.FC<SponsorRegisterMemberModalProp
       }
 
       // 3. Register member with locked sponsor & mandatory password update flag
-      const newMember = await StorageService.registerMemberBySponsor(currentUser, {
+      const regRes = await StorageService.registerMemberBySponsorWithStatus(currentUser, {
         fullName: fullName.trim(),
         mobile: cleanMobile,
         whatsapp: sameAsMobile ? cleanMobile : (whatsapp.trim() || cleanMobile),
-        email: email.trim(),
+        email: cleanEmail,
         qualification,
         state,
         city: city.trim(),
@@ -153,13 +166,32 @@ export const SponsorRegisterMemberModal: React.FC<SponsorRegisterMemberModalProp
         paymentScreenshotUrl: paymentScreenshotUrl || undefined,
       });
 
-      setCreatedMember(newMember);
-      onSuccess(newMember);
+      setCloudSyncStatus(regRes.cloudSaved ? 'synced' : 'queued');
+      setCloudSyncError(regRes.cloudError || '');
+      setCreatedMember(regRes.member);
+      onSuccess(regRes.member);
     } catch (err) {
       console.error('Sponsor register error:', err);
       setErrorMessage('सदस्य जोड़ने में त्रुटि हुई। कृपया पुनः प्रयास करें।');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleRetryCloudSync = async () => {
+    if (!createdMember || isRetryingCloudSync) return;
+    setIsRetryingCloudSync(true);
+    setCloudSyncError('');
+    try {
+      FirestoreService.clearQuotaPauseForRetry();
+      const res = await FirestoreService.saveMemberDetailed(createdMember);
+      if (res.ok) {
+        setCloudSyncStatus('synced');
+      } else if (res.reason) {
+        setCloudSyncError(res.reason);
+      }
+    } finally {
+      setIsRetryingCloudSync(false);
     }
   };
 
@@ -288,6 +320,32 @@ Start Young, Retire Young! 🚀`;
             </p>
           </div>
         </div>
+
+        {cloudSyncStatus === 'synced' ? (
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 flex items-center gap-2 font-bold">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>✓ नए सदस्य का रिकॉर्ड Admin Panel व क्लाउड सर्वर में लाइव सेव हो गया है!</span>
+          </div>
+        ) : (
+          <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-950 space-y-2">
+            <p className="font-bold">
+              ⏳ सदस्य लोकल डिवाइस में सेव है — Admin क्लाउड सर्वर पर भेजना बाकी है!
+            </p>
+            {cloudSyncError && (
+              <p className="text-[11px] text-red-700 bg-white/80 p-1.5 rounded border border-red-200 font-mono">
+                कारण: {cloudSyncError}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={handleRetryCloudSync}
+              disabled={isRetryingCloudSync}
+              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-lg text-xs shadow-xs cursor-pointer disabled:opacity-60"
+            >
+              {isRetryingCloudSync ? 'क्लाउड पर भेजा जा रहा है...' : '🔄 Admin Server पर अभी सिंक करें'}
+            </button>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="space-y-2.5">
@@ -593,6 +651,13 @@ Start Young, Retire Young! 🚀`;
                 />
               </div>
             </div>
+          </div>
+        )}
+
+        {errorMessage && (
+          <div className="p-3 bg-red-50 border border-red-300 text-red-700 text-xs rounded-xl flex items-center gap-2 shadow-xs">
+            <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+            <span className="font-bold">{errorMessage}</span>
           </div>
         )}
 

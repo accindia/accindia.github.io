@@ -283,13 +283,13 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
   showTelegramSupport: true,
   showEmailSupport: true,
   showCallSupport: false,
-  appDownloadUrl: 'https://achieversclub.in/download/acc-official-v2.apk',
+  appDownloadUrl: '',
   showAppDownload: true,
   appName: 'ACC Official Android APK',
   appVersion: 'v2.4.0 (Latest)',
   appFileSize: '18.5 MB',
-  autoGrantAppLinkOnVerification: true,
-  appDownloadNotice: 'केवल अधिकृत ACC वेबसाइट से ही APK डाउनलोड करें। इंस्टालेशन के समय "Install from Unknown Sources" को अनुमति दें।',
+  autoGrantAppLinkOnVerification: false,
+  appDownloadNotice: 'केवल अधिकृत ACC एडमिन द्वारा दिए गए लिंक से ही Real App डाउनलोड करें। इंस्टालेशन के समय "Install from Unknown Sources" को अनुमति दें।',
   services: DEFAULT_SERVICES,
   promotionalPosters: DEFAULT_PROMOTIONAL_POSTERS,
   homeSliderPhotos: [],
@@ -298,33 +298,43 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
   celebrationAutoRealTimeFestival: true,
 };
 
-// Helper to extract uppercase initials
+// Helper to extract uppercase ASCII-safe initials for Firestore-compatible ACC IDs
 export function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  } else if (parts.length === 1 && parts[0].length >= 2) {
-    return parts[0].substring(0, 2).toUpperCase();
+  const asciiParts = name
+    .trim()
+    .split(/\s+/)
+    .map((p) => p.replace(/[^a-zA-Z0-9]/g, ''))
+    .filter(Boolean);
+  if (asciiParts.length >= 2) {
+    return (asciiParts[0][0] + asciiParts[asciiParts.length - 1][0]).toUpperCase();
+  } else if (asciiParts.length === 1 && asciiParts[0].length >= 2) {
+    return asciiParts[0].substring(0, 2).toUpperCase();
+  } else if (asciiParts.length === 1) {
+    return `${asciiParts[0][0]}M`.toUpperCase();
   }
   return 'MB';
 }
 
-// Generate Unique ACC ID according to the user's explicit rule:
-// For TWIS: TWACCRK01 (TWACC + initials + 2-digit index e.g. Rahul Kumar joining TWIS first is TWACCRK01)
-// For SWIS: SWACCRK01 (SWACC + initials + 2-digit index)
+// Generate strictly unique ACC ID (e.g., TWACCRK01, SWACCKK01) across all known members
 export function generateAccId(fullName: string, plan: PlanType, existingMembers: Member[]): string {
   const planTag = plan === 'TWIS' ? 'TWACC' : plan === 'SWIS' ? 'SWACC' : 'ACC';
   const initials = getInitials(fullName);
   const prefix = `${planTag}${initials}`;
 
-  // Count existing matching IDs (including old format or new format)
-  const matching = existingMembers.filter(m => 
-    m.accId.toUpperCase().startsWith(prefix.toUpperCase()) ||
-    m.accId.toUpperCase().includes(`${planTag}${initials}`.toUpperCase())
+  const existingIds = new Set(
+    existingMembers.map((m) => (m.accId || '').trim().toUpperCase()).filter(Boolean)
   );
-  const nextSeq = (matching.length + 1).toString().padStart(2, '0');
-  
-  return `${prefix}${nextSeq}`;
+  let seq =
+    existingMembers.filter((m) =>
+      (m.accId || '').toUpperCase().startsWith(prefix.toUpperCase())
+    ).length + 1;
+
+  let candidate = `${prefix}${String(seq).padStart(2, '0')}`;
+  while (existingIds.has(candidate.toUpperCase())) {
+    seq += 1;
+    candidate = `${prefix}${String(seq).padStart(2, '0')}`;
+  }
+  return candidate;
 }
 
 // Initial Seed Members
@@ -750,6 +760,7 @@ export function subscribeToSync(callback: () => void): () => void {
 
 let activeFirestoreInitPromise: Promise<void> | null = null;
 let firestoreSyncedOnce = false;
+const attemptedCloudBackfillIds = new Set<string>();
 
 const SEED_MEMBER_IDS = new Set(['mem-001', 'mem-002', 'mem-003', 'mem-004', 'mem-005']);
 
@@ -929,9 +940,9 @@ export const StorageService = {
     return merged;
   },
 
-  // Sync with Firestore & IndexedDB on startup (non-destructive, replays offline queue safely)
-  async initFirestoreSync() {
-    if (firestoreSyncedOnce) return;
+  // Sync with Firestore & IndexedDB on startup or forced manual refresh (non-destructive, replays offline queue safely)
+  async initFirestoreSync(forceRefresh: boolean = false) {
+    if (firestoreSyncedOnce && !forceRefresh) return;
     if (activeFirestoreInitPromise) return activeFirestoreInitPromise;
 
     activeFirestoreInitPromise = (async () => {
@@ -1048,17 +1059,8 @@ export const StorageService = {
           this.mergeMembersWithCloud(cloudMembers, true);
         }
 
-        // Safely backfill any non-seed local members missing from Firestore without wasting writes
-        if (!FirestoreService.isWriteQuotaPaused()) {
-          const cloudIds = new Set(cloudMembers.map((m) => (m.accId || m.id || '').toUpperCase()));
-          const localOnlyRealMembers = this.getMembers().filter(
-            (m) => m.accId && !SEED_MEMBER_IDS.has(m.id) && !cloudIds.has(m.accId.toUpperCase())
-          );
-          for (const unsynced of localOnlyRealMembers) {
-            if (FirestoreService.isWriteQuotaPaused()) break;
-            await FirestoreService.saveMember(unsynced);
-          }
-        }
+        // Safely backfill any non-seed local members missing from Firestore
+        await this.syncUnsyncedLocalMembersToCloud(cloudMembers);
 
         const cloudTxs = cloudTxsRes.status === 'fulfilled' ? cloudTxsRes.value : [];
         if (cloudTxs.length > 0) {
@@ -1168,7 +1170,51 @@ export const StorageService = {
     return newMember;
   },
 
-  async addMemberAsync(newMember: Member): Promise<Member> {
+  async syncUnsyncedLocalMembersToCloud(
+    cloudMembersSnapshot?: Member[],
+    forceRetryAll: boolean = false
+  ): Promise<{ pushed: number; unsyncedRemaining: number }> {
+    try {
+      const cloudList = Array.isArray(cloudMembersSnapshot)
+        ? cloudMembersSnapshot
+        : await FirestoreService.getMembers();
+      const cloudIds = new Set(
+        cloudList.map((m) => (m.accId || m.id || '').trim().toUpperCase()).filter(Boolean)
+      );
+      const localOnlyRealMembers = this.getMembers().filter((m) => {
+        const key = (m.accId || '').trim().toUpperCase();
+        if (!key || SEED_MEMBER_IDS.has(m.id)) return false;
+        if (cloudIds.has(key)) {
+          attemptedCloudBackfillIds.delete(key);
+          return false;
+        }
+        if (!forceRetryAll && attemptedCloudBackfillIds.has(key)) return false;
+        return true;
+      });
+
+      let pushed = 0;
+      for (const unsynced of localOnlyRealMembers) {
+        const key = unsynced.accId.trim().toUpperCase();
+        attemptedCloudBackfillIds.add(key);
+        const res = await FirestoreService.saveMemberDetailed(unsynced);
+        if (res.ok) {
+          pushed += 1;
+        } else if (FirestoreService.isWriteQuotaPaused()) {
+          break;
+        }
+      }
+      return {
+        pushed,
+        unsyncedRemaining: Math.max(0, localOnlyRealMembers.length - pushed),
+      };
+    } catch {
+      return { pushed: 0, unsyncedRemaining: 0 };
+    }
+  },
+
+  async addMemberWithCloudStatus(
+    newMember: Member
+  ): Promise<{ member: Member; cloudSaved: boolean; cloudError?: string }> {
     const members = this.getMembers();
     const cleanNewId = (newMember.accId || '').toUpperCase();
     const existingIdx = members.findIndex(m => (m.accId || '').toUpperCase() === cleanNewId);
@@ -1179,11 +1225,17 @@ export const StorageService = {
     }
     this.saveMembers(members);
 
-    // Save to Firestore with confirmation
+    // Save to Firestore with explicit confirmation status & detailed error if queued
+    let cloudSaved = false;
+    let cloudError: string | undefined;
     try {
-      await FirestoreService.saveMember(newMember);
+      const res = await FirestoreService.saveMemberDetailed(newMember);
+      cloudSaved = res.ok;
+      cloudError = res.reason;
     } catch (e) {
       console.warn('Firestore saveMember err:', e);
+      cloudSaved = false;
+      cloudError = e instanceof Error ? e.message : String(e);
     }
 
     // If member has sponsor, credit referral bonus ₹150 for TWIS sponsor
@@ -1233,7 +1285,12 @@ export const StorageService = {
       }
     }
 
-    return newMember;
+    return { member: newMember, cloudSaved, cloudError };
+  },
+
+  async addMemberAsync(newMember: Member): Promise<Member> {
+    const res = await this.addMemberWithCloudStatus(newMember);
+    return res.member;
   },
 
   updateMember(accId: string, updates: Partial<Member>): Member | null {
@@ -2142,14 +2199,19 @@ export const StorageService = {
   },
 
   approveMember(accId: string, customAppLink?: string): Member | null {
-    const defaultLink = customAppLink || 'https://achieversclub.in/download/acc-official-v2.apk';
-    const updated = this.updateMember(accId, {
+    const cleanLink = (customAppLink || '').trim();
+    const isRealLink = Boolean(cleanLink && cleanLink !== 'https://achieversclub.in/download/acc-official-v2.apk');
+    const updates: Partial<Member> = {
       status: 'verified',
       verifiedAt: new Date().toISOString(),
-      realAppLink: defaultLink,
-      realAppLinkApproved: true,
+      lastEditedAt: new Date().toISOString(),
       rejectionReason: undefined,
-    });
+    };
+    if (isRealLink) {
+      updates.realAppLink = cleanLink;
+      updates.realAppLinkApproved = true;
+    }
+    const updated = this.updateMember(accId, updates);
     return updated;
   },
 
@@ -2182,6 +2244,9 @@ export const StorageService = {
       : safe.telegramLink;
 
     const isWhatsAppActive = safe.showWhatsAppSupport === true;
+    const rawAppUrl = typeof safe.appDownloadUrl === 'string' ? safe.appDownloadUrl.trim() : '';
+    const normalizedAppUrl =
+      rawAppUrl === 'https://achieversclub.in/download/acc-official-v2.apk' ? '' : rawAppUrl;
 
     return {
       ...DEFAULT_SITE_CONFIG,
@@ -2194,15 +2259,15 @@ export const StorageService = {
       showTelegramSupport: safe.showTelegramSupport !== false,
       showEmailSupport: safe.showEmailSupport !== false,
       showCallSupport: Boolean(safe.showCallSupport || safe.showHelplineCallButton),
-      appDownloadUrl: safe.appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk',
+      appDownloadUrl: normalizedAppUrl,
       showAppDownload: safe.showAppDownload !== false,
       appName: safe.appName || 'ACC Official Android APK',
       appVersion: safe.appVersion || 'v2.4.0 (Latest)',
       appFileSize: safe.appFileSize || '18.5 MB',
-      autoGrantAppLinkOnVerification: safe.autoGrantAppLinkOnVerification !== false,
+      autoGrantAppLinkOnVerification: safe.autoGrantAppLinkOnVerification === true,
       appDownloadNotice:
         safe.appDownloadNotice ||
-        'केवल अधिकृत ACC वेबसाइट से ही APK डाउनलोड करें। इंस्टालेशन के समय "Install from Unknown Sources" को अनुमति दें।',
+        'केवल अधिकृत ACC एडमिन द्वारा दिए गए लिंक से ही Real App डाउनलोड करें। इंस्टालेशन के समय "Install from Unknown Sources" को अनुमति दें।',
       services: Array.isArray(safe.services) ? safe.services : DEFAULT_SERVICES,
       promotionalPosters: (() => {
         const now = new Date();
@@ -2269,33 +2334,48 @@ export const StorageService = {
   },
 
   grantAppLink(accId: string, customAppLink?: string): Member | null {
-    const defaultLink = customAppLink || this.getSiteConfig().appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk';
+    const resolvedLink = (customAppLink ?? this.getSiteConfig().appDownloadUrl ?? '').trim();
+    if (!resolvedLink) {
+      return this.revokeAppLink(accId);
+    }
     const updated = this.updateMember(accId, {
-      realAppLink: defaultLink,
+      realAppLink: resolvedLink,
       realAppLinkApproved: true,
+      lastEditedAt: new Date().toISOString(),
     });
     return updated;
   },
 
   revokeAppLink(accId: string): Member | null {
     const updated = this.updateMember(accId, {
+      realAppLink: '',
       realAppLinkApproved: false,
+      lastEditedAt: new Date().toISOString(),
     });
     return updated;
   },
 
   bulkGrantAppLinkToVerified(appLink?: string): number {
-    const defaultLink = appLink || this.getSiteConfig().appDownloadUrl || 'https://achieversclub.in/download/acc-official-v2.apk';
+    const resolvedLink = (appLink ?? this.getSiteConfig().appDownloadUrl ?? '').trim();
+    if (!resolvedLink) return 0;
     const members = this.getMembers();
     let count = 0;
+    const nowIso = new Date().toISOString();
     const updated = members.map((m) => {
       if (m.status === 'verified') {
         count++;
-        return {
+        const nextM: Member = {
           ...m,
-          realAppLink: m.realAppLink || defaultLink,
+          realAppLink: (m.realAppLink && m.realAppLink !== 'https://achieversclub.in/download/acc-official-v2.apk') ? m.realAppLink : resolvedLink,
           realAppLinkApproved: true,
+          lastEditedAt: nowIso,
         };
+        FirestoreService.updateMember(
+          nextM.accId,
+          { realAppLink: nextM.realAppLink, realAppLinkApproved: true, lastEditedAt: nowIso },
+          nextM
+        ).catch(() => {});
+        return nextM;
       }
       return m;
     });
@@ -2414,7 +2494,7 @@ export const StorageService = {
   },
 
   // Sponsor Direct Member Enrollment with Mandatory Password Update on First Login
-  async registerMemberBySponsor(
+  async registerMemberBySponsorWithStatus(
     sponsor: Member,
     data: {
       fullName: string;
@@ -2431,19 +2511,30 @@ export const StorageService = {
       temporaryPassword: string;
       paymentScreenshotUrl?: string;
     }
-  ): Promise<Member> {
-    const existingMembers = this.getMembers();
+  ): Promise<{ member: Member; cloudSaved: boolean; cloudError?: string }> {
+    let existingMembers = this.getMembers();
+    try {
+      const cloudMembers = await FirestoreService.getMembers();
+      if (cloudMembers.length > 0) {
+        existingMembers = this.mergeMembersWithCloud(cloudMembers, true);
+      }
+    } catch {
+      // use local list
+    }
 
-    // Generate Unique ACC ID
+    // Generate Unique ACC ID across cloud + local
     const newAccId = generateAccId(data.fullName, data.plan, existingMembers);
+    const cleanMobile = data.mobile.trim().slice(0, 24);
+    const cleanWhatsapp = (data.whatsapp ? data.whatsapp.trim() : cleanMobile).slice(0, 24);
+    const cleanEmail = data.email.trim().toLowerCase();
 
     const newMember: Member = {
       id: `mem-${Date.now()}`,
       accId: newAccId,
       fullName: data.fullName.trim(),
-      mobile: data.mobile.trim(),
-      whatsapp: data.whatsapp ? data.whatsapp.trim() : data.mobile.trim(),
-      email: data.email.trim(),
+      mobile: cleanMobile,
+      whatsapp: cleanWhatsapp,
+      email: cleanEmail,
       qualification: data.qualification || 'Graduate',
       state: data.state || 'Madhya Pradesh',
       city: data.city ? data.city.trim() : '',
@@ -2481,8 +2572,8 @@ export const StorageService = {
       originalFormData: {
         submittedAt: new Date().toISOString(),
         fullName: data.fullName.trim(),
-        mobile: data.mobile.trim(),
-        email: data.email.trim(),
+        mobile: cleanMobile,
+        email: cleanEmail,
         qualification: data.qualification || 'Graduate',
         address: data.address || '',
         city: data.city || '',
@@ -2501,11 +2592,17 @@ export const StorageService = {
     const updatedMembers = [newMember, ...existingMembers.filter((m) => m.accId !== newMember.accId)];
     this.saveMembers(updatedMembers);
 
-    // Save to Firestore
+    // Save to Firestore with explicit confirmation
+    let cloudSaved = false;
+    let cloudError: string | undefined;
     try {
-      await FirestoreService.saveMember(newMember);
+      const res = await FirestoreService.saveMemberDetailed(newMember);
+      cloudSaved = res.ok;
+      cloudError = res.reason;
     } catch (err) {
       console.warn('Firestore saveMember error:', err);
+      cloudSaved = false;
+      cloudError = err instanceof Error ? err.message : String(err);
     }
 
     // Add referral record for sponsor
@@ -2521,6 +2618,7 @@ export const StorageService = {
     };
     const currentRefs = this.getReferrals();
     this.saveReferrals([referralRecord, ...currentRefs]);
+    FirestoreService.saveReferral(referralRecord).catch(() => {});
 
     // Update sponsor referral count
     const updatedSponsor = this.updateMember(sponsor.accId, {
@@ -2530,7 +2628,29 @@ export const StorageService = {
       this.setCurrentUser(updatedSponsor);
     }
 
-    return newMember;
+    return { member: newMember, cloudSaved, cloudError };
+  },
+
+  async registerMemberBySponsor(
+    sponsor: Member,
+    data: {
+      fullName: string;
+      mobile: string;
+      whatsapp?: string;
+      email: string;
+      qualification: string;
+      state: string;
+      city: string;
+      pincode: string;
+      address: string;
+      plan: PlanType;
+      utrNumber: string;
+      temporaryPassword: string;
+      paymentScreenshotUrl?: string;
+    }
+  ): Promise<Member> {
+    const res = await this.registerMemberBySponsorWithStatus(sponsor, data);
+    return res.member;
   },
 
   // -------------------------------------------------------------

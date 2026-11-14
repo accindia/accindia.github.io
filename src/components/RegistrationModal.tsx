@@ -54,6 +54,9 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
   const [step, setStep] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdMember, setCreatedMember] = useState<Member | null>(null);
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<'idle' | 'synced' | 'queued'>('idle');
+  const [cloudSyncError, setCloudSyncError] = useState<string>('');
+  const [isRetryingCloudSync, setIsRetryingCloudSync] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
   const siteConfig: SiteConfig = StorageService.getSiteConfig();
 
@@ -286,7 +289,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
     return true;
   };
 
-  const validateStep2 = () => {
+  const validateStep2 = async () => {
     const clean = sponsorId.trim().toUpperCase();
     if (!clean || clean.length < 4) {
       setErrorMessage('कृपया मान्य स्पॉन्सर 🆔 दर्ज करें या नीचे "कंपनी डायरेक्ट" विकल्प चुनें');
@@ -299,13 +302,26 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
     }
 
     const members = StorageService.getMembers();
-    const found = members.find(m => m.accId.toUpperCase() === clean);
+    let found = members.find(m => m.accId.toUpperCase() === clean);
+    if (!found) {
+      try {
+        const cloudMembers = await FirestoreService.getMembers();
+        if (cloudMembers.length > 0) {
+          const merged = StorageService.mergeMembersWithCloud(cloudMembers, true);
+          found = merged.find(m => m.accId.toUpperCase() === clean);
+        }
+      } catch {
+        // ignore
+      }
+    }
     if (!found) {
       setSponsorVerified(false);
       setErrorMessage(`❌ अमान्य स्पॉन्सर 🆔! "${clean}" सिस्टम में मौजूद नहीं है। गलत या मनगढ़ंत स्पॉन्सर अस्वीकृत है। कृपया सही स्पॉन्सर 🆔 दर्ज करें या "कंपनी डायरेक्ट" चुनें।`);
       return false;
     }
 
+    setSponsorName(found.fullName);
+    setSponsorVerified(true);
     setErrorMessage('');
     return true;
   };
@@ -341,9 +357,9 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
     return true;
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step === 1 && !validateStep1()) return;
-    if (step === 2 && !validateStep2()) return;
+    if (step === 2 && !(await validateStep2())) return;
     if (step === 3 && !validateStep3()) return;
     setErrorMessage('');
     setStep(step + 1);
@@ -357,45 +373,57 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
     setErrorMessage('');
 
     try {
-      const existingMembers = StorageService.getMembers();
+      // Fetch & merge latest Firestore members BEFORE duplicate checks and ACC ID generation
+      let existingMembers = StorageService.getMembers();
+      try {
+        const cloudMembers = await FirestoreService.getMembers();
+        if (cloudMembers.length > 0) {
+          existingMembers = StorageService.mergeMembersWithCloud(cloudMembers, true);
+        }
+      } catch {
+        // continue with local list if temporarily offline
+      }
+
+      const cleanMobile = mobile.trim().slice(0, 24);
+      const cleanWhatsapp = (sameAsMobile ? cleanMobile : (whatsapp.trim() || cleanMobile)).slice(0, 24);
+      const cleanEmail = email.trim().toLowerCase();
+      const cleanUtr = utrNumber.trim();
 
       // 1. High-Security Check: Duplicate Mobile, Email & UTR in Firestore and Local
-      const dupCheck = await FirestoreService.checkDuplicate(mobile, email, utrNumber);
+      const dupCheck = await FirestoreService.checkDuplicate(cleanMobile, cleanEmail, cleanUtr);
       if (dupCheck.isDuplicate) {
         setErrorMessage(dupCheck.reason || 'यह विवरण पहले से पंजीकृत है!');
         setIsSubmitting(false);
         return;
       }
 
-      // Also check local storage duplicates
-      if (existingMembers.some((m) => m.mobile.trim() === mobile.trim())) {
-        setErrorMessage(`⚠️ यह मोबाइल नंबर (${mobile}) पहले से पंजीकृत है!`);
+      if (existingMembers.some((m) => (m.mobile || '').trim() === cleanMobile)) {
+        setErrorMessage(`⚠️ यह मोबाइल नंबर (${cleanMobile}) पहले से पंजीकृत है! कृपया लॉगिन करें।`);
         setIsSubmitting(false);
         return;
       }
-      if (existingMembers.some((m) => m.email.trim().toLowerCase() === email.trim().toLowerCase())) {
-        setErrorMessage(`⚠️ यह ईमेल (${email}) पहले से पंजीकृत है!`);
+      if (existingMembers.some((m) => (m.email || '').trim().toLowerCase() === cleanEmail.toLowerCase())) {
+        setErrorMessage(`⚠️ यह ईमेल (${cleanEmail}) पहले से पंजीकृत है!`);
         setIsSubmitting(false);
         return;
       }
-      if (existingMembers.some((m) => m.utrNumber.trim() === utrNumber.trim())) {
-        setErrorMessage(`⚠️ यह 12-अंकों का UPI UTR (${utrNumber}) पहले से उपयोग किया जा चुका है!`);
+      if (existingMembers.some((m) => (m.utrNumber || '').trim() === cleanUtr)) {
+        setErrorMessage(`⚠️ यह 12-अंकों का UPI UTR (${cleanUtr}) पहले से उपयोग किया जा चुका है!`);
         setIsSubmitting(false);
         return;
       }
 
-      // 2. Generate Unique ACC ID according to user's exact specification
-      // e.g. Rahul Kumar for TWIS -> TWACCRK01
+      // 2. Generate Strictly Unique ASCII ACC ID across Cloud + Local
       const newAccId = generateAccId(fullName, plan, existingMembers);
 
       const newMember: Member = {
         id: `mem-${Date.now()}`,
         accId: newAccId,
         fullName: fullName.trim(),
-        mobile: mobile.trim(),
-        whatsapp: sameAsMobile ? mobile.trim() : (whatsapp.trim() || mobile.trim()),
+        mobile: cleanMobile,
+        whatsapp: cleanWhatsapp,
         telegram: telegram.trim() || undefined,
-        email: email.trim(),
+        email: cleanEmail,
         qualification,
         state,
         city: city.trim(),
@@ -405,7 +433,7 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
         sponsorName: sponsorName.trim() || 'Achievers Core Team',
         sponsorId: sponsorId.trim() || 'ACC249SWISRK01',
         activationCharge: 249,
-        utrNumber: utrNumber.trim(),
+        utrNumber: cleanUtr,
         paymentScreenshotUrl: paymentScreenshotUrl,
         paymentDate: new Date().toISOString().split('T')[0],
         status: 'pending', // Pending until admin verifies ₹249 & screenshot
@@ -438,8 +466,8 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
         originalFormData: {
           submittedAt: new Date().toISOString(),
           fullName: fullName.trim(),
-          mobile: mobile.trim(),
-          email: email.trim(),
+          mobile: cleanMobile,
+          email: cleanEmail,
           qualification,
           address: address.trim(),
           city: city.trim(),
@@ -448,18 +476,20 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
           plan,
           sponsorId: sponsorId.trim() || 'ACC249SWISRK01',
           sponsorName: sponsorName.trim() || 'Achievers Core Team',
-          utrNumber: utrNumber.trim(),
+          utrNumber: cleanUtr,
           paymentDate: new Date().toISOString().split('T')[0],
-          paymentScreenshotUrl: paymentScreenshotUrl,
+          // Keep canonical screenshot only on member.paymentScreenshotUrl to avoid doubling payload
+          paymentScreenshotUrl: '',
           activationCharge: 249,
         },
       };
 
-      // 3. Save new member to local cache & Firestore (addMemberAsync handles single Firestore write)
-      console.log('Saving new member to local storage and Firestore...', newMember.accId);
-      await StorageService.addMemberAsync(newMember);
-      StorageService.setCurrentUser(newMember);
-      setCreatedMember(newMember);
+      // 3. Save new member to local cache & Firestore with explicit confirmation
+      const saveRes = await StorageService.addMemberWithCloudStatus(newMember);
+      StorageService.setCurrentUser(saveRes.member);
+      setCloudSyncStatus(saveRes.cloudSaved ? 'synced' : 'queued');
+      setCloudSyncError(saveRes.cloudError || '');
+      setCreatedMember(saveRes.member);
       setIsSubmitting(false);
 
       try {
@@ -468,13 +498,37 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
           spread: 70,
           origin: { y: 0.6 },
         });
-      } catch (err) {
+      } catch {
         // confetti fallback
       }
     } catch (error) {
       console.error('Registration submission error:', error);
       setErrorMessage('पंजीकरण सबमिट करने में समस्या आई। कृपया पुनः प्रयास करें।');
       setIsSubmitting(false);
+    }
+  };
+
+  const handleRetryCloudSync = async () => {
+    if (!createdMember || isRetryingCloudSync) return;
+    setIsRetryingCloudSync(true);
+    setCloudSyncError('');
+    try {
+      FirestoreService.clearQuotaPauseForRetry();
+      const res = await FirestoreService.saveMemberDetailed(createdMember);
+      if (res.ok) {
+        setCloudSyncStatus('synced');
+        setCloudSyncError('');
+      } else {
+        const flushRes = await FirestoreService.flushPendingSyncQueue();
+        if (flushRes.flushed > 0 && flushRes.remaining === 0) {
+          setCloudSyncStatus('synced');
+          setCloudSyncError('');
+        } else if (res.reason) {
+          setCloudSyncError(res.reason);
+        }
+      }
+    } finally {
+      setIsRetryingCloudSync(false);
     }
   };
 
@@ -567,15 +621,36 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
             )}
           </div>
 
-          <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200 text-xs text-slate-700 space-y-1">
-            <p className="flex items-center gap-1.5 font-bold text-[#2874f0]">
-              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>एडमिन द्वारा वेरीफाई होने के बाद Real App Link भेजा जाएगा</span>
-            </p>
-            <p className="text-slate-600">
-              आपके पंजीकृत मेल / टेलीग्राम / व्हाट्सएप पर डायरेक्ट लिंक प्राप्त होगा। आप अपने डैशबोर्ड में भी स्थिति देख सकते हैं।
-            </p>
-          </div>
+          {cloudSyncStatus === 'synced' ? (
+            <div className="mt-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200 text-xs text-emerald-900 space-y-1">
+              <p className="flex items-center gap-1.5 font-bold text-emerald-800">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>✓ आपका रिकॉर्ड Admin Panel व क्लाउड डेटाबेस में लाइव पहुंच गया है!</span>
+              </p>
+              <p className="text-emerald-700">
+                वेरीफिकेशन के बाद आपके डैशबोर्ड में डिफ़ॉल्ट रूप से आपका पर्सनल रेफरल लिंक रहेगा और एडमिन आपका कस्टम Real App Link सीधे शेयर करेंगे।
+              </p>
+            </div>
+          ) : (
+            <div className="mt-3 p-3 bg-amber-50 rounded-lg border border-amber-300 text-xs text-amber-900 space-y-2">
+              <p className="font-bold">
+                ⏳ आपका फॉर्म लोकल डिवाइस में सुरक्षित सेव है — Admin क्लाउड सर्वर पर भेजना बाकी है!
+              </p>
+              {cloudSyncError && (
+                <p className="text-[11px] text-red-700 bg-white/80 p-2 rounded border border-red-200 font-mono">
+                  कारण: {cloudSyncError}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={handleRetryCloudSync}
+                disabled={isRetryingCloudSync}
+                className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-lg text-xs shadow-xs transition cursor-pointer disabled:opacity-60"
+              >
+                {isRetryingCloudSync ? 'क्लाउड पर भेजा जा रहा है...' : '🔄 Admin Server पर अभी सिंक करें'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Next Actions */}
@@ -1368,6 +1443,13 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
               onScreenshotUpload={handleFileUpload}
               onRemoveScreenshot={() => setPaymentScreenshotUrl('')}
             />
+
+            {errorMessage && (
+              <div className="p-3 bg-red-50 border-2 border-red-300 text-red-800 text-xs rounded-lg flex items-center gap-2 font-bold shadow-xs animate-shake">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
 
             <div className="flex items-center justify-between pt-3">
               <button

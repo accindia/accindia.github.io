@@ -73,14 +73,21 @@ export function ensureSafeFirestoreSize(base64: string, maxDim = 500, quality = 
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
+        let dataUrl = canvas.toDataURL('image/jpeg', quality);
+        if (dataUrl.length > 240000) {
+          dataUrl = canvas.toDataURL('image/jpeg', Math.min(quality, 0.45));
+        }
+        if (dataUrl.length > 280000) {
+          dataUrl = canvas.toDataURL('image/jpeg', 0.3);
+        }
+        resolve(dataUrl);
       } else {
         resolve(base64.slice(0, 100000));
       }
     };
     img.onerror = () => {
-      // If cannot process image, return truncated or empty to prevent crashing Firestore
-      resolve(base64.slice(0, 80000));
+      // Avoid writing corrupted raw binary blobs over 100KB
+      resolve(base64.length <= 120000 ? base64 : '');
     };
   });
 }

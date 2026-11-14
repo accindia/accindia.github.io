@@ -40,19 +40,21 @@ service cloud.firestore {
         && data.accId is string && data.accId.size() >= 3 && data.accId.size() <= 64
         && data.accId.matches('^[A-Za-z0-9_\\-]+$')
         && data.fullName is string && data.fullName.size() >= 1 && data.fullName.size() <= 120
-        && data.mobile is string && data.mobile.size() <= 20
+        && data.mobile is string && data.mobile.size() <= 24
         && data.plan in ['SWIS', 'TWIS', 'COMBO']
         && data.status in ['verified', 'pending', 'rejected']
         && isValidOptionalString(data, 'id', 128)
-        && isValidOptionalString(data, 'whatsapp', 20)
-        && isValidOptionalString(data, 'email', 160)
+        && isValidOptionalString(data, 'whatsapp', 24)
+        && isValidOptionalString(data, 'email', 200)
         && isValidOptionalString(data, 'sponsorId', 64)
         && isValidOptionalString(data, 'sponsorName', 120)
         && isValidOptionalString(data, 'utrNumber', 64)
         && isValidOptionalString(data, 'createdAt', 64)
-        && isValidOptionalString(data, 'avatarUrl', 450000)
-        && isValidOptionalString(data, 'paymentScreenshotUrl', 650000)
-        && isValidOptionalString(data, 'personalQrUrl', 450000)
+        && isValidOptionalString(data, 'realAppLink', 2000)
+        && isValidOptionalBool(data, 'realAppLinkApproved')
+        && isValidOptionalString(data, 'avatarUrl', 600000)
+        && isValidOptionalString(data, 'paymentScreenshotUrl', 850000)
+        && isValidOptionalString(data, 'personalQrUrl', 600000)
         && isValidOptionalNumber(data, 'walletBalance', 0, 10000000)
         && isValidOptionalNumber(data, 'totalEarnings', 0, 10000000)
         && isValidOptionalNumber(data, 'swisEarnings', 0, 10000000)
@@ -64,9 +66,7 @@ service cloud.firestore {
 
     function isValidMemberUpdate(incoming, existing) {
       return isValidMember(incoming)
-        && incoming.accId == existing.accId
-        && (!('id' in existing) || incoming.id == existing.id)
-        && (!('createdAt' in existing) || incoming.createdAt == existing.createdAt);
+        && incoming.accId == existing.accId;
     }
 
     // 2. RechargeTransaction validation (Append-only)
@@ -128,17 +128,22 @@ service cloud.firestore {
     // 6. SiteConfig validation
     function isValidSiteConfig(data) {
       return data is map
-        && isValidOptionalString(data, 'helplinePhone', 40)
-        && isValidOptionalString(data, 'whatsappNumber', 40)
-        && isValidOptionalString(data, 'officialEmail', 160)
-        && isValidOptionalString(data, 'officialAddress', 400)
-        && isValidOptionalString(data, 'websiteUrl', 200)
-        && isValidOptionalString(data, 'telegramLink', 200)
-        && isValidOptionalString(data, 'adminSignatoryName', 120)
-        && isValidOptionalString(data, 'adminSignatoryTitle', 120)
-        && isValidOptionalString(data, 'upiId', 120)
-        && isValidOptionalString(data, 'upiReceiverName', 120)
-        && isValidOptionalString(data, 'announcementMarquee', 2000)
+        && isValidOptionalString(data, 'helplinePhone', 200)
+        && isValidOptionalString(data, 'whatsappNumber', 200)
+        && isValidOptionalString(data, 'officialEmail', 240)
+        && isValidOptionalString(data, 'officialAddress', 600)
+        && isValidOptionalString(data, 'websiteUrl', 400)
+        && isValidOptionalString(data, 'telegramLink', 400)
+        && isValidOptionalString(data, 'adminSignatoryName', 160)
+        && isValidOptionalString(data, 'adminSignatoryTitle', 160)
+        && isValidOptionalString(data, 'upiId', 200)
+        && isValidOptionalString(data, 'upiReceiverName', 160)
+        && isValidOptionalString(data, 'announcementMarquee', 3000)
+        && isValidOptionalString(data, 'appDownloadUrl', 2000)
+        && isValidOptionalString(data, 'appName', 200)
+        && isValidOptionalString(data, 'appVersion', 100)
+        && isValidOptionalString(data, 'appFileSize', 100)
+        && isValidOptionalString(data, 'appDownloadNotice', 1000)
         && isValidOptionalString(data, 'configUpdatedAt', 64)
         && isValidOptionalNumber(data, 'activationFee', 0, 100000);
     }
