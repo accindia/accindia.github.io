@@ -7,6 +7,7 @@ interface AvatarWith3DFrameProps {
   frame?: AvatarFrameType;
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   showBadge?: boolean;
+  lite?: boolean;
   className?: string;
   onClick?: () => void;
 }
@@ -345,6 +346,7 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
   frame = 'acc_medallion',
   size = 'md',
   showBadge = true,
+  lite = false,
   className = '',
   onClick,
 }) => {
@@ -372,16 +374,33 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
     '2xl': 'w-10 h-10 text-lg -bottom-2 -right-2',
   };
 
+  const svgUid = React.useId().replace(/[^a-zA-Z0-9_-]/g, '');
+  const [imgFailed, setImgFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    setImgFailed(false);
+  }, [avatarUrl]);
+
   const activeFrame = AVATAR_FRAMES.find((f) => f.id === frame) || AVATAR_FRAMES[0];
   const isNone = frame === 'none' || !frame;
+  const isShowcaseSize = size === 'lg' || size === 'xl' || size === '2xl';
 
   return (
     <div
       onClick={onClick}
       className={`relative inline-flex items-center justify-center select-none ${
-        onClick ? 'cursor-pointer' : ''
-      } ${className}`}
+        lite ? 'acc-avatar-lite' : ''
+      } ${onClick ? 'cursor-pointer' : ''} ${className}`}
     >
+      {/* Ambient 3D Luminous Back-Aura Halo (disabled in lite miniature mode to prevent mobile GPU OOM) */}
+      {!isNone && !lite && (
+        <div
+          aria-hidden="true"
+          className={`absolute ${
+            isShowcaseSize ? '-inset-3.5' : '-inset-1.5'
+          } rounded-full bg-gradient-to-tr ${activeFrame.gradientClass} opacity-45 blur-md animate-frame-aura pointer-events-none z-0`}
+        />
+      )}
       {/* ----------------------------------------------------------------- */}
       {/* 0. ACC 3D NACHTA HUA CIRCULAR GOLD RING (DANCING GYRO ORBIT FRAME) */}
       {/* ----------------------------------------------------------------- */}
@@ -393,14 +412,14 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
           {/* SVG Dancing Gyro Ring with Orbiting Beads & Curved Text */}
           <svg viewBox="0 0 300 300" className="w-full h-full block animate-spin-slow will-change-transform drop-shadow-[0_4px_16px_rgba(0,0,0,0.7)]">
             <defs>
-              <linearGradient id="dancingGoldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id={`dancingGoldGrad_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#fff8db" />
                 <stop offset="25%" stopColor="#ffd700" />
                 <stop offset="50%" stopColor="#ff8c00" />
                 <stop offset="75%" stopColor="#f59e0b" />
                 <stop offset="100%" stopColor="#d97706" />
               </linearGradient>
-              <linearGradient id="dancingRainbowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <linearGradient id={`dancingRainbowGrad_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stopColor="#ff007a" />
                 <stop offset="20%" stopColor="#9d4edd" />
                 <stop offset="40%" stopColor="#2563eb" />
@@ -408,12 +427,12 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
                 <stop offset="80%" stopColor="#10b981" />
                 <stop offset="100%" stopColor="#ffd700" />
               </linearGradient>
-              <path id="dancingTextOrbit" d="M 150,150 m -114,0 a 114,114 0 1,1 228,0 a 114,114 0 1,1 -228,0" fill="none" />
+              <path id={`dancingTextOrbit_${svgUid}`} d="M 150,150 m -114,0 a 114,114 0 1,1 228,0 a 114,114 0 1,1 -228,0" fill="none" />
             </defs>
 
             {/* Outer Jeweled Rim */}
-            <circle cx="150" cy="150" r="145" fill="none" stroke="url(#dancingGoldGrad)" strokeWidth="3.5" />
-            <circle cx="150" cy="150" r="139" fill="none" stroke="url(#dancingRainbowGrad)" strokeWidth="2.5" opacity="0.9" strokeDasharray="6,4" />
+            <circle cx="150" cy="150" r="145" fill="none" stroke={`url(#dancingGoldGrad_${svgUid})`} strokeWidth="3.5" />
+            <circle cx="150" cy="150" r="139" fill="none" stroke={`url(#dancingRainbowGrad_${svgUid})`} strokeWidth="2.5" opacity="0.9" strokeDasharray="6,4" />
             
             {/* 8 Dancing Orbiting Gems / Beads */}
             {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => {
@@ -430,7 +449,7 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
 
             {/* Rotating 360 Engraved Text */}
             <text fontFamily="Roboto, sans-serif" fontWeight="900" fontSize="10.5" fill="#fffbeb" letterSpacing="2.2" stroke="#451a03" strokeWidth="0.8" paintOrder="stroke fill">
-              <textPath href="#dancingTextOrbit" startOffset="0%">
+              <textPath href={`#dancingTextOrbit_${svgUid}`} startOffset="0%">
                 ★ ACHIEVERS CLUB COMMUNITY ★ ACC INDIA ★ 3D LIVE DANCING COIN ★
               </textPath>
             </text>
@@ -441,7 +460,7 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
             <circle cx="150" cy="150" r="88" fill="none" stroke="#138808" strokeWidth="2.5" opacity="0.9" />
             
             {/* Photo Rim 3D Bevel */}
-            <circle cx="150" cy="150" r="87" fill="none" stroke="url(#dancingGoldGrad)" strokeWidth="3" />
+            <circle cx="150" cy="150" r="87" fill="none" stroke={`url(#dancingGoldGrad_${svgUid})`} strokeWidth="3" />
           </svg>
         </div>
       )}
@@ -455,14 +474,14 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
           
           <svg viewBox="0 0 300 300" className="w-full h-full block animate-spin-slow will-change-transform">
             <defs>
-              <linearGradient id="deepakGold" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id={`deepakGold_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#fff8db" />
                 <stop offset="40%" stopColor="#fbbf24" />
                 <stop offset="80%" stopColor="#ea580c" />
                 <stop offset="100%" stopColor="#7c2d12" />
               </linearGradient>
             </defs>
-            <circle cx="150" cy="150" r="144" fill="none" stroke="url(#deepakGold)" strokeWidth="3" strokeDasharray="4,6" />
+            <circle cx="150" cy="150" r="144" fill="none" stroke={`url(#deepakGold_${svgUid})`} strokeWidth="3" strokeDasharray="4,6" />
             <circle cx="150" cy="150" r="128" fill="none" stroke="#f59e0b" strokeWidth="2" opacity="0.75" />
             
             {/* 6 Radiant Golden Diyas with Flames */}
@@ -479,7 +498,7 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
               );
             })}
             
-            <circle cx="150" cy="150" r="88" fill="none" stroke="url(#deepakGold)" strokeWidth="3.5" />
+            <circle cx="150" cy="150" r="88" fill="none" stroke={`url(#deepakGold_${svgUid})`} strokeWidth="3.5" />
           </svg>
         </div>
       )}
@@ -493,7 +512,7 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
           
           <svg viewBox="0 0 300 300" className="w-full h-full block animate-spin-reverse-slow will-change-transform">
             <defs>
-              <linearGradient id="chakraRainbow" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id={`chakraRainbow_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#ff007a" />
                 <stop offset="25%" stopColor="#f59e0b" />
                 <stop offset="50%" stopColor="#10b981" />
@@ -501,7 +520,7 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
                 <stop offset="100%" stopColor="#8b5cf6" />
               </linearGradient>
             </defs>
-            <circle cx="150" cy="150" r="144" fill="none" stroke="url(#chakraRainbow)" strokeWidth="4" />
+            <circle cx="150" cy="150" r="144" fill="none" stroke={`url(#chakraRainbow_${svgUid})`} strokeWidth="4" />
             <circle cx="150" cy="150" r="130" fill="none" stroke="#fbbf24" strokeWidth="2" strokeDasharray="3,5" />
             
             {/* 9 Navratna Gemstones Orbiting */}
@@ -530,45 +549,45 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
         <div className="absolute -inset-3 sm:-inset-4 rounded-full pointer-events-none z-20 overflow-visible">
           <svg viewBox="0 0 300 300" className="w-full h-full block drop-shadow-[0_4px_12px_rgba(0,0,0,0.55)]">
             <defs>
-              <linearGradient id="avatarGoldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id={`avatarGoldGrad_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#fff8db" />
                 <stop offset="20%" stopColor="#fbbf24" />
                 <stop offset="50%" stopColor="#f59e0b" />
                 <stop offset="80%" stopColor="#d97706" />
                 <stop offset="100%" stopColor="#78350f" />
               </linearGradient>
-              <linearGradient id="avatarSaffronGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <linearGradient id={`avatarSaffronGrad_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stopColor="#ff6600" />
                 <stop offset="100%" stopColor="#ff9933" />
               </linearGradient>
-              <linearGradient id="avatarGreenGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <linearGradient id={`avatarGreenGrad_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stopColor="#0e692a" />
                 <stop offset="100%" stopColor="#138808" />
               </linearGradient>
-              <path id="avatarPathTopArch" d="M 46,150 A 104,104 0 0,1 254,150" fill="none" />
-              <path id="avatarPathBottomArch" d="M 254,150 A 104,104 0 0,1 46,150" fill="none" />
+              <path id={`avatarPathTopArch_${svgUid}`} d="M 46,150 A 104,104 0 0,1 254,150" fill="none" />
+              <path id={`avatarPathBottomArch_${svgUid}`} d="M 254,150 A 104,104 0 0,1 46,150" fill="none" />
             </defs>
             {/* Outer Coin Milled Rim */}
-            <circle cx="150" cy="150" r="144" fill="url(#avatarGoldGrad)" stroke="#78350f" strokeWidth="2.5" />
+            <circle cx="150" cy="150" r="144" fill={`url(#avatarGoldGrad_${svgUid})`} stroke="#78350f" strokeWidth="2.5" />
             <circle cx="150" cy="150" r="138" fill="none" stroke="#fffbeb" strokeWidth="1.2" opacity="0.85" />
             <circle cx="150" cy="150" r="134" fill="none" stroke="#fffbeb" strokeWidth="1.8" strokeDasharray="2,5" opacity="0.9" />
             <circle cx="150" cy="150" r="124" fill="#081836" stroke="#fbbf24" strokeWidth="1.2" />
             
             {/* Indian Tiranga Concentric Halo Ring */}
-            <path d="M 54,150 A 96,96 0 0,1 246,150" fill="none" stroke="url(#avatarSaffronGrad)" strokeWidth="3.2" strokeLinecap="round" />
-            <path d="M 246,150 A 96,96 0 0,1 54,150" fill="none" stroke="url(#avatarGreenGrad)" strokeWidth="3.2" strokeLinecap="round" />
+            <path d="M 54,150 A 96,96 0 0,1 246,150" fill="none" stroke={`url(#avatarSaffronGrad_${svgUid})`} strokeWidth="3.2" strokeLinecap="round" />
+            <path d="M 246,150 A 96,96 0 0,1 54,150" fill="none" stroke={`url(#avatarGreenGrad_${svgUid})`} strokeWidth="3.2" strokeLinecap="round" />
             <circle cx="150" cy="150" r="92" fill="none" stroke="#ffffff" strokeWidth="1.2" opacity="0.95" />
 
             {/* Top Curved Engraved Text: ACHIEVERS CLUB COMMUNITY */}
             <text fontFamily="Roboto, sans-serif" fontWeight="900" fontSize="10.5" fill="#fffbeb" letterSpacing="1.8" stroke="#000000" strokeWidth="0.3" paintOrder="stroke fill">
-              <textPath href="#avatarPathTopArch" startOffset="50%" textAnchor="middle">
+              <textPath href={`#avatarPathTopArch_${svgUid}`} startOffset="50%" textAnchor="middle">
                 ACHIEVERS CLUB COMMUNITY
               </textPath>
             </text>
 
             {/* Bottom Curved Engraved Text: ★ START YOUNG • RETIRE YOUNG ★ */}
             <text fontFamily="Roboto, sans-serif" fontWeight="900" fontSize="9" fill="#fef08a" letterSpacing="1.4" stroke="#000000" strokeWidth="0.3" paintOrder="stroke fill">
-              <textPath href="#avatarPathBottomArch" startOffset="50%" textAnchor="middle">
+              <textPath href={`#avatarPathBottomArch_${svgUid}`} startOffset="50%" textAnchor="middle">
                 ★ START YOUNG • RETIRE YOUNG ★
               </textPath>
             </text>
@@ -580,7 +599,7 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
             </g>
 
             {/* Inner Gold Bevel on photo rim */}
-            <circle cx="150" cy="150" r="88" fill="none" stroke="url(#avatarGoldGrad)" strokeWidth="3.5" />
+            <circle cx="150" cy="150" r="88" fill="none" stroke={`url(#avatarGoldGrad_${svgUid})`} strokeWidth="3.5" />
           </svg>
         </div>
       )}
@@ -596,22 +615,22 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
           {/* Smooth 360° Orbiting SVG Text Ring */}
           <svg viewBox="0 0 300 300" className="w-full h-full block animate-spin-slow will-change-transform">
             <defs>
-              <linearGradient id="avatarSpinGold" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id={`avatarSpinGold_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#fff8db" />
                 <stop offset="35%" stopColor="#fbbf24" />
                 <stop offset="70%" stopColor="#f59e0b" />
                 <stop offset="100%" stopColor="#d97706" />
               </linearGradient>
-              <path id="avatarSpinOrbitPath" d="M 150,150 m -112,0 a 112,112 0 1,1 224,0 a 112,112 0 1,1 -224,0" fill="none" />
+              <path id={`avatarSpinOrbitPath_${svgUid}`} d="M 150,150 m -112,0 a 112,112 0 1,1 224,0 a 112,112 0 1,1 -224,0" fill="none" />
             </defs>
-            <circle cx="150" cy="150" r="142" fill="none" stroke="url(#avatarSpinGold)" strokeWidth="2.5" strokeDasharray="3,6" />
+            <circle cx="150" cy="150" r="142" fill="none" stroke={`url(#avatarSpinGold_${svgUid})`} strokeWidth="2.5" strokeDasharray="3,6" />
             <circle cx="150" cy="150" r="126" fill="none" stroke="#2563eb" strokeWidth="1.5" opacity="0.6" />
             <text fontFamily="Roboto, sans-serif" fontWeight="900" fontSize="10.5" fill="#fef08a" letterSpacing="2.2" stroke="#451a03" strokeWidth="0.6" paintOrder="stroke fill">
-              <textPath href="#avatarSpinOrbitPath" startOffset="0%">
+              <textPath href={`#avatarSpinOrbitPath_${svgUid}`} startOffset="0%">
                 ★ ACHIEVERS CLUB COMMUNITY ★ ACC INDIA ★ START YOUNG RETIRE YOUNG ★
               </textPath>
             </text>
-            <circle cx="150" cy="150" r="88" fill="none" stroke="url(#avatarSpinGold)" strokeWidth="3" />
+            <circle cx="150" cy="150" r="88" fill="none" stroke={`url(#avatarSpinGold_${svgUid})`} strokeWidth="3" />
           </svg>
         </div>
       )}
@@ -623,11 +642,11 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
         <div className="absolute -inset-3.5 sm:-inset-4.5 rounded-full pointer-events-none z-20 overflow-visible">
           <svg viewBox="0 0 300 300" className="w-full h-full block drop-shadow-[0_4px_14px_rgba(0,0,0,0.5)]">
             <defs>
-              <linearGradient id="tirangaSaffronHalo" x1="0%" y1="0%" x2="100%" y2="0%">
+              <linearGradient id={`tirangaSaffronHalo_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stopColor="#ff6600" />
                 <stop offset="100%" stopColor="#ff9933" />
               </linearGradient>
-              <linearGradient id="tirangaGreenHalo" x1="0%" y1="0%" x2="100%" y2="0%">
+              <linearGradient id={`tirangaGreenHalo_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stopColor="#0e692a" />
                 <stop offset="100%" stopColor="#138808" />
               </linearGradient>
@@ -635,8 +654,8 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
             {/* Outer Bevel */}
             <circle cx="150" cy="150" r="144" fill="none" stroke="#fbbf24" strokeWidth="3.5" />
             {/* Saffron & Green Halos */}
-            <path d="M 38,150 A 112,112 0 0,1 262,150" fill="none" stroke="url(#tirangaSaffronHalo)" strokeWidth="14" strokeLinecap="round" />
-            <path d="M 262,150 A 112,112 0 0,1 38,150" fill="none" stroke="url(#tirangaGreenHalo)" strokeWidth="14" strokeLinecap="round" />
+            <path d="M 38,150 A 112,112 0 0,1 262,150" fill="none" stroke={`url(#tirangaSaffronHalo_${svgUid})`} strokeWidth="14" strokeLinecap="round" />
+            <path d="M 262,150 A 112,112 0 0,1 38,150" fill="none" stroke={`url(#tirangaGreenHalo_${svgUid})`} strokeWidth="14" strokeLinecap="round" />
             <circle cx="150" cy="150" r="112" fill="none" stroke="#ffffff" strokeWidth="2.5" />
             
             {/* 24-spoke Ashoka Chakra Watermark Lines */}
@@ -881,22 +900,22 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
           <div className="absolute inset-0 rounded-full border-2 border-yellow-300 shadow-[0_0_30px_rgba(251,191,36,0.95)] animate-orbit-dance" />
           <svg viewBox="0 0 300 300" className="w-full h-full block animate-spin-slow will-change-transform drop-shadow-[0_4px_16px_rgba(0,0,0,0.7)]">
             <defs>
-              <linearGradient id="bharatGold" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id={`bharatGold_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#ffffff" />
                 <stop offset="25%" stopColor="#ffd700" />
                 <stop offset="50%" stopColor="#d97706" />
                 <stop offset="75%" stopColor="#fbbf24" />
                 <stop offset="100%" stopColor="#78350f" />
               </linearGradient>
-              <linearGradient id="bharatPlatinum" x1="0%" y1="0%" x2="100%" y2="0%">
+              <linearGradient id={`bharatPlatinum_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stopColor="#f8fafc" />
                 <stop offset="50%" stopColor="#cbd5e1" />
                 <stop offset="100%" stopColor="#94a3b8" />
               </linearGradient>
-              <path id="bharatTextOrbit" d="M 150,150 m -114,0 a 114,114 0 1,1 228,0 a 114,114 0 1,1 -228,0" fill="none" />
+              <path id={`bharatTextOrbit_${svgUid}`} d="M 150,150 m -114,0 a 114,114 0 1,1 228,0 a 114,114 0 1,1 -228,0" fill="none" />
             </defs>
-            <circle cx="150" cy="150" r="145" fill="none" stroke="url(#bharatGold)" strokeWidth="4" />
-            <circle cx="150" cy="150" r="139" fill="none" stroke="url(#bharatPlatinum)" strokeWidth="2" strokeDasharray="3,5" />
+            <circle cx="150" cy="150" r="145" fill="none" stroke={`url(#bharatGold_${svgUid})`} strokeWidth="4" />
+            <circle cx="150" cy="150" r="139" fill="none" stroke={`url(#bharatPlatinum_${svgUid})`} strokeWidth="2" strokeDasharray="3,5" />
             
             {/* 12 Sparkling Diamond Gemstones */}
             {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((angle, i) => {
@@ -918,13 +937,13 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
 
             {/* 360 Engraved Text */}
             <text fontFamily="Roboto, sans-serif" fontWeight="900" fontSize="10" fill="#fffbeb" letterSpacing="2" stroke="#451a03" strokeWidth="0.7" paintOrder="stroke fill">
-              <textPath href="#bharatTextOrbit" startOffset="0%">
+              <textPath href={`#bharatTextOrbit_${svgUid}`} startOffset="0%">
                 ★ ACC BHARAT RATNA VIP ★ 24K DIAMOND CHAKRA ★ SUPREME MERIT ★
               </textPath>
             </text>
 
             <circle cx="150" cy="150" r="92" fill="none" stroke="#fbbf24" strokeWidth="2.5" />
-            <circle cx="150" cy="150" r="88" fill="none" stroke="url(#bharatGold)" strokeWidth="3" />
+            <circle cx="150" cy="150" r="88" fill="none" stroke={`url(#bharatGold_${svgUid})`} strokeWidth="3" />
           </svg>
         </div>
       )}
@@ -937,7 +956,7 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
           <div className="absolute inset-0 rounded-full border-2 border-orange-400 shadow-[0_0_28px_rgba(234,88,12,0.95)] animate-flame-pulse" />
           <svg viewBox="0 0 300 300" className="w-full h-full block will-change-transform">
             <defs>
-              <linearGradient id="phoenixGold" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id={`phoenixGold_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#fff8db" />
                 <stop offset="30%" stopColor="#f59e0b" />
                 <stop offset="70%" stopColor="#ea580c" />
@@ -949,7 +968,7 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
             <g className="animate-pulse" style={{ animationDuration: '2s' }}>
               <path
                 d="M 60,150 C 30,120 20,80 50,45 C 55,60 55,80 75,95 C 65,70 70,50 90,35 C 92,55 98,75 115,90 C 105,65 115,45 135,35 C 130,55 135,75 142,95 Z"
-                fill="url(#phoenixGold)"
+                fill={`url(#phoenixGold_${svgUid})`}
                 stroke="#fff8db"
                 strokeWidth="1.2"
                 opacity="0.9"
@@ -960,7 +979,7 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
             <g className="animate-pulse" style={{ animationDuration: '2s' }}>
               <path
                 d="M 240,150 C 270,120 280,80 250,45 C 245,60 245,80 225,95 C 235,70 230,50 210,35 C 208,55 202,75 185,90 C 195,65 185,45 165,35 C 170,55 165,75 158,95 Z"
-                fill="url(#phoenixGold)"
+                fill={`url(#phoenixGold_${svgUid})`}
                 stroke="#fff8db"
                 strokeWidth="1.2"
                 opacity="0.9"
@@ -969,7 +988,7 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
 
             {/* Rotating Flame Orbit Ring */}
             <g className="animate-spin-slow origin-center">
-              <circle cx="150" cy="150" r="132" fill="none" stroke="url(#phoenixGold)" strokeWidth="3" strokeDasharray="6,8" />
+              <circle cx="150" cy="150" r="132" fill="none" stroke={`url(#phoenixGold_${svgUid})`} strokeWidth="3" strokeDasharray="6,8" />
               {[0, 60, 120, 180, 240, 300].map((angle, i) => {
                 const rad = (angle * Math.PI) / 180;
                 const cx = 150 + 132 * Math.cos(rad);
@@ -980,7 +999,7 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
               })}
             </g>
 
-            <circle cx="150" cy="150" r="88" fill="none" stroke="url(#phoenixGold)" strokeWidth="3.5" />
+            <circle cx="150" cy="150" r="88" fill="none" stroke={`url(#phoenixGold_${svgUid})`} strokeWidth="3.5" />
           </svg>
         </div>
       )}
@@ -993,18 +1012,18 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
           <div className="absolute inset-0 rounded-full border-2 border-indigo-400 shadow-[0_0_30px_rgba(147,51,234,0.95)] animate-orbit-dance" />
           <svg viewBox="0 0 300 300" className="w-full h-full block will-change-transform">
             <defs>
-              <linearGradient id="galaxyCosmic" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id={`galaxyCosmic_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#c084fc" />
                 <stop offset="35%" stopColor="#6366f1" />
                 <stop offset="70%" stopColor="#06b6d4" />
                 <stop offset="100%" stopColor="#ec4899" />
               </linearGradient>
-              <path id="galaxyTextOrbit" d="M 150,150 m -114,0 a 114,114 0 1,1 228,0 a 114,114 0 1,1 -228,0" fill="none" />
+              <path id={`galaxyTextOrbit_${svgUid}`} d="M 150,150 m -114,0 a 114,114 0 1,1 228,0 a 114,114 0 1,1 -228,0" fill="none" />
             </defs>
 
             {/* Rotating Nebula Arm 1 */}
             <g className="animate-spin-slow origin-center">
-              <circle cx="150" cy="150" r="142" fill="none" stroke="url(#galaxyCosmic)" strokeWidth="3.5" strokeDasharray="4,8" />
+              <circle cx="150" cy="150" r="142" fill="none" stroke={`url(#galaxyCosmic_${svgUid})`} strokeWidth="3.5" strokeDasharray="4,8" />
               {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => {
                 const rad = (angle * Math.PI) / 180;
                 const cx = 150 + 140 * Math.cos(rad);
@@ -1024,13 +1043,13 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
             <g className="animate-spin-reverse-slow origin-center">
               <circle cx="150" cy="150" r="126" fill="none" stroke="#38bdf8" strokeWidth="2" opacity="0.8" strokeDasharray="2,6" />
               <text fontFamily="Roboto, sans-serif" fontWeight="900" fontSize="9.5" fill="#e0e7ff" letterSpacing="1.8" stroke="#1e1b4b" strokeWidth="0.8" paintOrder="stroke fill">
-                <textPath href="#galaxyTextOrbit" startOffset="0%">
+                <textPath href={`#galaxyTextOrbit_${svgUid}`} startOffset="0%">
                   ★ ACC COSMIC GALAXY ★ START YOUNG REACH THE STARS ★ SUPERNOVA ★
                 </textPath>
               </text>
             </g>
 
-            <circle cx="150" cy="150" r="88" fill="none" stroke="url(#galaxyCosmic)" strokeWidth="3" />
+            <circle cx="150" cy="150" r="88" fill="none" stroke={`url(#galaxyCosmic_${svgUid})`} strokeWidth="3" />
           </svg>
         </div>
       )}
@@ -1043,15 +1062,15 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
           <div className="absolute inset-0 rounded-full border-2 border-orange-400 shadow-[0_0_26px_rgba(249,115,22,0.9)] animate-orbit-dance" />
           <svg viewBox="0 0 300 300" className="w-full h-full block will-change-transform">
             <defs>
-              <linearGradient id="warriorSaffron" x1="0%" y1="0%" x2="100%" y2="0%">
+              <linearGradient id={`warriorSaffron_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stopColor="#ff5500" />
                 <stop offset="100%" stopColor="#ffa000" />
               </linearGradient>
-              <linearGradient id="warriorGreen" x1="0%" y1="0%" x2="100%" y2="0%">
+              <linearGradient id={`warriorGreen_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stopColor="#0a5c22" />
                 <stop offset="100%" stopColor="#16a34a" />
               </linearGradient>
-              <linearGradient id="warriorGold" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id={`warriorGold_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#ffffff" />
                 <stop offset="50%" stopColor="#f59e0b" />
                 <stop offset="100%" stopColor="#78350f" />
@@ -1059,8 +1078,8 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
             </defs>
 
             {/* Saffron & Green Warrior Arcs */}
-            <path d="M 40,150 A 110,110 0 0,1 260,150" fill="none" stroke="url(#warriorSaffron)" strokeWidth="12" strokeLinecap="round" />
-            <path d="M 260,150 A 110,110 0 0,1 40,150" fill="none" stroke="url(#warriorGreen)" strokeWidth="12" strokeLinecap="round" />
+            <path d="M 40,150 A 110,110 0 0,1 260,150" fill="none" stroke={`url(#warriorSaffron_${svgUid})`} strokeWidth="12" strokeLinecap="round" />
+            <path d="M 260,150 A 110,110 0 0,1 40,150" fill="none" stroke={`url(#warriorGreen_${svgUid})`} strokeWidth="12" strokeLinecap="round" />
             <circle cx="150" cy="150" r="110" fill="none" stroke="#ffffff" strokeWidth="2.5" />
 
             {/* 4 Corner Warrior Gold Shields */}
@@ -1070,7 +1089,7 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
               const cy = 150 + 130 * Math.sin(rad);
               return (
                 <g key={i} transform={`translate(${cx}, ${cy}) rotate(${angle})`}>
-                  <polygon points="0,-8 6,-2 4,6 0,9 -4,6 -6,-2" fill="url(#warriorGold)" stroke="#ffffff" strokeWidth="0.8" />
+                  <polygon points="0,-8 6,-2 4,6 0,9 -4,6 -6,-2" fill={`url(#warriorGold_${svgUid})`} stroke="#ffffff" strokeWidth="0.8" />
                 </g>
               );
             })}
@@ -1091,7 +1110,7 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
               })}
             </g>
 
-            <circle cx="150" cy="150" r="88" fill="none" stroke="url(#warriorGold)" strokeWidth="3.5" />
+            <circle cx="150" cy="150" r="88" fill="none" stroke={`url(#warriorGold_${svgUid})`} strokeWidth="3.5" />
           </svg>
         </div>
       )}
@@ -1104,14 +1123,14 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
           <div className="absolute inset-0 rounded-full border-2 border-emerald-400 shadow-[0_0_28px_rgba(16,185,129,0.95)] animate-orbit-dance" />
           <svg viewBox="0 0 300 300" className="w-full h-full block animate-spin-slow will-change-transform">
             <defs>
-              <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id={`emeraldGrad_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#a7f3d0" />
                 <stop offset="30%" stopColor="#34d399" />
                 <stop offset="70%" stopColor="#059669" />
                 <stop offset="100%" stopColor="#064e3b" />
               </linearGradient>
             </defs>
-            <circle cx="150" cy="150" r="144" fill="none" stroke="url(#emeraldGrad)" strokeWidth="4" />
+            <circle cx="150" cy="150" r="144" fill="none" stroke={`url(#emeraldGrad_${svgUid})`} strokeWidth="4" />
             <circle cx="150" cy="150" r="132" fill="none" stroke="#fcd34d" strokeWidth="1.8" strokeDasharray="4,6" />
 
             {/* 8 Emerald Facet Jewels */}
@@ -1127,7 +1146,7 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
                     width="9"
                     height="9"
                     transform={`rotate(45, ${cx}, ${cy})`}
-                    fill="url(#emeraldGrad)"
+                    fill={`url(#emeraldGrad_${svgUid})`}
                     stroke="#ffffff"
                     strokeWidth="1"
                   />
@@ -1149,7 +1168,7 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
           <div className="absolute inset-0 rounded-full border-2 border-rose-400 shadow-[0_0_28px_rgba(225,29,72,0.95)] animate-flame-pulse" />
           <svg viewBox="0 0 300 300" className="w-full h-full block will-change-transform">
             <defs>
-              <linearGradient id="rubyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id={`rubyGrad_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#fecdd3" />
                 <stop offset="25%" stopColor="#fb7185" />
                 <stop offset="60%" stopColor="#e11d48" />
@@ -1160,7 +1179,7 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
             {/* Golden Emperor Laurel Wreath Ring */}
             <g className="animate-spin-slow origin-center">
               <circle cx="150" cy="150" r="142" fill="none" stroke="#fbbf24" strokeWidth="2.5" />
-              <circle cx="150" cy="150" r="136" fill="none" stroke="url(#rubyGrad)" strokeWidth="3.5" strokeDasharray="6,6" />
+              <circle cx="150" cy="150" r="136" fill="none" stroke={`url(#rubyGrad_${svgUid})`} strokeWidth="3.5" strokeDasharray="6,6" />
 
               {/* 10 Ruby Heart & Teardrop Jewels */}
               {[0, 36, 72, 108, 144, 180, 216, 252, 288, 324].map((angle, i) => {
@@ -1169,14 +1188,14 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
                 const cy = 150 + 136 * Math.sin(rad);
                 return (
                   <g key={i}>
-                    <circle cx={cx} cy={cy} r="5" fill="url(#rubyGrad)" stroke="#ffffff" strokeWidth="1" />
+                    <circle cx={cx} cy={cy} r="5" fill={`url(#rubyGrad_${svgUid})`} stroke="#ffffff" strokeWidth="1" />
                     <circle cx={cx - 1.2} cy={cy - 1.2} r="1.5" fill="#ffffff" />
                   </g>
                 );
               })}
             </g>
 
-            <circle cx="150" cy="150" r="88" fill="none" stroke="url(#rubyGrad)" strokeWidth="3.5" />
+            <circle cx="150" cy="150" r="88" fill="none" stroke={`url(#rubyGrad_${svgUid})`} strokeWidth="3.5" />
           </svg>
         </div>
       )}
@@ -1189,7 +1208,7 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
           <div className="absolute inset-0 rounded-full border-2 border-cyan-400 shadow-[0_0_28px_rgba(6,182,212,0.95)] animate-orbit-dance" />
           <svg viewBox="0 0 300 300" className="w-full h-full block will-change-transform">
             <defs>
-              <linearGradient id="cyberMatrixGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id={`cyberMatrixGrad_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#22d3ee" />
                 <stop offset="50%" stopColor="#3b82f6" />
                 <stop offset="100%" stopColor="#10b981" />
@@ -1201,7 +1220,7 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
               <polygon
                 points="150,10 270,80 270,220 150,290 30,220 30,80"
                 fill="none"
-                stroke="url(#cyberMatrixGrad)"
+                stroke={`url(#cyberMatrixGrad_${svgUid})`}
                 strokeWidth="2.5"
                 opacity="0.85"
               />
@@ -1243,7 +1262,7 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
           <div className="absolute inset-0 rounded-full border-2 border-amber-300 shadow-[0_0_30px_rgba(245,158,11,1)] animate-flame-pulse" />
           <svg viewBox="0 0 300 300" className="w-full h-full block will-change-transform">
             <defs>
-              <linearGradient id="solarFlareGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id={`solarFlareGrad_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#ffffff" />
                 <stop offset="25%" stopColor="#fef08a" />
                 <stop offset="50%" stopColor="#f59e0b" />
@@ -1268,13 +1287,13 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
                   <polygon
                     key={i}
                     points={`${tipX},${tipY} ${b1X},${b1Y} ${b2X},${b2Y}`}
-                    fill="url(#solarFlareGrad)"
+                    fill={`url(#solarFlareGrad_${svgUid})`}
                     stroke="#fff8db"
                     strokeWidth="0.8"
                   />
                 );
               })}
-              <circle cx="150" cy="150" r="128" fill="none" stroke="url(#solarFlareGrad)" strokeWidth="3" />
+              <circle cx="150" cy="150" r="128" fill="none" stroke={`url(#solarFlareGrad_${svgUid})`} strokeWidth="3" />
             </g>
 
             <circle cx="150" cy="150" r="88" fill="none" stroke="#f59e0b" strokeWidth="3.5" />
@@ -1290,16 +1309,16 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
           <div className="absolute inset-0 rounded-full border-2 border-cyan-300 shadow-[0_0_32px_rgba(56,189,248,1)] animate-orbit-dance" />
           <svg viewBox="0 0 300 300" className="w-full h-full block will-change-transform">
             <defs>
-              <linearGradient id="kohinoorGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id={`kohinoorGrad_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#ffffff" />
                 <stop offset="25%" stopColor="#bae6fd" />
                 <stop offset="50%" stopColor="#38bdf8" />
                 <stop offset="75%" stopColor="#818cf8" />
                 <stop offset="100%" stopColor="#c084fc" />
               </linearGradient>
-              <path id="kohinoorPath" d="M 150,150 m -114,0 a 114,114 0 1,1 228,0 a 114,114 0 1,1 -228,0" fill="none" />
+              <path id={`kohinoorPath_${svgUid}`} d="M 150,150 m -114,0 a 114,114 0 1,1 228,0 a 114,114 0 1,1 -228,0" fill="none" />
             </defs>
-            <circle cx="150" cy="150" r="144" fill="none" stroke="url(#kohinoorGrad)" strokeWidth="3.5" />
+            <circle cx="150" cy="150" r="144" fill="none" stroke={`url(#kohinoorGrad_${svgUid})`} strokeWidth="3.5" />
             <circle cx="150" cy="150" r="136" fill="none" stroke="#ffffff" strokeWidth="1.5" strokeDasharray="3,6" opacity="0.8" />
             
             {/* 16 Rotating Sparkling Diamonds */}
@@ -1320,13 +1339,13 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
             {/* Rotating 360 Engraved Text */}
             <g className="animate-spin-reverse-slow origin-center">
               <text fontFamily="Roboto, sans-serif" fontWeight="900" fontSize="10.5" fill="#e0f2fe" letterSpacing="2.2" stroke="#0369a1" strokeWidth="0.8" paintOrder="stroke fill">
-                <textPath href="#kohinoorPath" startOffset="0%">
+                <textPath href={`#kohinoorPath_${svgUid}`} startOffset="0%">
                   ★ ACC KOHINOOR CROWN ★ DIAMOND SUPREME ★ ACHIEVERS CLUB ★
                 </textPath>
               </text>
             </g>
 
-            <circle cx="150" cy="150" r="88" fill="none" stroke="url(#kohinoorGrad)" strokeWidth="3.5" />
+            <circle cx="150" cy="150" r="88" fill="none" stroke={`url(#kohinoorGrad_${svgUid})`} strokeWidth="3.5" />
           </svg>
         </div>
       )}
@@ -1339,13 +1358,13 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
           <div className="absolute inset-0 rounded-full border-2 border-orange-500 shadow-[0_0_32px_rgba(249,115,22,1)] animate-flame-pulse" />
           <svg viewBox="0 0 300 300" className="w-full h-full block will-change-transform">
             <defs>
-              <linearGradient id="bhagwaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id={`bhagwaGrad_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#fff7ed" />
                 <stop offset="30%" stopColor="#fb923c" />
                 <stop offset="70%" stopColor="#ea580c" />
                 <stop offset="100%" stopColor="#9a3412" />
               </linearGradient>
-              <path id="bhagwaPath" d="M 150,150 m -112,0 a 112,112 0 1,1 224,0 a 112,112 0 1,1 -224,0" fill="none" />
+              <path id={`bhagwaPath_${svgUid}`} d="M 150,150 m -112,0 a 112,112 0 1,1 224,0 a 112,112 0 1,1 -224,0" fill="none" />
             </defs>
 
             {/* 12 Radiant Bhagwa Pennant Spears */}
@@ -1362,18 +1381,18 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
                   <polygon
                     key={i}
                     points={`${tipX},${tipY} ${b1X},${b1Y} ${b2X},${b2Y}`}
-                    fill="url(#bhagwaGrad)"
+                    fill={`url(#bhagwaGrad_${svgUid})`}
                     stroke="#fef08a"
                     strokeWidth="0.8"
                   />
                 );
               })}
-              <circle cx="150" cy="150" r="130" fill="none" stroke="url(#bhagwaGrad)" strokeWidth="3" />
+              <circle cx="150" cy="150" r="130" fill="none" stroke={`url(#bhagwaGrad_${svgUid})`} strokeWidth="3" />
             </g>
 
             {/* Engraved Sanskrit Inscription Orbit */}
             <text fontFamily="Roboto, sans-serif" fontWeight="900" fontSize="10" fill="#fff7ed" letterSpacing="2" stroke="#7c2d12" strokeWidth="0.8" paintOrder="stroke fill">
-              <textPath href="#bhagwaPath" startOffset="0%">
+              <textPath href={`#bhagwaPath_${svgUid}`} startOffset="0%">
                 🚩 प्रतिपच्चंद्रलेखेव वर्धिष्णुर्विश्ववंदिता 🚩 ACC INDIA SWARAJYA 🚩
               </textPath>
             </text>
@@ -1391,13 +1410,13 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
           <div className="absolute inset-0 rounded-full border-2 border-teal-400 shadow-[0_0_30px_rgba(20,184,166,1)] animate-orbit-dance" />
           <svg viewBox="0 0 300 300" className="w-full h-full block will-change-transform">
             <defs>
-              <linearGradient id="quantumGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id={`quantumGrad_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#5eead4" />
                 <stop offset="50%" stopColor="#06b6d4" />
                 <stop offset="100%" stopColor="#3b82f6" />
               </linearGradient>
             </defs>
-            <circle cx="150" cy="150" r="144" fill="none" stroke="url(#quantumGrad)" strokeWidth="3" strokeDasharray="12,6" className="animate-spin-slow origin-center" />
+            <circle cx="150" cy="150" r="144" fill="none" stroke={`url(#quantumGrad_${svgUid})`} strokeWidth="3" strokeDasharray="12,6" className="animate-spin-slow origin-center" />
             <circle cx="150" cy="150" r="134" fill="none" stroke="#a5f3fc" strokeWidth="2" strokeDasharray="4,8" className="animate-spin-reverse-slow origin-center" />
             
             {/* 3 Elliptical Orbiting Particle Paths */}
@@ -1429,14 +1448,14 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
           <div className="absolute inset-0 rounded-full border-2 border-emerald-400 shadow-[0_0_30px_rgba(16,185,129,1)] animate-orbit-dance" />
           <svg viewBox="0 0 300 300" className="w-full h-full block will-change-transform">
             <defs>
-              <linearGradient id="peacockGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id={`peacockGrad_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#34d399" />
                 <stop offset="40%" stopColor="#06b6d4" />
                 <stop offset="80%" stopColor="#2563eb" />
                 <stop offset="100%" stopColor="#1e3a8a" />
               </linearGradient>
             </defs>
-            <circle cx="150" cy="150" r="144" fill="none" stroke="url(#peacockGrad)" strokeWidth="3.5" />
+            <circle cx="150" cy="150" r="144" fill="none" stroke={`url(#peacockGrad_${svgUid})`} strokeWidth="3.5" />
             
             {/* 8 Royal Peacock Eyelets */}
             <g className="animate-spin-slow origin-center">
@@ -1467,14 +1486,14 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
           <div className="absolute inset-0 rounded-full border-2 border-yellow-400 shadow-[0_0_30px_rgba(234,179,8,1)] animate-flame-pulse" />
           <svg viewBox="0 0 300 300" className="w-full h-full block will-change-transform">
             <defs>
-              <linearGradient id="cryptoGold" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id={`cryptoGold_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#fffbeb" />
                 <stop offset="30%" stopColor="#fde047" />
                 <stop offset="70%" stopColor="#ca8a04" />
                 <stop offset="100%" stopColor="#854d0e" />
               </linearGradient>
             </defs>
-            <circle cx="150" cy="150" r="144" fill="none" stroke="url(#cryptoGold)" strokeWidth="3.5" />
+            <circle cx="150" cy="150" r="144" fill="none" stroke={`url(#cryptoGold_${svgUid})`} strokeWidth="3.5" />
             
             {/* Hexagonal Node Mesh */}
             <g className="animate-spin-slow origin-center">
@@ -1492,7 +1511,7 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
               <circle cx="150" cy="150" r="126" fill="none" stroke="#facc15" strokeWidth="1.5" strokeDasharray="6,4" />
             </g>
 
-            <circle cx="150" cy="150" r="88" fill="none" stroke="url(#cryptoGold)" strokeWidth="3.5" />
+            <circle cx="150" cy="150" r="88" fill="none" stroke={`url(#cryptoGold_${svgUid})`} strokeWidth="3.5" />
           </svg>
         </div>
       )}
@@ -1505,14 +1524,14 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
           <div className="absolute inset-0 rounded-full border-2 border-sky-400 shadow-[0_0_32px_rgba(59,130,246,1)] animate-orbit-dance" />
           <svg viewBox="0 0 300 300" className="w-full h-full block will-change-transform">
             <defs>
-              <linearGradient id="thunderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id={`thunderGrad_${svgUid}`} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#ffffff" />
                 <stop offset="30%" stopColor="#38bdf8" />
                 <stop offset="70%" stopColor="#2563eb" />
                 <stop offset="100%" stopColor="#1e1b4b" />
               </linearGradient>
             </defs>
-            <circle cx="150" cy="150" r="144" fill="none" stroke="url(#thunderGrad)" strokeWidth="3.5" />
+            <circle cx="150" cy="150" r="144" fill="none" stroke={`url(#thunderGrad_${svgUid})`} strokeWidth="3.5" />
             
             {/* 8 Radiating Thunderbolts */}
             <g className="animate-spin-slow origin-center">
@@ -1534,7 +1553,7 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
       )}
 
       {/* ----------------------------------------------------------------- */}
-      {/* 9. INNER AVATAR PHOTO & INITIALS CONTAINER                       */}
+      {/* 9. INNER AVATAR PHOTO & INITIALS CONTAINER + METALLIC 3D SHEEN    */}
       {/* ----------------------------------------------------------------- */}
       <div
         className={`relative rounded-full p-1 z-10 transition-all duration-300 ${
@@ -1544,30 +1563,56 @@ export const AvatarWith3DFrame: React.FC<AvatarWith3DFrameProps> = ({
         }`}
       >
         <div
-          className={`${sizeClasses[size]} relative rounded-full overflow-hidden bg-gradient-to-br from-slate-800 to-slate-950 flex items-center justify-center font-bold font-display text-white border-2 border-white shadow-inner z-10`}
+          className={`${sizeClasses[size]} relative rounded-full overflow-hidden bg-gradient-to-br from-slate-800 to-slate-950 flex items-center justify-center font-bold font-display text-white border-2 border-white/90 shadow-[inset_0_2px_10px_rgba(0,0,0,0.65)] z-10`}
         >
-          {avatarUrl ? (
+          {avatarUrl && !imgFailed ? (
             <img
               src={avatarUrl}
               alt={name}
+              referrerPolicy="no-referrer"
               className="w-full h-full object-cover"
-              onError={(e) => {
-                (e.target as HTMLElement).style.display = 'none';
-              }}
+              onError={() => setImgFailed(true)}
             />
           ) : (
             <span className="tracking-wider drop-shadow-sm">{initials}</span>
           )}
+
+          {/* Subtle Diagonal 3D Light Sheen Across Framed Portrait */}
+          {!isNone && isShowcaseSize && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 overflow-hidden rounded-full"
+            >
+              <div className="w-1/2 h-[180%] -top-[40%] bg-gradient-to-r from-transparent via-white/30 to-transparent animate-frame-shimmer" />
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Starlight Glint Orbits on Showcase Size Frames */}
+      {!isNone && isShowcaseSize && (
+        <div aria-hidden="true" className="pointer-events-none absolute -inset-4 z-25">
+          <span
+            className="absolute top-1 left-4 w-2 h-2 rounded-full bg-white shadow-[0_0_8px_#fff] animate-frame-sparkle"
+            style={{ animationDelay: '0s' }}
+          />
+          <span
+            className="absolute bottom-3 right-2 w-1.5 h-1.5 rounded-full bg-amber-200 shadow-[0_0_8px_#fde047] animate-frame-sparkle"
+            style={{ animationDelay: '0.8s' }}
+          />
+          <span
+            className="absolute top-1/2 -left-1 w-1.5 h-1.5 rounded-full bg-cyan-200 shadow-[0_0_8px_#67e8f9] animate-frame-sparkle"
+            style={{ animationDelay: '1.5s' }}
+          />
+        </div>
+      )}
 
       {/* ----------------------------------------------------------------- */}
       {/* 10. 3D BADGE INDICATOR (BOTTOM CORNER)                           */}
       {/* ----------------------------------------------------------------- */}
       {showBadge && !isNone && (
         <div
-          className={`absolute ${badgeSizes[size]} rounded-full bg-slate-950 border-2 border-white flex items-center justify-center shadow-lg z-30 animate-bounce`}
-          style={{ animationDuration: '3s' }}
+          className={`absolute ${badgeSizes[size]} rounded-full bg-slate-950 border-2 border-white flex items-center justify-center shadow-lg z-30 transition-transform duration-200`}
           title={activeFrame.name}
         >
           <span>{activeFrame.icon}</span>

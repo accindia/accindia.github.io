@@ -97,10 +97,14 @@ export default function App() {
         if (typeof window !== 'undefined') {
           const params = new URLSearchParams(window.location.search);
           let sId = params.get('sponsor') || params.get('ref');
-          if (sId && sId.trim()) {
-            sessionStorage.setItem('acc_active_sponsor_ref', sId.trim());
-          } else {
-            sId = sessionStorage.getItem('acc_active_sponsor_ref');
+          try {
+            if (sId && sId.trim()) {
+              sessionStorage.setItem('acc_active_sponsor_ref', sId.trim());
+            } else {
+              sId = sessionStorage.getItem('acc_active_sponsor_ref');
+            }
+          } catch {
+            // ignore restricted storage
           }
 
           if (sId && sId.trim()) {
@@ -126,47 +130,99 @@ export default function App() {
 
   // Load initial user & subscribe to sync across tabs/windows & Firestore multi-device
   useEffect(() => {
+    const isSeedUser = (u: Member | null) =>
+      !u || u.id === 'mem-001' || u.id === 'mem-002' || u.id === 'mem-003';
+
+    const safeUpdateCurrentUser = (nextUser: Member) => {
+      setCurrentUser((prev) => {
+        if (
+          prev &&
+          prev.accId === nextUser.accId &&
+          prev.status === nextUser.status &&
+          prev.walletBalance === nextUser.walletBalance &&
+          prev.totalEarnings === nextUser.totalEarnings &&
+          prev.avatarFrame === nextUser.avatarFrame &&
+          prev.avatarUrl === nextUser.avatarUrl &&
+          prev.activeSessionId === nextUser.activeSessionId &&
+          prev.lastEditedAt === nextUser.lastEditedAt &&
+          prev.isActive === nextUser.isActive
+        ) {
+          return prev;
+        }
+        return nextUser;
+      });
+    };
+
     // 1. Initial background sync with Firestore
     StorageService.initFirestoreSync().then(() => {
       const user = StorageService.getCurrentUser();
-      if (user && user.id !== 'mem-001' && user.id !== 'mem-002' && user.id !== 'mem-003') {
-        setCurrentUser(user);
+      if (!isSeedUser(user)) {
+        safeUpdateCurrentUser(user!);
       }
     });
 
-    const user = StorageService.getCurrentUser();
-    // Do NOT auto-login as fake/dummy seed users (mem-001 / mem-002 / mem-003)
-    if (user && user.id !== 'mem-001' && user.id !== 'mem-002' && user.id !== 'mem-003') {
-      setCurrentUser(user);
-    } else {
-      StorageService.setCurrentUser(null);
+    const initialUser = StorageService.getCurrentUser();
+    if (!isSeedUser(initialUser)) {
+      safeUpdateCurrentUser(initialUser!);
+    } else if (initialUser) {
+      StorageService.setCurrentUser(null, true);
       setCurrentUser(null);
     }
 
     // 2. Real-time multi-device Firestore synchronization for members
     const unsubscribeFirestore = FirestoreService.subscribeToMembers((cloudMembers) => {
+      if (cloudMembers && cloudMembers.length > 0) {
+        StorageService.mergeMembersWithCloud(cloudMembers, true);
+      }
       const current = StorageService.getCurrentUser();
       if (current) {
         const found = cloudMembers.find((m) => m.accId.toUpperCase() === current.accId.toUpperCase());
         if (found) {
-          // Check multi-device single active session protection!
           const localSessionId = StorageService.getLocalSessionId();
-          if (found.activeSessionId && localSessionId && found.activeSessionId !== localSessionId) {
-            // A newer session was created on another device!
+          const localSessTs = StorageService.parseSessionTimestamp(localSessionId);
+          const cloudSessTs = StorageService.parseSessionTimestamp(found.activeSessionId);
+
+          // ONLY kick out if another device created a STRICTLY NEWER session (>2s newer) and cloud writes aren't paused
+          if (
+            found.activeSessionId &&
+            localSessionId &&
+            found.activeSessionId !== localSessionId &&
+            cloudSessTs > localSessTs + 2000 &&
+            !FirestoreService.isWriteQuotaPaused()
+          ) {
             StorageService.clearSession();
             setCurrentUser(null);
             setDeviceKickoutAlertOpen(true);
             return;
           }
 
-          StorageService.setCurrentUser(found);
-          setCurrentUser(found);
+          // Protect newer local session / edits from being overwritten by stale Firestore snapshots
+          const localEditTs = current.lastEditedAt ? Date.parse(current.lastEditedAt) || 0 : 0;
+          const cloudEditTs = found.lastEditedAt ? Date.parse(found.lastEditedAt) || 0 : 0;
+          const keepLocalEdits = localEditTs > cloudEditTs;
+          const keepLocalSession = localSessTs >= cloudSessTs && Boolean(localSessionId);
+
+          const mergedUser: Member = {
+            ...found,
+            ...(keepLocalEdits ? current : {}),
+            avatarUrl: (keepLocalEdits ? current.avatarUrl : found.avatarUrl) || current.avatarUrl || found.avatarUrl,
+            activeSessionId: keepLocalSession ? localSessionId! : (found.activeSessionId || current.activeSessionId),
+            lastLoginAt: keepLocalSession ? (current.lastLoginAt || found.lastLoginAt) : (found.lastLoginAt || current.lastLoginAt),
+          };
+
+          StorageService.setCurrentUser(mergedUser, true);
+          safeUpdateCurrentUser(mergedUser);
         }
       }
       // Also sync referral sponsor if stored
-      const storedSponsorId = typeof window !== 'undefined' ? sessionStorage.getItem('acc_active_sponsor_ref') : null;
+      let storedSponsorId: string | null = null;
+      try {
+        storedSponsorId = typeof window !== 'undefined' ? sessionStorage.getItem('acc_active_sponsor_ref') : null;
+      } catch {
+        // ignore
+      }
       if (storedSponsorId) {
-        const sponsorFound = cloudMembers.find((m) => m.accId.toUpperCase() === storedSponsorId.trim().toUpperCase());
+        const sponsorFound = cloudMembers.find((m) => m.accId.toUpperCase() === storedSponsorId!.trim().toUpperCase());
         if (sponsorFound) {
           setReferralSponsor(sponsorFound);
         }
@@ -183,15 +239,22 @@ export default function App() {
     // 4. Tab-level synchronization
     const unsubscribeSync = subscribeToSync(() => {
       const refreshedUser = StorageService.getCurrentUser();
-      if (refreshedUser && refreshedUser.id !== 'mem-001' && refreshedUser.id !== 'mem-002') {
+      if (!isSeedUser(refreshedUser)) {
         const localSessionId = StorageService.getLocalSessionId();
-        if (refreshedUser.activeSessionId && localSessionId && refreshedUser.activeSessionId !== localSessionId) {
+        const localSessTs = StorageService.parseSessionTimestamp(localSessionId);
+        const refreshedSessTs = StorageService.parseSessionTimestamp(refreshedUser!.activeSessionId);
+        if (
+          refreshedUser!.activeSessionId &&
+          localSessionId &&
+          refreshedUser!.activeSessionId !== localSessionId &&
+          refreshedSessTs > localSessTs + 2000
+        ) {
           StorageService.clearSession();
           setCurrentUser(null);
           setDeviceKickoutAlertOpen(true);
           return;
         }
-        setCurrentUser(refreshedUser);
+        safeUpdateCurrentUser(refreshedUser!);
       } else {
         setCurrentUser(null);
       }
@@ -519,7 +582,7 @@ export default function App() {
         {/* VIEW: ACC CHAT & HELP (Complete Facebook-like Social System) */}
         {activeWindow === 'chat' && (
           currentUser ? (
-            <div className="fixed inset-0 z-[60] bg-slate-950 overflow-y-auto animate-fadeIn">
+            <div className="fixed inset-0 z-[60] bg-slate-950 overflow-hidden animate-fadeIn">
               <AccChatAndHelpHub
                 currentUser={currentUser}
                 onClose={() => handleNavigateWithScroll('dashboard')}

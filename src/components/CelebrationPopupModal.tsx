@@ -11,15 +11,22 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { CelebrationPopupItem, SiteConfig } from '../types';
-import { getTodayFestival } from '../utils/festivalPanchangEngine';
+import {
+  getTodayFestival,
+  getStrictlyUpcomingFestivals,
+  calculateFestivalCountdown,
+  isFestivalItemExpired,
+  getLocalDateStr,
+} from '../utils/festivalPanchangEngine';
 
 export type PopupPageContext = 'home' | 'dashboard' | 'other';
 
 /**
  * Resolves which celebration popups should be shown right now.
- * STRICT RULE:
- * - If admin has NOT set any photo or popup message (`celebrationPopups` empty),
- *   NO popup is shown UNLESS today is a real-time festival/celebration!
+ * - Filters out any passed festivals automatically.
+ * - If admin added non-expired manual items, shows those first.
+ * - Otherwise automatically generates BOTH Today's Active Festival (if any) AND Upcoming Festival(s)
+ *   with their matching festival photo, clear festival greeting message, and countdown!
  */
 export function resolveActiveCelebrationPopups(
   siteConfig: SiteConfig,
@@ -42,9 +49,10 @@ export function resolveActiveCelebrationPopups(
   const manualItems = Array.isArray(siteConfig.celebrationPopups)
     ? siteConfig.celebrationPopups.filter(
         (item) =>
-          Boolean(item.imageUrl?.trim()) ||
-          Boolean(item.title?.trim()) ||
-          Boolean(item.message?.trim())
+          (Boolean(item.imageUrl?.trim()) ||
+            Boolean(item.title?.trim()) ||
+            Boolean(item.message?.trim())) &&
+          !isFestivalItemExpired(item, now)
       )
     : [];
 
@@ -52,29 +60,56 @@ export function resolveActiveCelebrationPopups(
     return manualItems;
   }
 
-  // No manual photo or popup message is set -> ONLY show if a real-time festival is active today!
+  // Real-Time Auto Festival Mode: Today's Festival + Upcoming Festival(s)
   if (siteConfig.celebrationAutoRealTimeFestival === false) {
     return [];
   }
 
+  const autoItems: CelebrationPopupItem[] = [];
   const todayFestival = getTodayFestival(now);
-  if (!todayFestival) {
-    return [];
-  }
+  const upcomingFestivals = getStrictlyUpcomingFestivals(now, todayFestival ? 1 : 2);
 
-  return [
-    {
-      id: `realtime_festival_${todayFestival.id}`,
+  if (todayFestival) {
+    autoItems.push({
+      id: `realtime_today_${todayFestival.id}_${getLocalDateStr(now)}`,
       imageUrl: todayFestival.imageUrl,
-      badgeText: `${todayFestival.badge} • आज का लाइव पर्व`,
-      title: `आप सभी मित्रों को ${todayFestival.hindiName} की हार्दिक शुभकामनाएं!`,
-      message: `${todayFestival.tagline}\n📅 शुभ तिथि: ${todayFestival.tithi}\n⏰ शुभ मुहूर्त: ${todayFestival.shubhMuhurat}`,
+      badgeText: `🎉 आज का महापर्व • ${todayFestival.badge}`,
+      title: todayFestival.greetingTitle,
+      message: `${todayFestival.greetingMessage}\n\n📅 शुभ तिथि: ${todayFestival.tithi}\n⏰ शुभ मुहूर्त: ${todayFestival.shubhMuhurat}\n🚩 शुभ लग्न: ${todayFestival.lagan}`,
       actionUrl: todayFestival.ctaTarget || 'register',
       actionLabel: todayFestival.ctaText || 'अभी जॉइन करें (₹249)',
       enableCelebrationEffect: true,
+      festivalDate: todayFestival.date,
       createdAt: now.toISOString(),
-    },
-  ];
+    });
+  }
+
+  upcomingFestivals.forEach((upcoming, idx) => {
+    const countdown = calculateFestivalCountdown(upcoming.date, now);
+    const daysAhead = countdown.days + (countdown.hours > 0 || countdown.minutes > 0 ? 1 : 0);
+    const formattedDate = new Date(`${upcoming.date}T00:00:00`).toLocaleDateString('hi-IN', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    autoItems.push({
+      id: `realtime_upcoming_${upcoming.id}_${getLocalDateStr(now)}`,
+      imageUrl: upcoming.imageUrl,
+      badgeText: idx === 0
+        ? `⏳ आने वाला त्यौहार (${daysAhead} दिन शेष) • ${formattedDate}`
+        : `📅 अगला पावन पर्व • ${formattedDate}`,
+      title: `${upcoming.hindiName} की अग्रिम हार्दिक शुभकामनाएं! ${upcoming.iconEmoji}`,
+      message: `${upcoming.upcomingGreetingMessage || upcoming.greetingMessage}\n\n📅 आगामी तिथि: ${formattedDate} (${upcoming.tithi})\n⏰ शुभ मुहूर्त: ${upcoming.shubhMuhurat}\n⏳ शेष समय: ${countdown.days} दिन ${countdown.hours} घंटे`,
+      actionUrl: upcoming.ctaTarget || 'register',
+      actionLabel: upcoming.ctaText || 'अभी शुरुआत करें (₹249)',
+      enableCelebrationEffect: true,
+      festivalDate: upcoming.date,
+      createdAt: now.toISOString(),
+    });
+  });
+
+  return autoItems;
 }
 
 interface CelebrationPopupModalProps {
@@ -263,14 +298,22 @@ export const CelebrationPopupModal: React.FC<CelebrationPopupModalProps> = ({
 
         {/* Body Content (Scrollable on tiny screens) */}
         <div className="overflow-y-auto flex-1">
-          {/* Uploaded Photo Container (Shown when photo exists) */}
+          {/* Uploaded / Real-Time Festival Photo Container */}
           {activeItem.imageUrl && (
-            <div className="relative w-full bg-slate-950 flex items-center justify-center border-b border-amber-400/20">
+            <div className="relative w-full aspect-[16/9] max-h-[46vh] bg-slate-950 flex items-center justify-center border-b border-amber-400/30 overflow-hidden">
+              <img
+                src={activeItem.imageUrl}
+                alt=""
+                aria-hidden="true"
+                referrerPolicy="no-referrer"
+                className="absolute inset-0 w-full h-full object-cover blur-md opacity-35 scale-105 pointer-events-none"
+              />
               <img
                 key={activeItem.id}
                 src={activeItem.imageUrl}
                 alt={activeItem.title || 'ACC Celebration Popup'}
-                className="w-full h-auto max-h-[54vh] object-contain select-none"
+                referrerPolicy="no-referrer"
+                className="relative z-10 w-full h-full object-contain select-none drop-shadow-[0_6px_18px_rgba(0,0,0,0.8)]"
                 loading="eager"
               />
 
@@ -279,7 +322,7 @@ export const CelebrationPopupModal: React.FC<CelebrationPopupModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setCurrentIndex((prev) => (prev - 1 + safeItems.length) % safeItems.length)}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/75 hover:bg-black text-white border border-white/30 transition active:scale-90 cursor-pointer"
+                    className="absolute left-2 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-black/75 hover:bg-black text-white border border-white/30 transition active:scale-90 cursor-pointer"
                     aria-label="पिछला पॉप-अप"
                   >
                     <ChevronLeft className="w-5 h-5" />
@@ -287,7 +330,7 @@ export const CelebrationPopupModal: React.FC<CelebrationPopupModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setCurrentIndex((prev) => (prev + 1) % safeItems.length)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/75 hover:bg-black text-white border border-white/30 transition active:scale-90 cursor-pointer"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-black/75 hover:bg-black text-white border border-white/30 transition active:scale-90 cursor-pointer"
                     aria-label="अगला पॉप-अप"
                   >
                     <ChevronRight className="w-5 h-5" />
@@ -302,11 +345,11 @@ export const CelebrationPopupModal: React.FC<CelebrationPopupModalProps> = ({
             <div className="flex items-center justify-center sm:justify-between gap-2 flex-wrap">
               <span className="inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] font-black bg-amber-400/15 text-amber-300 border border-amber-400/40 px-2.5 py-0.5 rounded-full">
                 <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-pulse" />
-                <span>CONGRATULATIONS & CELEBRATION SPECIAL</span>
+                <span>शुभकामना संदेश • पावन उत्सव विशेष</span>
               </span>
               {safeItems.length > 1 && (
-                <span className="text-[11px] font-mono font-bold text-amber-300 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700">
-                  {currentIndex + 1} / {safeItems.length}
+                <span className="text-[11px] font-mono font-bold text-amber-300 bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-700">
+                  स्लाइड {currentIndex + 1} / {safeItems.length}
                 </span>
               )}
             </div>
@@ -318,7 +361,7 @@ export const CelebrationPopupModal: React.FC<CelebrationPopupModalProps> = ({
             )}
 
             {activeItem.message && (
-              <div className="bg-slate-900/90 border border-amber-400/25 rounded-xl p-3 sm:p-4 text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line shadow-inner">
+              <div className="bg-gradient-to-br from-amber-500/10 via-slate-900/95 to-orange-500/10 border border-amber-400/35 rounded-xl p-3.5 sm:p-4 text-xs sm:text-sm text-amber-50 leading-relaxed whitespace-pre-line shadow-inner">
                 {activeItem.message}
               </div>
             )}

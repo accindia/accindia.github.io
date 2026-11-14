@@ -216,6 +216,13 @@
   backface-visibility: hidden;
 }
 
+.acc-avatar-lite,
+.acc-avatar-lite * {
+  animation: none !important;
+  will-change: auto !important;
+  filter: none !important;
+}
+
 /* ------------------------------------------------------------- */
 /* Rainbow & Premium Themes: Rock-Solid Buttons, Borders, Halo Glows (स्थिर व क्रिस्टल क्लियर) */
 /* ------------------------------------------------------------- */
@@ -355,6 +362,75 @@
   animation: orbitDance 7s linear infinite;
   backface-visibility: hidden;
   transform: translateZ(0);
+}
+
+@keyframes frameAuraBreathe {
+  0%, 100% {
+    opacity: 0.72;
+    transform: translate3d(0, 0, 0) scale(0.98);
+  }
+  50% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1.06);
+  }
+}
+
+@keyframes frameShimmerSweep {
+  0% {
+    transform: translate3d(-120%, -120%, 0) rotate(35deg);
+    opacity: 0;
+  }
+  35% {
+    opacity: 0.55;
+  }
+  70% {
+    transform: translate3d(120%, 120%, 0) rotate(35deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translate3d(120%, 120%, 0) rotate(35deg);
+    opacity: 0;
+  }
+}
+
+@keyframes frameSparkleTwinkle {
+  0%, 100% {
+    opacity: 0.35;
+    transform: translate3d(0, 0, 0) scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1.25);
+  }
+}
+
+.animate-frame-aura {
+  animation: frameAuraBreathe 3.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+.animate-frame-shimmer {
+  animation: frameShimmerSweep 3.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  backface-visibility: hidden;
+}
+
+.animate-frame-sparkle {
+  animation: frameSparkleTwinkle 2.2s ease-in-out infinite;
+  backface-visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin-slow,
+  .animate-spin-reverse-slow,
+  .animate-orbit-dance,
+  .animate-flame-pulse,
+  .animate-flame-tongue,
+  .animate-frame-aura,
+  .animate-frame-shimmer,
+  .animate-frame-sparkle {
+    animation: none !important;
+  }
 }
 
 /* ------------------------------------------------------------- */

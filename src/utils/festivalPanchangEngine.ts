@@ -1,7 +1,17 @@
+import type { PromotionalPoster } from '../types';
+import chhathPujaBannerImg from '../assets/images/chhath_puja_banner_1793965595973.jpg';
+import chhathKharnaImg from '../assets/images/chhath_kharna_festival_1794642483479.jpg';
+import chhathArghyaImg from '../assets/images/chhath_arghya_worship_1794642482925.jpg';
+import devUthaniTulsiImg from '../assets/images/dev_uthani_tulsi_vivah_1794642484422.jpg';
+import devDiwaliImg from '../assets/images/dev_diwali_kartik_purnima_1794642486151.jpg';
+import makarSankrantiImg from '../assets/images/makar_sankranti_festive_1794642506856.jpg';
+import studentEarningImg from '../assets/images/acc_student_earning_banner_1793965628499.jpg';
+import accOfficialLogoImg from '../assets/images/acc_official_logo_1793842923620.jpg';
+
 /**
  * Real Panchang & Dynamic Festival Engine (पंचांग व स्वतः त्योहार अपडेट सिस्टम)
  * Automatically computes real-time Panchang, active festivals, countdown to upcoming festivals,
- * auto-removes passed festivals, and generates 7 daily Good Morning / Suvichar slides.
+ * auto-removes passed festivals, and generates dynamic festival + Good Morning / Suvichar slides.
  */
 
 export interface ChoghadiyaItem {
@@ -61,6 +71,9 @@ export interface FestivalEvent {
   tagline: string;
   significance: string;
   pujaVidhi: string;
+  greetingTitle: string;
+  greetingMessage: string;
+  upcomingGreetingMessage: string;
   imageUrl: string;
   badge: string;
   iconEmoji: string;
@@ -78,6 +91,7 @@ export interface DynamicSlide {
   festivalOrDayTitle: string;
   tagline: string;
   mainHeadline: string;
+  greetingMessage?: string;
   description: string;
   highlightPoints: string[];
   panchangHighlight?: {
@@ -111,12 +125,15 @@ export const MASTER_FESTIVALS_CALENDAR: FestivalEvent[] = [
     hindiName: 'छठ महापर्व: नहाय-खाय 2026 (Day 1)',
     date: '2026-11-13',
     tithi: 'कार्तिक शुक्ल चतुर्थी (सूर्य षष्ठी महाव्रत आरंभ)',
-    shubhMuhurat: 'प्रातः 06:42 से 11:30 बजे (पवित्र नदी स्नान व कद्दू-भात ग्रहण)',
+    shubhMuhurat: 'प्रातः 06:42 से 11:30 बजे (पवित्र स्नान व कद्दू-भात प्रसाद)',
     lagan: 'धनु लग्न (शुभ संकल्प)',
-    tagline: 'चार दिवसीय सूर्योपासना का प्रथम दिन - आत्मशुद्धि, पवित्र गंगा स्नान व सात्विक व्रत संकल्प',
-    significance: 'नहाय-खाय से छठ व्रती तन-मन की निर्मलता के साथ 4 दिवसीय महाव्रत का संकल्प लेते हैं। अरवा चावल, चने की दाल व घी में बनी कद्दू (लौकी) की सात्विक सब्जी का महाभोग।',
+    tagline: 'लोक आस्था के महापर्व छठ के प्रथम दिन नहाय-खाय पर पवित्र शुद्धि व सात्विक व्रत संकल्प',
+    significance: 'नहाय-खाय से छठ व्रती तन-मन की निर्मलता के साथ 4 दिवसीय महाव्रत का संकल्प लेते हैं। अरवा चावल, चने की दाल व घी में बनी कद्दू की सात्विक सब्जी का महाभोग।',
     pujaVidhi: 'पवित्र नदी/तालाब में स्नान, भगवान सूर्य देव को जल अर्घ्य, घर-आंगन की शुद्धि व कद्दू-भात प्रसाद ग्रहण।',
-    imageUrl: 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=1200&q=80',
+    greetingTitle: 'नहाय-खाय के पावन अवसर पर छठ महापर्व की हार्दिक शुभकामनाएं! ☀️🪔',
+    greetingMessage: 'सूर्योपासना और पवित्रता के महापर्व नहाय-खाय पर भगवान भास्कर और छठी मइया आपके जीवन को शुद्धता, उत्तम स्वास्थ्य, सुख-शांति और आत्मनिर्भर सफलता से भर दें!',
+    upcomingGreetingMessage: 'लोक आस्था का महापर्व छठ नहाय-खाय आने वाला है—छठी मइया की कृपा से आपके परिवार में पवित्रता और समृद्धि का वास हो!',
+    imageUrl: chhathPujaBannerImg,
     badge: '☀️ छठ महापर्व: नहाय-खाय (Day 1)',
     iconEmoji: '🪔',
     colorGradient: 'from-amber-600 via-orange-600 to-amber-700',
@@ -132,11 +149,14 @@ export const MASTER_FESTIVALS_CALENDAR: FestivalEvent[] = [
     tithi: 'कार्तिक शुक्ल पंचमी',
     shubhMuhurat: 'शाम 05:28 से 06:50 बजे (गुड़-खीर नैवेद्य व प्रसाद ग्रहण)',
     lagan: 'मकर लग्न (स्थिर सिद्धि)',
-    tagline: 'संध्या काल में मिट्टी के नए चूल्हे पर बनी गुड़-खीर व घी की रोटी - 36 घंटे के निर्जला महाव्रत का संकल्प',
-    significance: 'खरना के दिन पूरे दिन निर्जला उपवास के बाद शाम को छठी मइया व भगवान भास्कर को आम की लकड़ी पर गुड़ की खीर का भोग लगाया जाता है। इसके बाद 36 घंटे का अखंड निर्जला व्रत आरंभ होता है।',
+    tagline: 'मिट्टी के चूल्हे पर बनी पावन गुड़-खीर प्रसाद व 36 घंटे के अखंड निर्जला छठ व्रत का शुभारंभ',
+    significance: 'खरना के दिन पूरे दिन उपवास के बाद शाम को छठी मइया व सूर्य देव को आम की लकड़ी पर बनी गुड़ की खीर का भोग लगाकर 36 घंटे का निर्जला व्रत आरंभ किया जाता है।',
     pujaVidhi: 'संध्या आरती, मिट्टी के चूल्हे पर गुड़-खीर का नैवेद्य, कुलदेवता स्मरण व शांत मन से प्रसाद ग्रहण।',
-    imageUrl: 'https://images.unsplash.com/photo-1609766857041-ed402ea8069a?auto=format&fit=crop&w=1200&q=80',
-    badge: '🌾 छठ महापर्व: खरना (Day 2)',
+    greetingTitle: 'छठ महापर्व ' + 'खरना व लोहंडा' + ' की मंगलमय शुभकामनाएं! 🍯🪔',
+    greetingMessage: 'गुड़-खीर के मीठे प्रसाद की तरह छठी मइया आपके परिवार में मधुरता, अखंड सौभाग्य, आरोग्य और हर कार्य में सिद्धि प्रदान करें। खरना महाव्रत की हार्दिक बधाई!',
+    upcomingGreetingMessage: 'आने वाला पावन दिन ' + 'छठ खरना (Day 2)' + ' है—छठी मइया और सूर्य देव के आशीर्वाद से आपका घर-आंगन सुख-समृद्धि व मधुर प्रसाद से महक उठे!',
+    imageUrl: chhathKharnaImg,
+    badge: '🍯 छठ महापर्व: खरना व लोहंडा (Day 2)',
     iconEmoji: '🍯',
     colorGradient: 'from-yellow-600 via-amber-600 to-orange-700',
     accentColor: 'text-yellow-200',
@@ -146,16 +166,19 @@ export const MASTER_FESTIVALS_CALENDAR: FestivalEvent[] = [
   {
     id: 'chhath_sandhya_arghya_2026',
     name: 'Chhath Puja: Sandhya Arghya',
-    hindiName: 'लोक आस्था का महापर्व: छठ संध्या अर्घ्य (पहला अर्घ्य - Day 3)',
+    hindiName: 'महापर्व छठ: संध्या अर्घ्य (पहला अर्घ्य - Day 3)',
     date: '2026-11-15',
     tithi: 'कार्तिक शुक्ल षष्ठी (डाला छठ)',
     shubhMuhurat: 'अस्ताचलगामी (डूबते) सूर्य को अर्घ्य: सायं 05:27 बजे (गोधूलि वेला)',
     lagan: 'कुंभ लग्न (महापुण्य काल)',
-    tagline: 'अस्ताचलगामी भगवान भास्कर को पहला अर्घ्य - घाटों पर सूप-दउरा, ठेकुआ व कांचहि बांस के बहंगिया के पावन गीत',
-    significance: 'सनातन संस्कृति का अद्भुत पर्व जहां डूबते हुए सूर्य को भी अर्घ्य देकर जीवन में प्रकाश देने के लिए कृतज्ञता व्यक्त की जाती है। छठी मइया से संतान सुख, दीर्घायु, आरोग्य व सर्व मनोकामना सिद्धि होती है।',
-    pujaVidhi: 'नदी/तालाब में कमर भर जल में खड़े होकर बांस के सूप में ठेकुआ, गन्ना, मौसमी फल रखकर दूध व गंगाजल से भगवान सूर्य को अर्घ्य।',
-    imageUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80',
-    badge: '🌅 महापर्व छठ: संध्या अर्घ्य (पहला अर्घ्य)',
+    tagline: 'पवित्र घाटों पर बांस के सूप, ठेकुआ, गन्ना और दीपों संग अस्ताचलगामी सूर्य देव को पहला अर्घ्य',
+    significance: 'डूबते सूर्य को अर्घ्य देकर जीवन के हर पड़ाव पर कृतज्ञता सिखाने वाला अद्वितीय महापर्व। छठी मइया से संतान सुख, दीर्घायु, यश और मनवांछित सफलता प्राप्त होती है।',
+    pujaVidhi: 'नदी/तालाब में कमर भर जल में खड़े होकर सूप में ठेकुआ, गन्ना व मौसमी फल रखकर दूध और गंगाजल से सूर्य को अर्घ्य।',
+    greetingTitle: 'डाला छठ संध्या अर्घ्य की असीम शुभकामनाएं! 🌅☀️',
+    greetingMessage: 'डूबते सूर्य की सुनहरी किरणों और छठी मइया के पावन आशीर्वाद से आपके जीवन के सभी कष्ट दूर हों, परिवार में खुशहाली आए और हर सपना साकार हो। जय छठी मइया!',
+    upcomingGreetingMessage: 'आने वाला महापर्व ' + 'डाला छठ संध्या अर्घ्य' + ' है—सूप-दउरा, ठेकुआ और दीपों संग छठी मइया का आशीर्वाद आपके पूरे परिवार पर सदैव बना रहे!',
+    imageUrl: chhathArghyaImg,
+    badge: '🌅 डाला छठ: संध्या अर्घ्य (Day 3)',
     iconEmoji: '☀️',
     colorGradient: 'from-orange-600 via-red-600 to-amber-700',
     accentColor: 'text-yellow-100',
@@ -168,14 +191,17 @@ export const MASTER_FESTIVALS_CALENDAR: FestivalEvent[] = [
     hindiName: 'छठ महापर्व: उषा अर्घ्य व पारण 2026 (Day 4)',
     date: '2026-11-16',
     tithi: 'कार्तिक शुक्ल सप्तमी',
-    shubhMuhurat: 'उदीयमान (उगते) सूर्य को अर्घ्य: प्रातः 06:44 बजे | पारण समय: प्रातः 07:15 बजे के बाद',
+    shubhMuhurat: 'उगते सूर्य को अर्घ्य: प्रातः 06:44 बजे | पारण: प्रातः 07:15 बजे के बाद',
     lagan: 'वृश्चिक लग्न (अमृत सिद्धि)',
-    tagline: 'उदीयमान सूर्य देव को दूसरा अर्घ्य व 36 घंटे निर्जला व्रत का मंगलमय पारण - महाव्रत की सफल पूर्णाहुति',
-    significance: 'उगते सूर्य को अर्घ्य देकर भगवान भास्कर और छठी मइया से समस्त मनोरथ सिद्धि और परिवार की रक्षा का आशीर्वाद लिया जाता है। पारण के साथ महापर्व संपन्न होता है।',
-    pujaVidhi: 'प्रातःकाल नदी घाट पर कमर तक जल में सूर्योदय पर अर्घ्य, बड़ों के चरण स्पर्श व ठेकुआ-प्रसाद से पारण।',
-    imageUrl: 'https://images.unsplash.com/photo-1470240731273-7821a6eeb6bd?auto=format&fit=crop&w=1200&q=80',
+    tagline: 'उदीयमान सूर्य देव को दूसरा अर्घ्य व 36 घंटे के निर्जला छठ महाव्रत का मंगलमय पारण',
+    significance: 'उगते सूर्य की प्रथम किरणों को अर्घ्य देकर भगवान भास्कर से नव ऊर्जा, उज्ज्वल भविष्य, संतान रक्षा और संपूर्ण परिवार के मंगल की प्रार्थना की जाती है।',
+    pujaVidhi: 'प्रातःकाल नदी घाट पर सूर्योदय अर्घ्य, बड़ों का आशीर्वाद व ठेकुआ-प्रसाद ग्रहण कर पारण।',
+    greetingTitle: 'छठ पूजा उषा अर्घ्य एवं मंगल पारण की हार्दिक बधाई! 🌄🚩',
+    greetingMessage: 'उगते सूर्य की सुनहरी आभा की तरह आपका भविष्य चमक उठे! भगवान सूर्य देव व छठी मइया की कृपा से सुख, संपत्ति, स्वास्थ्य और सफलता आपके कदम चूमे।',
+    upcomingGreetingMessage: 'आने वाला पावन दिन ' + 'छठ उषा अर्घ्य व पारण' + ' है—उदीयमान सूर्य देव आपके जीवन में नई रोशनी और अपार उन्नति लेकर आएं!',
+    imageUrl: chhathArghyaImg,
     badge: '🌄 छठ महापर्व: उषा अर्घ्य व पारण (Day 4)',
-    iconEmoji: '🚩',
+    iconEmoji: '🌄',
     colorGradient: 'from-amber-500 via-orange-500 to-red-600',
     accentColor: 'text-amber-100',
     ctaText: 'छठ महापर्व पारण ₹249',
@@ -187,35 +213,41 @@ export const MASTER_FESTIVALS_CALENDAR: FestivalEvent[] = [
     hindiName: 'देवउठनी प्रबोधिनी एकादशी 2026',
     date: '2026-11-20',
     tithi: 'कार्तिक शुक्ल एकादशी',
-    shubhMuhurat: 'प्रातः 06:48 से 08:08 बजे (अमृत चौघड़िया)',
+    shubhMuhurat: 'प्रातः 06:48 से 08:08 बजे (अमृत चौघड़िया) एवं सायं 05:30 बजे दीपदान',
     lagan: 'वृश्चिक लग्न (स्थिर व मांगलिक)',
-    tagline: 'भगवान श्री हरि विष्णु का चार माह के योगनिद्रा से जागरण व मांगलिक कार्यों का शुभारंभ',
-    significance: 'देवउठनी एकादशी से सभी शुभ विवाह, गृह प्रवेश व मांगलिक कार्य आरंभ होते हैं। तुलसी विवाह का पावन अवसर।',
-    pujaVidhi: 'तुलसी-शालिग्राम विवाह, दीपदान, गन्ने का मंडप व विष्णु सहस्रनाम पाठ।',
-    imageUrl: 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=1200&q=80',
-    badge: '🪔 आगामी पावन महापर्व',
+    tagline: 'श्री हरि विष्णु का योगनिद्रा से शुभ जागरण एवं सभी मांगलिक कार्यों का महाशुभारंभ',
+    significance: 'देवउठनी एकादशी से चार माह के चातुर्मास के बाद सभी शुभ विवाह, गृह प्रवेश व नवीन कार्यों का शुभारंभ होता है। गन्ने का मंडप सजाकर दीपदान किया जाता है।',
+    pujaVidhi: 'गन्ने का मंडप सजाकर श्री हरि विष्णु पूजा, शंख ध्वनि, दीपदान व विष्णु सहस्रनाम पाठ।',
+    greetingTitle: 'देवउठनी एकादशी की मंगलमय हार्दिक शुभकामनाएं! 🚩🪔',
+    greetingMessage: 'भगवान श्री हरि विष्णु के शुभ जागरण के साथ आपके जीवन में भी हर रुका हुआ शुभ कार्य प्रारंभ हो। गन्ने के मंडप व दीपदान की तरह आपका जीवन खुशियों से जगमगाए!',
+    upcomingGreetingMessage: 'आने वाला पावन पर्व ' + 'देवउठनी एकादशी' + ' है—श्री हरि की कृपा से आपके घर में मांगलिक कार्यों, समृद्धि व उन्नति के नए द्वार खुलें!',
+    imageUrl: devUthaniTulsiImg,
+    badge: '🪔 देवउठनी प्रबोधिनी एकादशी',
     iconEmoji: '🚩',
-    colorGradient: 'from-amber-600 via-yellow-600 to-amber-700',
-    accentColor: 'text-amber-300',
-    ctaText: 'एकादशी विशेष ऑफर में जॉइन करें (₹249)',
+    colorGradient: 'from-amber-600 via-yellow-600 to-emerald-700',
+    accentColor: 'text-amber-200',
+    ctaText: 'शुभ शुरुआत आज ही करें (₹249)',
     ctaTarget: 'register',
   },
   {
     id: 'tulsi_vivah_2026',
     name: 'Tulsi Vivah',
-    hindiName: 'श्री तुलसी विवाह महापर्व 2026',
+    hindiName: 'श्री तुलसी-शालिग्राम विवाह महापर्व 2026',
     date: '2026-11-21',
     tithi: 'कार्तिक शुक्ल द्वादशी',
-    shubhMuhurat: 'शाम 05:28 से 07:05 बजे (गोधूलि मुहूर्त)',
+    shubhMuhurat: 'शाम 05:28 से 07:05 बजे (गोधूलि व मांगलिक विवाह लग्न)',
     lagan: 'धनु लग्न (शुभ विवाह लग्न)',
-    tagline: 'मां तुलसी व भगवान शालिग्राम का दिव्य विवाह - घर-घर सुख, शांति व अखंड सौभाग्य',
-    significance: 'कन्यादान के समान पुण्य फल देने वाला पावन पर्व। घर में लक्ष्मी व नारायण का वास।',
-    pujaVidhi: 'तुलसी पौधे का सुहाग सामग्री से श्रृंगार, शालिग्राम पूजन व मंगल फेरे।',
-    imageUrl: 'https://images.unsplash.com/photo-1609766857041-ed402ea8069a?auto=format&fit=crop&w=1200&q=80',
-    badge: '🌿 मंगलमय पर्व',
+    tagline: 'मां तुलसी व भगवान शालिग्राम का दिव्य विवाह — अखंड सौभाग्य व पारिवारिक खुशहाली',
+    significance: 'मां तुलसी व भगवान शालिग्राम के विवाह पूजन से कन्यादान के समान पुण्य फल मिलता है और घर में माता लक्ष्मी व नारायण का स्थायी वास होता है।',
+    pujaVidhi: 'तुलसी पौधे का लाल चुनरी व सुहाग सामग्री से श्रृंगार, गन्ने का मंडप, शालिग्राम पूजन व मंगल आरती।',
+    greetingTitle: 'पावन श्री तुलसी-शालिग्राम विवाह पर्व की हार्दिक शुभकामनाएं! 🌿🌸',
+    greetingMessage: 'मां तुलसी और भगवान शालिग्राम का दिव्य आशीर्वाद आपके पूरे परिवार पर बरसे! आपके घर में अखंड प्रेम, पवित्रता, सुख-समृद्धि और मंगल का वास सदैव बना रहे।',
+    upcomingGreetingMessage: 'आने वाला मांगलिक उत्सव ' + 'श्री तुलसी विवाह' + ' है—मां तुलसी और भगवान विष्णु की कृपा से आपका जीवन पावन खुशियों से परिपूर्ण हो!',
+    imageUrl: devUthaniTulsiImg,
+    badge: '🌿 मंगलमय श्री तुलसी विवाह',
     iconEmoji: '🌸',
     colorGradient: 'from-emerald-700 via-teal-700 to-emerald-900',
-    accentColor: 'text-emerald-300',
+    accentColor: 'text-emerald-200',
     ctaText: 'तुलसी विवाह संकल्प ₹249',
     ctaTarget: 'register',
   },
@@ -225,12 +257,15 @@ export const MASTER_FESTIVALS_CALENDAR: FestivalEvent[] = [
     hindiName: 'कार्तिक पूर्णिमा व देव दीपावली 2026',
     date: '2026-11-24',
     tithi: 'कार्तिक पूर्णिमा (त्रिपुरारी पूर्णिमा)',
-    shubhMuhurat: 'शाम 05:12 से 07:45 बजे (प्रदोष काल दीपदान)',
+    shubhMuhurat: 'शाम 05:12 से 07:45 बजे (प्रदोष काल महादीपदान वेला)',
     lagan: 'कुंभ लग्न (अमृत सिद्धि)',
-    tagline: 'काशी में देवताओं की दिवाली - गंगा घाटों पर लाखों दीपों का दिव्य महोत्सव',
-    significance: 'भगवान शिव द्वारा त्रिपुरासुर संहार की विजय स्मृति। इस दिन गंगा स्नान व दीपदान से मोक्ष की प्राप्ति होती है।',
-    pujaVidhi: 'पवित्र नदी स्नान, 365 बत्ती दीपदान, सत्यनारायण कथा व महाआरती।',
-    imageUrl: 'https://images.unsplash.com/photo-1576487247299-e2b3e8394474?auto=format&fit=crop&w=1200&q=80',
+    tagline: 'देवताओं की दिवाली — पावन गंगा घाटों पर असंख्य दीपों की अलौकिक छटा व महाआरती',
+    significance: 'भगवान शिव द्वारा त्रिपुरासुर संहार की विजय स्मृति में स्वयं देवतागण काशी में दीप जलाते हैं। गंगा स्नान व दीपदान से जीवन अंधकार से प्रकाश की ओर बढ़ता है।',
+    pujaVidhi: 'पवित्र स्नान, प्रदोष काल में दीपदान, भगवान शिव-विष्णु आरती एवं सत्यनारायण कथा।',
+    greetingTitle: 'कार्तिक पूर्णिमा एवं देव दीपावली की दिव्य शुभकामनाएं! ✨🪔',
+    greetingMessage: 'देव दीपावली के असंख्य दीपों की रोशनी की तरह आपका जीवन भी ज्ञान, यश, धन और आध्यात्मिक तेज से जगमगाए। महादेव व मां गंगा का आशीर्वाद सदा बना रहे!',
+    upcomingGreetingMessage: 'आने वाला महापर्व ' + 'कार्तिक पूर्णिमा व देव दीपावली' + ' है—गंगा घाटों के दिव्य दीपों की भांति आपका भविष्य उज्ज्वल व खुशहाल हो!',
+    imageUrl: devDiwaliImg,
     badge: '✨ देव दीपावली विशेषांक',
     iconEmoji: '🪔',
     colorGradient: 'from-orange-600 via-amber-600 to-yellow-600',
@@ -246,16 +281,19 @@ export const MASTER_FESTIVALS_CALENDAR: FestivalEvent[] = [
     tithi: 'मार्गशीर्ष शुक्ल एकादशी',
     shubhMuhurat: 'प्रातः 07:10 से 09:30 बजे (शुभ वेला)',
     lagan: 'मकर लग्न',
-    tagline: 'कुरुक्षेत्र की रणभूमि में भगवान श्री कृष्ण द्वारा अर्जुन को दिए गए अमर गीता ज्ञान का अवतरण दिवस',
-    significance: 'कर्मण्येवाधिकारस्ते मा फलेषु कदाचन - कर्मयोग से जीवन में सफलता और आत्मनिर्भरता की प्राप्ति।',
-    pujaVidhi: 'गीता जी का पूजन, 11वें अध्याय का पाठ एवं शंख ध्वनि।',
-    imageUrl: 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=1200&q=80',
-    badge: '📖 अमर ज्ञान पर्व',
+    tagline: 'कुरुक्षेत्र में भगवान श्री कृष्ण द्वारा दिए गए अमर कर्मयोग गीता ज्ञान का पावन अवतरण दिवस',
+    significance: 'कर्मण्येवाधिकारस्ते मा फलेषु कदाचन — सच्चे कर्मयोग से ही जीवन में स्वावलंबन, आत्मविश्वास और स्थायी सफलता प्राप्त होती है।',
+    pujaVidhi: 'गीता जी का पूजन, श्री कृष्ण आरती, 11वें व 18वें अध्याय का पाठ।',
+    greetingTitle: 'श्रीमद्भगवद्गीता जयंती व मोक्षदा एकादशी की हार्दिक शुभकामनाएं! 📖🪶',
+    greetingMessage: 'भगवान श्री कृष्ण का अमर गीता ज्ञान आपके जीवन से हर भ्रम व भय दूर करे और आपको कर्मयोग के पथ पर चलकर हर क्षेत्र में विजय व स्वावलंबन दिलाए!',
+    upcomingGreetingMessage: 'आने वाला ज्ञान पर्व ' + 'गीता जयंती' + ' है—श्री कृष्ण की वाणी आपके जीवन को सही दिशा, आत्मबल व सफलता से आलोकित करे!',
+    imageUrl: devDiwaliImg,
+    badge: '📖 श्रीमद्भगवद्गीता जयंती',
     iconEmoji: '🪶',
     colorGradient: 'from-indigo-700 via-purple-700 to-slate-900',
-    accentColor: 'text-indigo-300',
-    ctaText: 'गीता ज्ञान व कर्मयोग से जुड़ें',
-    ctaTarget: 'plans',
+    accentColor: 'text-indigo-200',
+    ctaText: 'गीता कर्मयोग से जुड़ें (₹249)',
+    ctaTarget: 'register',
   },
   {
     id: 'new_year_2027',
@@ -265,10 +303,13 @@ export const MASTER_FESTIVALS_CALENDAR: FestivalEvent[] = [
     tithi: 'पौष कृष्ण पक्ष नवमी',
     shubhMuhurat: 'प्रातः 07:15 से 11:30 बजे (सर्वार्थ सिद्धि)',
     lagan: 'धनु लग्न',
-    tagline: 'नए साल में नया संकल्प: ₹249 से बनाएं डिजिटल आत्मनिर्भरता की नई शुरुआत',
-    significance: 'सफलता का नया अध्याय - पढ़ाई व कॉलेज के साथ हर महीने 5,000 से 25,000 रु. की निश्चित आमदनी।',
-    pujaVidhi: 'ईष्ट देव पूजन, संकल्प पत्र लेखन व नव संकल्प।',
-    imageUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1200&q=80',
+    tagline: 'नववर्ष 2027 का नया संकल्प — पढ़ाई के साथ डिजिटल आत्मनिर्भरता की उड़ान',
+    significance: 'नया साल, नया जोश व नया अवसर! अपने मोबाइल और खाली समय को आमदनी में बदलकर परिवार का गौरव बनें।',
+    pujaVidhi: 'ईष्ट देव स्मरण, माता-पिता का आशीर्वाद व आत्मनिर्भरता संकल्प।',
+    greetingTitle: 'नववर्ष 2027 की अनंत हार्दिक बधाई एवं शुभकामनाएं! 🎉🎊',
+    greetingMessage: 'नया वर्ष 2027 आपके जीवन में नई उम्मीदें, उत्तम स्वास्थ्य, नई उपलब्धियां और आर्थिक स्वावलंबन लेकर आए। आपका हर दिन मंगलमय व सफल हो!',
+    upcomingGreetingMessage: 'नया साल 2027 दस्तक दे रहा है—आगामी नववर्ष आपके परिवार के लिए खुशियों, प्रगति और बड़ी सफलताओं की सौगात लेकर आए!',
+    imageUrl: makarSankrantiImg,
     badge: '🎉 नववर्ष 2027 स्पेशल',
     iconEmoji: '🎊',
     colorGradient: 'from-rose-600 via-pink-600 to-indigo-700',
@@ -284,15 +325,18 @@ export const MASTER_FESTIVALS_CALENDAR: FestivalEvent[] = [
     tithi: 'माघ कृष्ण षष्ठी (सूर्य का मकर राशि प्रवेश)',
     shubhMuhurat: 'प्रातः 07:15 से दोपहर 12:45 बजे (महापुण्य काल)',
     lagan: 'मकर लग्न (सूर्य उत्तरायण)',
-    tagline: 'सूर्य देव का उत्तरायण प्रवेश - तिल, गुड़, पतंग उत्सव व खुशहाली का पावन आगमन',
-    significance: 'उत्तरायण से देवताओं का दिन आरंभ होता है। दान, स्नान व आत्मबल संवर्धन का महापर्व।',
+    tagline: 'सूर्य देव का उत्तरायण प्रवेश — तिल-गुड़ की मिठास, पतंग उत्सव व नई ऊर्जा का आगमन',
+    significance: 'उत्तरायण से देवताओं का दिवस आरंभ होता है। पतंग की ऊंची उड़ान की तरह युवाओं के सपनों को नई ऊंचाई देने का पर्व।',
     pujaVidhi: 'सूर्य अर्घ्य, तिल-गुड़ व खिचड़ी दान, गायत्री मंत्र जप।',
-    imageUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=1200&q=80',
-    badge: '☀️ सूर्य उत्तरायण महापर्व',
+    greetingTitle: 'मकर संक्रांति व उत्तरायण महापर्व की हार्दिक शुभकामनाएं! 🪁☀️',
+    greetingMessage: 'तिल-गुड़ की मिठास और आकाश में उड़ती रंग-बिरंगी पतंगों की तरह आपका जीवन भी खुशियों और सफलता की नई ऊंचाइयों को छुए!',
+    upcomingGreetingMessage: 'आने वाला महापर्व ' + 'मकर संक्रांति' + ' है—सूर्य देव का उत्तरायण आपके जीवन में मधुरता, नई ऊर्जा और अपार सुख-संपत्ति लेकर आए!',
+    imageUrl: makarSankrantiImg,
+    badge: '☀️ मकर संक्रांति महापर्व',
     iconEmoji: '🪁',
     colorGradient: 'from-amber-500 via-orange-600 to-red-600',
     accentColor: 'text-yellow-200',
-    ctaText: 'संक्रांति महाऑफर (₹249 लाइफटाइम)',
+    ctaText: 'संक्रांति महाऑफर (₹249)',
     ctaTarget: 'register',
   },
   {
@@ -303,34 +347,40 @@ export const MASTER_FESTIVALS_CALENDAR: FestivalEvent[] = [
     tithi: 'माघ कृष्ण चतुर्थी',
     shubhMuhurat: 'प्रातः 08:00 से 10:30 बजे (ध्वजारोहण वेला)',
     lagan: 'कुंभ लग्न',
-    tagline: 'भारत का स्वाभिमान - भारतीय संविधान व युवाओं की डिजिटल आत्मनिर्भरता का राष्ट्रीय उत्सव',
-    significance: 'सशक्त युवा, समर्थ भारत। डिजिटल इंडिया मिशन में हर छात्र का योगदान।',
-    pujaVidhi: 'तिरंगा ध्वजारोहण, राष्ट्रगान व स्वावलंबन संकल्प।',
-    imageUrl: 'https://images.unsplash.com/photo-1532375810709-75b1da00537c?auto=format&fit=crop&w=1200&q=80',
-    badge: '🇮🇳 राष्ट्रीय महापर्व',
+    tagline: 'भारत का स्वाभिमान — संविधान, तिरंगा सम्मान और आत्मनिर्भर युवा भारत का संकल्प',
+    significance: 'सशक्त युवा, समर्थ भारत। डिजिटल इंडिया के साथ हर छात्र को स्वावलंबी बनाने का राष्ट्रीय पर्व।',
+    pujaVidhi: 'तिरंगा ध्वजारोहण, राष्ट्रगान व देश सेवा का संकल्प।',
+    greetingTitle: '78वें गणतंत्र दिवस की सभी देशवासियों को हार्दिक शुभकामनाएं! 🇮🇳🚩',
+    greetingMessage: 'गर्व से लहराता तिरंगा हमें सदैव एकता, कर्तव्य और आत्मनिर्भर राष्ट्र निर्माण की प्रेरणा देता रहे। जय हिंद, वंदे मातरम!',
+    upcomingGreetingMessage: 'आने वाला राष्ट्रीय महापर्व ' + 'गणतंत्र दिवस' + ' है—सशक्त युवा और आत्मनिर्भर डिजिटल भारत के निर्माण में कदम बढ़ाएं!',
+    imageUrl: accOfficialLogoImg,
+    badge: '🇮🇳 78वां गणतंत्र दिवस',
     iconEmoji: '🇮🇳',
     colorGradient: 'from-orange-600 via-slate-900 to-emerald-700',
-    accentColor: 'text-orange-300',
+    accentColor: 'text-orange-200',
     ctaText: 'डिजिटल भारत में शामिल हों',
     ctaTarget: 'register',
   },
   {
     id: 'vasant_panchami_2027',
     name: 'Vasant Panchami / Saraswati Puja',
-    hindiName: 'बसंत पंचमी व मां सरस्वती प्राकट्योत्सव 2027',
+    hindiName: 'बसंत पंचमी व मां सरस्वती पूजा 2027',
     date: '2027-02-11',
     tithi: 'माघ शुक्ल पंचमी',
     shubhMuhurat: 'प्रातः 07:05 से दोपहर 12:35 बजे (वाग्देवी पूजन मुहूर्त)',
     lagan: 'मीन लग्न (अमृत वेला)',
-    tagline: 'विद्या, बुद्धि, ज्ञान व कला की देवी मां सरस्वती की असीम कृपा आप पर बरसे',
-    significance: 'छात्रों व युवाओं के लिए वर्ष का सबसे पवित्र दिन। नई विद्या, पुस्तक व कलम पूजन।',
-    pujaVidhi: 'पीत वस्त्र धारण, मां सरस्वती पूजन, पेन-कॉपी व वाद्य यंत्र अर्पण।',
-    imageUrl: 'https://images.unsplash.com/photo-1516962215378-7fa2e137ae93?auto=format&fit=crop&w=1200&q=80',
-    badge: '🌼 ज्ञान व विद्या पर्व',
+    tagline: 'विद्या, बुद्धि, ज्ञान व कला की देवी मां शारदा की असीम कृपा का पावन उत्सव',
+    significance: 'छात्रों व युवाओं के लिए वर्ष का सबसे पवित्र दिन। नई विद्या, पुस्तक व कलम पूजन से बुद्धि प्रखर होती है।',
+    pujaVidhi: 'पीत वस्त्र धारण, मां सरस्वती पूजन, पुस्तक व कलम अर्पण।',
+    greetingTitle: 'बसंत पंचमी एवं मां सरस्वती पूजा की मंगल शुभकामनाएं! 🌼🪕',
+    greetingMessage: 'मां वीणावादिनी सरस्वती की असीम कृपा से आपके जीवन में ज्ञान, विवेक, रचनात्मकता और विद्या-बुद्धि का प्रकाश सदैव फैला रहे!',
+    upcomingGreetingMessage: 'आने वाला विद्या पर्व ' + 'बसंत पंचमी' + ' है—मां सरस्वती के आशीर्वाद से हर विद्यार्थी का भविष्य ज्ञान व सफलता से चमक उठे!',
+    imageUrl: devUthaniTulsiImg,
+    badge: '🌼 बसंत पंचमी व सरस्वती पूजा',
     iconEmoji: '🪕',
     colorGradient: 'from-yellow-500 via-amber-500 to-yellow-600',
     accentColor: 'text-yellow-100',
-    ctaText: 'विद्यार्थी स्वावलंबन किट प्राप्त करें',
+    ctaText: 'विद्यार्थी स्वावलंबन किट ₹249',
     ctaTarget: 'register',
   },
   {
@@ -341,14 +391,17 @@ export const MASTER_FESTIVALS_CALENDAR: FestivalEvent[] = [
     tithi: 'फाल्गुन कृष्ण चतुर्दशी',
     shubhMuhurat: 'निशीथ काल: रात्रि 12:08 से 12:57 बजे',
     lagan: 'वृश्चिक लग्न (महाकाल सिद्धि)',
-    tagline: 'देवाधिदेव महादेव व माता पार्वती का महामिलन - समस्त संकटों का नाश व मनवांछित फल',
-    significance: 'चारों प्रहर की पूजा से मनुष्य के सभी पाप नष्ट होते हैं और अपार धैर्य व सामर्थ्य मिलता है।',
-    pujaVidhi: 'बेलपत्र, गंगाजल, दूध, धतूरा अर्पण व ॐ नमः शिवाय का अखण्ड जप।',
-    imageUrl: 'https://images.unsplash.com/photo-1608979087030-1a1ab4d262c1?auto=format&fit=crop&w=1200&q=80',
-    badge: '🔱 देवाधिदेव महादेव पर्व',
+    tagline: 'देवाधिदेव महादेव व माता पार्वती का दिव्य मिलन — समस्त संकटों के नाश की महा-रात्रि',
+    significance: 'चारों प्रहर के शिव पूजन से मनुष्य के सभी कष्ट नष्ट होते हैं और अपार धैर्य, शक्ति व सामर्थ्य की प्राप्ति होती है।',
+    pujaVidhi: 'बेलपत्र, गंगाजल, कच्चा दूध अर्पण व ॐ नमः शिवाय का अखण्ड जप।',
+    greetingTitle: 'महाशिवरात्रि महापर्व की हार्दिक शुभकामनाएं! हर-हर महादेव! 🔱🙏',
+    greetingMessage: 'भोलेनाथ और माता पार्वती की असीम कृपा से आपके जीवन के समस्त संकट मिटें और घर में सुख, शांति, शक्ति व वैभव का वास हो। ॐ नमः शिवाय!',
+    upcomingGreetingMessage: 'आने वाला पावन पर्व ' + 'महाशिवरात्रि' + ' है—देवाधिदेव महादेव आपके समस्त मनोरथ पूर्ण करें और जीवन को मंगलमय बनाएं!',
+    imageUrl: devDiwaliImg,
+    badge: '🔱 महाशिवरात्रि विशेषांक',
     iconEmoji: '🔱',
     colorGradient: 'from-blue-900 via-indigo-900 to-slate-950',
-    accentColor: 'text-cyan-300',
+    accentColor: 'text-cyan-200',
     ctaText: 'शिवरात्रि महासंकल्प ₹249',
     ctaTarget: 'register',
   },
@@ -360,22 +413,25 @@ export const MASTER_FESTIVALS_CALENDAR: FestivalEvent[] = [
     tithi: 'चैत्र कृष्ण प्रतिपदा',
     shubhMuhurat: 'होलिका दहन: 21 मार्च रात्रि 09:20 से 10:35 बजे',
     lagan: 'कन्या लग्न',
-    tagline: 'प्रेम, सौहार्द और खुशियों के सतरंगी रंगों से भर जाए आपका जीवन',
-    significance: 'बुराई पर अच्छाई और भक्ति की विजय का पावन उत्सव। भक्त प्रह्लाद की रक्षा।',
+    tagline: 'प्रेम, सौहार्द और खुशियों के सतरंगी गुलाल से खिल उठने वाला महा-रंगोत्सव',
+    significance: 'बुराई पर अच्छाई और सच्ची भक्ति की विजय का पावन उत्सव जो आपसी प्रेम और भाईचारे को प्रगाढ़ करता है।',
     pujaVidhi: 'होलिका दहन, गुलाल अर्पण, बड़ों का आशीर्वाद व मिष्ठान्न वितरण।',
-    imageUrl: 'https://images.unsplash.com/photo-1576487247299-e2b3e8394474?auto=format&fit=crop&w=1200&q=80',
-    badge: '🎨 खुशियों का रंगोत्सव',
+    greetingTitle: 'रंगों के महापर्व होली की ढेर सारी हार्दिक शुभकामनाएं! 🌈🎨',
+    greetingMessage: 'होली के खूबसूरत रंगों की तरह आपका जीवन भी खुशियों, उमंग, सफलता, अच्छे स्वास्थ्य और मधुर रिश्तों से सतरंगी हो जाए! शुभ होली!',
+    upcomingGreetingMessage: 'रंगों का महापर्व ' + 'होली 2027' + ' आ रहा है—प्रेम, उल्लास और सफलता के अनगिनत रंग आपके जीवन को खुशहाल बनाएं!',
+    imageUrl: makarSankrantiImg,
+    badge: '🎨 खुशियों का रंगोत्सव होली',
     iconEmoji: '🌈',
     colorGradient: 'from-pink-600 via-purple-600 to-amber-600',
-    accentColor: 'text-pink-200',
-    ctaText: 'होली खुशियों के साथ अर्निंग शुरू करें',
+    accentColor: 'text-pink-100',
+    ctaText: 'होली संग नई शुरुआत करें (₹249)',
     ctaTarget: 'register',
   },
 ];
 
 // -------------------------------------------------------------
 // Daily Good Morning & Motivational Suvichar Bank (7 Slides)
-// When today is not a festival, these 7 slides rotate with today's Panchang
+// Verified local images so images never fail or show unrelated stock
 // -------------------------------------------------------------
 export const DAILY_GOOD_MORNING_SUVICHAR = [
   {
@@ -388,11 +444,11 @@ export const DAILY_GOOD_MORNING_SUVICHAR = [
       'सूरज की पहली किरण के साथ नए लक्ष्य तय करें',
       'ACC कम्युनिटी के साथ मात्र ₹249 में डिजिटल शुरुआत',
       'अपने हर रिचार्ज पर 3.30% बचत व कमीशन पाएं',
-      'असंभव कुछ भी नहीं - जब संकल्प अडिग हो'
+      'असंभव कुछ भी नहीं - जब संकल्प अडिग हो',
     ],
     ctaText: 'आज ही अपनी शुरुआत करें (₹249)',
     ctaTarget: 'register',
-    imageUrl: 'https://images.unsplash.com/photo-1470240731273-7821a6eeb6bd?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: studentEarningImg,
     gradient: 'from-amber-600 via-orange-600 to-yellow-600',
     iconEmoji: '☀️',
   },
@@ -406,11 +462,11 @@ export const DAILY_GOOD_MORNING_SUVICHAR = [
       'TWIS: ₹150 प्रति रेफरल सीधा बैंक / UPI पेआउट',
       'माता-पिता के UPI में भी सुरक्षित विथड्रॉल की सुविधा',
       'Zero Investment Work - कोई मासिक हिडन फीस नहीं',
-      'हजारों कॉलेज छात्रों का वेरिफाइड व भरोसेमंद नेटवर्क'
+      'हजारों कॉलेज छात्रों का वेरिफाइड व भरोसेमंद नेटवर्क',
     ],
     ctaText: 'इनकम कैलकुलेटर से कमाई देखें',
     ctaTarget: 'calculator',
-    imageUrl: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: accOfficialLogoImg,
     gradient: 'from-blue-700 via-indigo-700 to-cyan-700',
     iconEmoji: '💼',
   },
@@ -424,11 +480,11 @@ export const DAILY_GOOD_MORNING_SUVICHAR = [
       'डिजिटल ID कार्ड के साथ प्रोफेशनल पहचान',
       'ISO 9001:2015 क्वालिटी अप्रूव्ड लर्निंग व अर्निंग',
       '100% ट्रांसपेरेंट पासबुक व रियल-टाइम लेजर',
-      'हर सफल कदम पर रिवॉर्ड व लीडरबोर्ड सम्मान'
+      'हर सफल कदम पर रिवॉर्ड व लीडरबोर्ड सम्मान',
     ],
     ctaText: 'अपना डिजिटल 🆔 कार्ड देखें',
     ctaTarget: 'idcard',
-    imageUrl: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: studentEarningImg,
     gradient: 'from-emerald-700 via-teal-700 to-slate-900',
     iconEmoji: '🚀',
   },
@@ -442,11 +498,11 @@ export const DAILY_GOOD_MORNING_SUVICHAR = [
       'Airtel, Jio, Vi, BSNL - सभी नेटवर्क पर तुरंत कैशबैक',
       'DTH, बिजली, गैस बिल व Fastag पर भी लाइव सेवाएं',
       'वॉलेट से 1-क्लिक में बैंक या UPI में ट्रांसफर',
-      'खुद का खर्च कम करें, दूसरों का रिचार्ज करके कमाएं'
+      'खुद का खर्च कम करें, दूसरों का रिचार्ज करके कमाएं',
     ],
     ctaText: 'SWIS रिचार्ज प्लान्स देखें',
     ctaTarget: 'plans',
-    imageUrl: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: makarSankrantiImg,
     gradient: 'from-purple-700 via-indigo-800 to-slate-900',
     iconEmoji: '⚡',
   },
@@ -460,11 +516,11 @@ export const DAILY_GOOD_MORNING_SUVICHAR = [
       'ACC Member Chat: 24x7 कम्युनिटी संवाद केंद्र',
       'ग्रुप डिस्कशन, ट्रेनिंग वीडियो व अर्निंग टिप्स',
       'सीनियर मेंबर्स से 1-to-1 चैट व मार्गदर्शन',
-      'एक-दूसरे को सिखाकर आगे बढ़ाने की परंपरा'
+      'एक-दूसरे को सिखाकर आगे बढ़ाने की परंपरा',
     ],
     ctaText: 'कम्युनिटी चैट में भाग लें',
     ctaTarget: 'chat',
-    imageUrl: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: devDiwaliImg,
     gradient: 'from-rose-700 via-amber-700 to-slate-900',
     iconEmoji: '💬',
   },
@@ -478,11 +534,11 @@ export const DAILY_GOOD_MORNING_SUVICHAR = [
       'वेरिफाइड Android APK 1-क्लिक डाउनलोड',
       'फुल HD वीडियो ट्रेनिंग व बिज़नेस प्रेजेंटेशन',
       'रियल-टाइम नोटिफिकेशन व लाइव वॉलेट अपडेट',
-      'कभी भी, कहीं भी - अपने समय पर काम करने की आज़ादी'
+      'कभी भी, कहीं भी - अपने समय पर काम करने की आज़ादी',
     ],
     ctaText: 'ट्रेनिंग वीडियो देखें',
     ctaTarget: 'video',
-    imageUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: studentEarningImg,
     gradient: 'from-cyan-700 via-blue-800 to-slate-950',
     iconEmoji: '🎥',
   },
@@ -496,11 +552,11 @@ export const DAILY_GOOD_MORNING_SUVICHAR = [
       'एडमिन द्वारा मैन्युअल UTR व स्क्रीनशॉट जांच',
       'मल्टी-डिवाइस सिंगल लॉगिन सुरक्षा कवच',
       '24 घंटे में बैंक / UPI में सीधा पेआउट ट्रांसफर',
-      'सत्यमेव जयते - भारत का स्वाभिमानी युवा मंच'
+      'सत्यमेव जयते - भारत का स्वाभिमानी युवा मंच',
     ],
     ctaText: 'वेरिफाइड सदस्य बनें (₹249)',
     ctaTarget: 'register',
-    imageUrl: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: accOfficialLogoImg,
     gradient: 'from-amber-600 via-slate-900 to-emerald-800',
     iconEmoji: '🇮🇳',
   },
@@ -768,6 +824,17 @@ export function getLivePanchangDetails(date: Date = new Date()): PanchangInfo {
 }
 
 // -------------------------------------------------------------
+// Local Date String Helper (YYYY-MM-DD in User's Local Timezone)
+// Prevents any UTC vs local midnight mismatch
+// -------------------------------------------------------------
+export function getLocalDateStr(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// -------------------------------------------------------------
 // Calculate Remaining Countdown to a Date
 // -------------------------------------------------------------
 export function calculateFestivalCountdown(targetDateStr: string, currentDate: Date = new Date()) {
@@ -790,51 +857,52 @@ export function calculateFestivalCountdown(targetDateStr: string, currentDate: D
 // Get Active Festival for Today (if any)
 // -------------------------------------------------------------
 export function getTodayFestival(currentDate: Date = new Date()): FestivalEvent | null {
-  const year = currentDate.getFullYear();
-  const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-  const day = String(currentDate.getDate()).padStart(2, '0');
-  const todayStr = `${year}-${month}-${day}`;
-
+  const todayStr = getLocalDateStr(currentDate);
   const found = MASTER_FESTIVALS_CALENDAR.find((f) => f.date === todayStr);
   return found || null;
 }
 
 // -------------------------------------------------------------
-// Get Next Upcoming Festival (Filters out passed festivals automatically!)
+// Filter Out All Passed Festivals Automatically (f.date >= todayStr)
 // -------------------------------------------------------------
-export function getNextUpcomingFestival(currentDate: Date = new Date()): FestivalEvent {
-  const todayTime = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate()).getTime();
-
-  // Filter only festivals strictly on or after today
-  const upcoming = MASTER_FESTIVALS_CALENDAR.filter((f) => {
-    const fTime = new Date(`${f.date}T00:00:00`).getTime();
-    return fTime >= todayTime;
-  });
-
-  if (upcoming.length > 0) {
-    return upcoming[0];
-  }
-
-  // Fallback to the first festival in calendar if all passed
-  return MASTER_FESTIVALS_CALENDAR[0];
+export function getActiveAndUpcomingFestivals(currentDate: Date = new Date()): FestivalEvent[] {
+  const todayStr = getLocalDateStr(currentDate);
+  return MASTER_FESTIVALS_CALENDAR.filter((f) => f.date >= todayStr);
 }
 
 // -------------------------------------------------------------
-// Get Strictly Future Festival (Whose countdown is > 0 seconds)
-// Used when today's festival time count has ended (0d:0h:0m:0s)
+// Get Strictly Future Festivals (f.date > todayStr)
+// Used for displaying Upcoming Festival cards/sliders/popups
+// -------------------------------------------------------------
+export function getStrictlyUpcomingFestivals(
+  currentDate: Date = new Date(),
+  limit: number = 3
+): FestivalEvent[] {
+  const todayStr = getLocalDateStr(currentDate);
+  const list = MASTER_FESTIVALS_CALENDAR.filter((f) => f.date > todayStr);
+  return list.slice(0, limit);
+}
+
+// -------------------------------------------------------------
+// Get Next Active or Upcoming Festival (Never shows passed festivals!)
+// -------------------------------------------------------------
+export function getNextUpcomingFestival(currentDate: Date = new Date()): FestivalEvent {
+  const upcoming = getActiveAndUpcomingFestivals(currentDate);
+  if (upcoming.length > 0) {
+    return upcoming[0];
+  }
+  return MASTER_FESTIVALS_CALENDAR[MASTER_FESTIVALS_CALENDAR.length - 1];
+}
+
+// -------------------------------------------------------------
+// Get Strictly Future Festival (Whose date > todayStr)
 // -------------------------------------------------------------
 export function getStrictlyUpcomingFestival(currentDate: Date = new Date()): FestivalEvent {
-  const nowMs = currentDate.getTime();
-  const strictlyFuture = MASTER_FESTIVALS_CALENDAR.filter((f) => {
-    const fTime = new Date(`${f.date}T00:00:00`).getTime();
-    return fTime > nowMs;
-  });
-
+  const strictlyFuture = getStrictlyUpcomingFestivals(currentDate, 1);
   if (strictlyFuture.length > 0) {
     return strictlyFuture[0];
   }
-
-  return MASTER_FESTIVALS_CALENDAR[0];
+  return MASTER_FESTIVALS_CALENDAR[MASTER_FESTIVALS_CALENDAR.length - 1];
 }
 
 // -------------------------------------------------------------
@@ -845,37 +913,155 @@ export function getFestivalAfter(festivalId: string): FestivalEvent {
   if (idx >= 0 && idx + 1 < MASTER_FESTIVALS_CALENDAR.length) {
     return MASTER_FESTIVALS_CALENDAR[idx + 1];
   }
-  return MASTER_FESTIVALS_CALENDAR[0];
+  return MASTER_FESTIVALS_CALENDAR[MASTER_FESTIVALS_CALENDAR.length - 1];
+}
+
+// -------------------------------------------------------------
+// Automatic Expiration Check for Promotional Posters & Popups
+// Automatically removes passed festivals (Dhanteras, Diwali, Govardhan, Bhai Dooj, expired Chhath days, etc.)
+// -------------------------------------------------------------
+const PAST_FESTIVAL_END_DATES: { keywords: string[]; lastActiveDate: string }[] = [
+  { keywords: ['dhanteras', 'धनतेरस'], lastActiveDate: '2026-11-08' },
+  { keywords: ['diwali', 'deepotsav', 'दीपावली', 'दीपोत्सव', 'दिवाली'], lastActiveDate: '2026-11-10' },
+  { keywords: ['govardhan', 'bhaidooj', 'bhai dooj', 'गोवर्धन', 'भाई दूज'], lastActiveDate: '2026-11-12' },
+  { keywords: ['nahay_khay', 'nahay khay', 'नहाय-खाय', 'नहाय खाय'], lastActiveDate: '2026-11-13' },
+  { keywords: ['kharna', 'खरना', 'लोहंडा'], lastActiveDate: '2026-11-14' },
+  { keywords: ['sandhya_arghya', 'sandhya arghya', 'संध्या अर्घ्य', 'डाला छठ'], lastActiveDate: '2026-11-15' },
+  { keywords: ['chhath', 'छठ'], lastActiveDate: '2026-11-16' },
+  { keywords: ['dev_uthani', 'प्रबोधिनी एकादशी', 'देवउठनी'], lastActiveDate: '2026-11-20' },
+  { keywords: ['tulsi_vivah', 'तुलसी विवाह'], lastActiveDate: '2026-11-21' },
+  { keywords: ['kartik_purnima', 'dev_diwali', 'देव दीपावली', 'कार्तिक पूर्णिमा'], lastActiveDate: '2026-11-24' },
+  { keywords: ['gita_jayanti', 'गीता जयंती'], lastActiveDate: '2026-12-20' },
+  { keywords: ['new_year_2027', 'नववर्ष 2027'], lastActiveDate: '2027-01-01' },
+  { keywords: ['makar_sankranti', 'मकर संक्रांति'], lastActiveDate: '2027-01-14' },
+  { keywords: ['republic_day_2027', 'गणतंत्र दिवस'], lastActiveDate: '2027-01-26' },
+  { keywords: ['vasant_panchami', 'बसंत पंचमी'], lastActiveDate: '2027-02-11' },
+  { keywords: ['maha_shivratri', 'महाशिवरात्रि'], lastActiveDate: '2027-03-06' },
+  { keywords: ['holi_2027', 'होली 2027', 'रंगोत्सव'], lastActiveDate: '2027-03-22' },
+];
+
+export function isFestivalItemExpired(
+  item: {
+    id?: string;
+    title?: string;
+    subtitle?: string;
+    badge?: string;
+    badgeText?: string;
+    festivalDate?: string;
+    expiresAt?: string;
+  },
+  currentDate: Date = new Date()
+): boolean {
+  const todayStr = getLocalDateStr(currentDate);
+
+  if (item.expiresAt && item.expiresAt < todayStr) {
+    return true;
+  }
+  if (item.festivalDate && item.festivalDate < todayStr) {
+    return true;
+  }
+
+  const combinedText = `${item.id || ''} ${item.title || ''} ${item.badge || ''} ${item.badgeText || ''}`.toLowerCase();
+
+  // Check auto-generated festival cards directly against MASTER_FESTIVALS_CALENDAR
+  for (const fest of MASTER_FESTIVALS_CALENDAR) {
+    if (item.id && (item.id.includes(fest.id) || item.id === `auto_poster_${fest.id}`)) {
+      return fest.date < todayStr;
+    }
+  }
+
+  // Check known festival keywords against their last active date
+  for (const rule of PAST_FESTIVAL_END_DATES) {
+    if (rule.keywords.some((kw) => combinedText.includes(kw.toLowerCase()))) {
+      if (rule.lastActiveDate < todayStr) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+// -------------------------------------------------------------
+// Auto-Generate Active Today & Upcoming Festival Promotional Posters
+// Automatically replaces expired festival cards with fresh ones
+// -------------------------------------------------------------
+export function getAutoDynamicFestivalPosters(currentDate: Date = new Date()): PromotionalPoster[] {
+  const todayFestival = getTodayFestival(currentDate);
+  const upcomingList = getStrictlyUpcomingFestivals(currentDate, todayFestival ? 1 : 2);
+  const posters: PromotionalPoster[] = [];
+
+  if (todayFestival) {
+    posters.push({
+      id: `auto_poster_today_${todayFestival.id}`,
+      title: `🎉 आज का महापर्व: ${todayFestival.hindiName}`,
+      subtitle: `${todayFestival.greetingMessage} (शुभ मुहूर्त: ${todayFestival.shubhMuhurat})`,
+      imageUrl: todayFestival.imageUrl,
+      ctaText: todayFestival.ctaText,
+      ctaLink: todayFestival.ctaTarget,
+      badge: `🎉 आज का त्यौहार • ${todayFestival.badge}`,
+      isActive: true,
+      createdAt: todayFestival.date,
+      festivalDate: todayFestival.date,
+      expiresAt: todayFestival.date,
+    });
+  }
+
+  upcomingList.forEach((fest, index) => {
+    const countdown = calculateFestivalCountdown(fest.date, currentDate);
+    const daysAhead = countdown.days + (countdown.hours > 0 || countdown.minutes > 0 ? 1 : 0);
+    const formattedDate = new Date(`${fest.date}T00:00:00`).toLocaleDateString('hi-IN', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    posters.push({
+      id: `auto_poster_upcoming_${fest.id}`,
+      title: `⏳ आने वाला त्यौहार (${daysAhead} दिन शेष): ${fest.hindiName}`,
+      subtitle: `📅 ${formattedDate} • ${fest.upcomingGreetingMessage || fest.greetingMessage}`,
+      imageUrl: fest.imageUrl,
+      ctaText: fest.ctaText,
+      ctaLink: fest.ctaTarget,
+      badge: index === 0 ? `⏭️ अगला आने वाला महापर्व (${daysAhead} दिन)` : `📅 आगामी महापर्व (${formattedDate})`,
+      isActive: true,
+      createdAt: getLocalDateStr(currentDate),
+      festivalDate: fest.date,
+      expiresAt: fest.date,
+    });
+  });
+
+  return posters;
 }
 
 // -------------------------------------------------------------
 // Generate Active 7 Slides for Home Page Carousel
-// (Automatic Festival Detection + Auto-Remove Past + 7 Good Morning Slides)
+// (Today's Festival + Upcoming Festivals + Clear Festival Wishes + Auto-Remove Passed Festivals)
 // -------------------------------------------------------------
 export function generateDynamicHomeSlides(currentDate: Date = new Date()): DynamicSlide[] {
   const todayFestival = getTodayFestival(currentDate);
-  const nextFestival = getStrictlyUpcomingFestival(currentDate);
+  const upcomingFestivals = getStrictlyUpcomingFestivals(currentDate, todayFestival ? 2 : 3);
   const panchang = getLivePanchangDetails(currentDate);
-  const countdown = calculateFestivalCountdown(nextFestival.date, currentDate);
 
   const slides: DynamicSlide[] = [];
 
-  // 1. If today is a festival, Slide #1 is Today's Active Festival Celebration
+  // 1. Today's Active Festival Celebration Slide (Auto-removed at midnight after festival ends)
   if (todayFestival) {
     slides.push({
       id: `today_${todayFestival.id}`,
       type: 'festival_today',
-      badge: `🎉 आज का महापर्व: ${todayFestival.hindiName}`,
+      badge: `🎉 आज का पावन त्यौहार: ${todayFestival.hindiName}`,
       iconEmoji: todayFestival.iconEmoji,
-      festivalOrDayTitle: todayFestival.hindiName,
+      festivalOrDayTitle: `आज: ${todayFestival.hindiName}`,
       tagline: todayFestival.tagline,
-      mainHeadline: `आज का पावन दिन: ${todayFestival.hindiName} की हार्दिक शुभकामनाएं!`,
-      description: `${todayFestival.significance} इस पावन अवसर पर ACC परिवार की ओर से आपको एवं आपके परिवार को ढेर सारी शुभकामनाएं। अपने जीवन में आत्मनिर्भरता का दीप जलाएं।`,
+      mainHeadline: todayFestival.greetingTitle,
+      greetingMessage: todayFestival.greetingMessage,
+      description: `${todayFestival.significance} इस पावन पर्व पर ACC परिवार की ओर से आपको व आपके पूरे परिवार को मंगलमय शुभकामनाएं।`,
       highlightPoints: [
         `शुभ पूजा मुहूर्त: ${todayFestival.shubhMuhurat}`,
         `पंचांग तिथि: ${todayFestival.tithi}`,
         `शुभ लग्न: ${todayFestival.lagan}`,
-        `विशेष: ${todayFestival.pujaVidhi}`,
+        `पूजा विधि: ${todayFestival.pujaVidhi}`,
       ],
       panchangHighlight: {
         date: panchang.dateStr,
@@ -891,49 +1077,56 @@ export function generateDynamicHomeSlides(currentDate: Date = new Date()): Dynam
     });
   }
 
-  // 2. Next Upcoming Festival Slide (with Live Countdown & Coming Soon Date)
-  const formattedNextDate = new Date(`${nextFestival.date}T00:00:00`).toLocaleDateString('hi-IN', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-  slides.push({
-    id: `upcoming_${nextFestival.id}`,
-    type: 'upcoming_festival',
-    badge: `⏳ अगला पावन पर्व (Coming Soon): ${nextFestival.hindiName}`,
-    iconEmoji: nextFestival.iconEmoji,
-    festivalOrDayTitle: `${nextFestival.hindiName} (Coming Soon)`,
-    tagline: `आगामी तिथि: ${formattedNextDate} • समय शेष: ${countdown.days} दिन ${countdown.hours} घंटे`,
-    mainHeadline: `तैयार रहें! अगला महापर्व आ रहा है: ${nextFestival.hindiName}`,
-    description: `${nextFestival.tagline}. ${nextFestival.significance} त्योहार के बीतते ही पिछला स्लाइडर स्वतः हट जाता है और अगला पर्व सक्रिय हो जाता है।`,
-    highlightPoints: [
-      `पर्व की शुभ तिथि: ${formattedNextDate} (${nextFestival.tithi})`,
-      `शुभ मुहूर्त व पूजा वेला: ${nextFestival.shubhMuhurat}`,
-      `शुभ लग्न: ${nextFestival.lagan}`,
-      `समय शेष: ${countdown.days} दिन, ${countdown.hours} घंटे, ${countdown.minutes} मिनट`,
-    ],
-    countdown: {
-      days: countdown.days,
-      hours: countdown.hours,
-      minutes: countdown.minutes,
-      seconds: countdown.seconds,
-      targetDateStr: nextFestival.date,
-    },
-    panchangHighlight: {
-      date: new Date(nextFestival.date).toLocaleDateString('hi-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
-      tithi: nextFestival.tithi,
-      muhurat: nextFestival.shubhMuhurat,
-      lagan: nextFestival.lagan,
-    },
-    ctaText: nextFestival.ctaText,
-    ctaTarget: nextFestival.ctaTarget,
-    gradient: nextFestival.colorGradient,
-    borderColor: 'border-amber-400',
-    imageUrl: nextFestival.imageUrl,
+  // 2. Upcoming Festivals Slides (Auto-updated with clear wishes & matching photos)
+  upcomingFestivals.forEach((nextFestival, idx) => {
+    const countdown = calculateFestivalCountdown(nextFestival.date, currentDate);
+    const formattedNextDate = new Date(`${nextFestival.date}T00:00:00`).toLocaleDateString('hi-IN', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    slides.push({
+      id: `upcoming_${nextFestival.id}`,
+      type: 'upcoming_festival',
+      badge: idx === 0
+        ? `⏳ आने वाला त्यौहार: ${nextFestival.hindiName}`
+        : `📅 अगला आगामी पर्व: ${nextFestival.hindiName}`,
+      iconEmoji: nextFestival.iconEmoji,
+      festivalOrDayTitle: `आगामी: ${nextFestival.hindiName}`,
+      tagline: `शुभ तिथि: ${formattedNextDate} • ${countdown.days} दिन ${countdown.hours} घंटे शेष`,
+      mainHeadline: `${nextFestival.hindiName} की अग्रिम हार्दिक शुभकामनाएं!`,
+      greetingMessage: nextFestival.upcomingGreetingMessage || nextFestival.greetingMessage,
+      description: `${nextFestival.tagline} — ${nextFestival.significance}`,
+      highlightPoints: [
+        `आगामी शुभ तिथि: ${formattedNextDate} (${nextFestival.tithi})`,
+        `शुभ मुहूर्त व पूजा वेला: ${nextFestival.shubhMuhurat}`,
+        `शुभ लग्न: ${nextFestival.lagan}`,
+        `पूजा विधि: ${nextFestival.pujaVidhi}`,
+      ],
+      countdown: {
+        days: countdown.days,
+        hours: countdown.hours,
+        minutes: countdown.minutes,
+        seconds: countdown.seconds,
+        targetDateStr: nextFestival.date,
+      },
+      panchangHighlight: {
+        date: formattedNextDate,
+        tithi: nextFestival.tithi,
+        muhurat: nextFestival.shubhMuhurat,
+        lagan: nextFestival.lagan,
+      },
+      ctaText: nextFestival.ctaText,
+      ctaTarget: nextFestival.ctaTarget,
+      gradient: nextFestival.colorGradient,
+      borderColor: idx === 0 ? 'border-amber-400' : 'border-yellow-300/70',
+      imageUrl: nextFestival.imageUrl,
+    });
   });
 
-  // 3. Fill the rest of the 7 slides with Daily Good Morning Suvichar and Panchang Status
-  const neededSuvicharCount = 7 - slides.length;
+  // 3. Fill remaining slides up to 7 with Daily Good Morning Suvichar and Panchang Status
+  const neededSuvicharCount = Math.max(0, 7 - slides.length);
   for (let i = 0; i < neededSuvicharCount && i < DAILY_GOOD_MORNING_SUVICHAR.length; i++) {
     const suvichar = DAILY_GOOD_MORNING_SUVICHAR[i];
     slides.push({
@@ -941,9 +1134,10 @@ export function generateDynamicHomeSlides(currentDate: Date = new Date()): Dynam
       type: 'good_morning_suvichar',
       badge: `${suvichar.badge} • ${panchang.dayName}, ${panchang.dateStr}`,
       iconEmoji: suvichar.iconEmoji,
-      festivalOrDayTitle: `सुप्रभात व दैनिक सुविचार (${i + 1}/7)`,
+      festivalOrDayTitle: `सुप्रभात व दैनिक सुविचार (${i + 1})`,
       tagline: suvichar.tagline,
       mainHeadline: suvichar.title,
+      greetingMessage: suvichar.description,
       description: suvichar.description,
       highlightPoints: [
         `आज का पंचांग: ${panchang.tithi} (${panchang.nakshatra} नक्षत्र)`,

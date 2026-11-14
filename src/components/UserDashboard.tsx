@@ -124,7 +124,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
   // 3D Avatar Frame Selection Modal State
   const [showFrameModal, setShowFrameModal] = useState<boolean>(false);
   const [framePreview, setFramePreview] = useState<AvatarFrameType>(currentUser.avatarFrame || 'acc_medallion');
-  const [frameCategory, setFrameCategory] = useState<'all' | 'acc' | 'elements' | 'vip'>('all');
+  const [frameCategory, setFrameCategory] = useState<'all' | 'acc' | 'elements' | 'vip' | 'classic'>('all');
   const [isSavingFrame, setIsSavingFrame] = useState<boolean>(false);
   const [frameSuccessMsg, setFrameSuccessMsg] = useState<string>('');
   const [showAddMemberModal, setShowAddMemberModal] = useState<boolean>(false);
@@ -136,16 +136,21 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
     try {
       const updated = StorageService.updateMemberWithAudit(currentUser.accId, { avatarFrame: newFrame }, 'USER');
       if (updated) {
+        StorageService.setCurrentUser(updated);
         onUpdateUser(updated);
+      } else {
+        const fallbackUser: Member = { ...currentUser, avatarFrame: newFrame };
+        StorageService.setCurrentUser(fallbackUser);
+        onUpdateUser(fallbackUser);
       }
-      setFrameSuccessMsg('✓ 3D लाइव अवतार फ्रेम सफलतापूर्वक सक्रिय हो गया!');
+      setFrameSuccessMsg('✓ नया 3D लाइव फ्रेम आपकी प्रोफाइल में सेव हो गया है!');
       try {
         confetti({ particleCount: 75, spread: 70, origin: { y: 0.6 } });
       } catch {}
       setTimeout(() => {
         setFrameSuccessMsg('');
         setShowFrameModal(false);
-      }, 1500);
+      }, 1100);
     } catch (err) {
       console.warn('Error saving frame:', err);
     } finally {
@@ -5671,174 +5676,216 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
       )}
 
       {/* ========================================================================= */}
-      {/* 3D LIVE AVATAR FRAME SELECTION MODAL */}
+      {/* 3D LIVE AVATAR FRAME SELECTION MODAL (Profile + Frame Live Studio)       */}
       {/* ========================================================================= */}
-      {showFrameModal && (
-        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 pt-3 pb-28 bg-black/85 backdrop-blur-md animate-fadeIn overflow-y-auto">
-          <div className="w-full max-w-2xl max-h-[92vh] overflow-y-auto bg-gradient-to-b from-slate-900 via-slate-950 to-black border-2 border-amber-500/60 rounded-3xl p-4 sm:p-6 pb-8 shadow-[0_0_50px_rgba(245,158,11,0.3)] space-y-4 text-white animate-scaleUp my-auto">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-600 text-slate-950 flex items-center justify-center font-black shadow-md">
-                  <Sparkles className="w-5 h-5" />
+      {showFrameModal && (() => {
+        const selectedFrameInfo = AVATAR_FRAMES.find((f) => f.id === framePreview) || AVATAR_FRAMES[0];
+        const isAlreadyActive = (currentUser.avatarFrame || 'acc_dancing_circle') === framePreview;
+        const filteredFrames = AVATAR_FRAMES.filter((f) => frameCategory === 'all' || f.category === frameCategory);
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
+            <div className="w-full max-w-4xl max-h-[92dvh] flex flex-col overflow-hidden bg-gradient-to-b from-slate-900 via-slate-950 to-black border-2 border-amber-400/60 rounded-2xl sm:rounded-3xl shadow-[0_0_60px_rgba(245,158,11,0.35)] text-white animate-scaleUp">
+              {/* Top Modal Header (Pinned) */}
+              <div className="shrink-0 flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b border-white/10 bg-slate-950/90">
+                <div className="min-w-0 flex items-center gap-3">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-400 to-orange-500 text-slate-950 flex items-center justify-center font-black shadow-md shrink-0">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm sm:text-lg font-black text-white truncate">
+                      प्रोफाइल 3D लाइव फ्रेम स्टूडियो
+                    </h3>
+                    <p className="text-[11px] sm:text-xs text-slate-300 truncate">
+                      {AVATAR_FRAMES.length} डिज़ाइन · फ्रेम चुनें, अपनी प्रोफाइल पर लाइव प्रीव्यू देखें और सेव करें
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2 flex-wrap">
-                    <span>🎨 3D लाइव अवतार फ्रेम सिस्टम</span>
-                    <span className="text-[10.5px] bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 px-2.5 py-0.5 rounded-full font-black shadow-sm">
-                      {AVATAR_FRAMES.length}+ विशेष डिज़ाइन्स
-                    </span>
-                  </h3>
-                  <p className="text-xs text-amber-200/90 leading-tight mt-0.5">
-                    ACC भारत रत्न, फीनिक्स विंग्स, 360° नाचता गोल्ड चक्र, तिरंगा योद्धा, सुपरनोवा एवं 24K मेडैलियन फ्रेम्स
+
+                <button
+                  type="button"
+                  onClick={() => setShowFrameModal(false)}
+                  aria-label="बंद करें"
+                  className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {frameSuccessMsg && (
+                <div className="shrink-0 mx-4 sm:mx-6 mt-3 p-2.5 bg-emerald-500/20 border border-emerald-400 text-emerald-200 text-xs font-bold rounded-xl flex items-center gap-2 animate-fadeIn">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>{frameSuccessMsg}</span>
+                </div>
+              )}
+
+              {/* Split Body: Pinned Profile+Frame Live Preview + Scrollable Frame Catalog */}
+              <div className="flex-1 min-h-0 flex flex-col md:grid md:grid-cols-12 overflow-hidden">
+                {/* LEFT / TOP PINNED STAGE: User Profile Card with Live Selected Frame */}
+                <div className="shrink-0 md:col-span-5 relative overflow-hidden border-b md:border-b-0 md:border-r border-white/10 bg-gradient-to-br from-[#0f172a] via-[#131d38] to-[#090d1a] p-3.5 sm:p-5 flex flex-row md:flex-col items-center justify-center gap-4 md:gap-3 text-left md:text-center">
+                  {/* Dynamic Spotlight Glow Behind Selected Frame */}
+                  <div
+                    aria-hidden="true"
+                    className={`pointer-events-none absolute w-56 h-56 rounded-full bg-gradient-to-tr ${selectedFrameInfo.gradientClass} opacity-25 blur-3xl transition-all duration-300`}
+                  />
+
+                  {/* Live Profile Avatar Wearing Selected Frame */}
+                  <div className="relative z-10 py-2 sm:py-4 px-2 shrink-0 flex items-center justify-center">
+                    <AvatarWith3DFrame
+                      avatarUrl={currentUser.avatarUrl}
+                      name={currentUser.fullName}
+                      frame={framePreview}
+                      size="xl"
+                    />
+                  </div>
+
+                  {/* Live Profile Identity + Selected Frame Details */}
+                  <div className="relative z-10 min-w-0 flex-1 md:flex-none md:w-full space-y-1.5">
+                    <div className="text-[10.5px] font-bold tracking-wide text-amber-300 uppercase">
+                      {isAlreadyActive ? 'वर्तमान सक्रिय प्रोफाइल फ्रेम' : 'लाइव प्रोफाइल प्रीव्यू'}
+                    </div>
+
+                    <h4 className="text-sm sm:text-base font-black text-white truncate">
+                      {currentUser.fullName}
+                    </h4>
+
+                    <p className="text-[11px] font-mono tabular-nums text-sky-200 truncate">
+                      {currentUser.accId} · {currentUser.plan} Plan
+                    </p>
+
+                    <div className="pt-1.5 border-t border-white/10">
+                      <p className="text-xs sm:text-sm font-black text-amber-300 truncate">
+                        {selectedFrameInfo.icon} {selectedFrameInfo.name}
+                      </p>
+                      <p className="text-[11px] text-slate-300 leading-snug line-clamp-2 mt-0.5">
+                        {selectedFrameInfo.description}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* RIGHT / BOTTOM: Category Filter + Scrollable Live Frame Cards */}
+                <div className="flex-1 min-h-0 md:col-span-7 flex flex-col overflow-hidden bg-slate-950/60">
+                  {/* Category Tabs */}
+                  <div className="shrink-0 px-3 sm:px-4 pt-3 pb-2 border-b border-white/10 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                    {[
+                      { id: 'all', label: `सभी (${AVATAR_FRAMES.length})` },
+                      { id: 'acc', label: `ACC स्पेशल (${AVATAR_FRAMES.filter((f) => f.category === 'acc').length})` },
+                      { id: 'vip', label: `रॉयल VIP (${AVATAR_FRAMES.filter((f) => f.category === 'vip').length})` },
+                      { id: 'elements', label: `3D एलिमेंट्स (${AVATAR_FRAMES.filter((f) => f.category === 'elements').length})` },
+                      { id: 'classic', label: `क्लासिक (${AVATAR_FRAMES.filter((f) => f.category === 'classic').length})` },
+                    ].map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setFrameCategory(cat.id as 'all' | 'acc' | 'elements' | 'vip' | 'classic')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 transition cursor-pointer ${
+                          frameCategory === cat.id
+                            ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
+                            : 'bg-white/10 hover:bg-white/15 text-slate-200'
+                        }`}
+                      >
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Frame Options Grid with Live User Photo Mini-Previews */}
+                  <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 overscroll-contain">
+                    {filteredFrames.map((f) => {
+                      const isSelected = framePreview === f.id;
+                      const isCurrent = (currentUser.avatarFrame || 'acc_dancing_circle') === f.id;
+                      return (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => setFramePreview(f.id)}
+                          className={`group relative p-3 rounded-2xl border text-center transition-all duration-200 cursor-pointer flex flex-col items-center justify-between gap-2 ${
+                            isSelected
+                              ? 'border-amber-400 bg-gradient-to-b from-amber-500/25 to-orange-500/10 shadow-[0_0_24px_rgba(245,158,11,0.45)] ring-2 ring-amber-400/70 scale-[1.01]'
+                              : 'border-white/10 bg-white/[0.04] hover:bg-white/[0.09] hover:border-white/25'
+                          }`}
+                        >
+                          {/* Live Mini Avatar Preview Inside Every Card */}
+                          <div className="py-2 flex items-center justify-center overflow-visible">
+                            <AvatarWith3DFrame
+                              avatarUrl={currentUser.avatarUrl}
+                              name={currentUser.fullName}
+                              frame={f.id}
+                              size="sm"
+                              showBadge={false}
+                              lite={!isSelected}
+                            />
+                          </div>
+
+                          <div className="w-full min-w-0 space-y-0.5">
+                            <strong className="text-[11px] sm:text-xs font-black text-white block truncate">
+                              {f.name}
+                            </strong>
+                            <p className="text-[10px] text-slate-300 leading-tight line-clamp-2">
+                              {f.desc || f.description}
+                            </p>
+                          </div>
+
+                          <div className="w-full pt-1.5 border-t border-white/10 text-[10px] flex items-center justify-between gap-1">
+                            <span className="text-amber-300 font-bold truncate">
+                              {isCurrent ? '✓ प्रोफाइल पर सेट' : f.badge}
+                            </span>
+                            <span className={`shrink-0 font-black ${isSelected ? 'text-amber-400' : 'text-slate-400 group-hover:text-white'}`}>
+                              {isSelected ? '✓ चयनित' : 'प्रीव्यू'}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Always-Visible Sticky Bottom Save Footer */}
+              <div className="shrink-0 px-4 sm:px-6 py-3 bg-slate-950 border-t border-amber-400/30 flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1 hidden sm:block">
+                  <p className="text-xs font-bold text-white truncate">
+                    चयनित: <span className="text-amber-300">{selectedFrameInfo.name}</span>
+                  </p>
+                  <p className="text-[11px] text-slate-400 truncate">
+                    सेव करते ही यह फ्रेम आपकी प्रोफाइल, चैट और ID कार्ड पर अपडेट हो जाएगा
                   </p>
                 </div>
-              </div>
 
-              <button
-                type="button"
-                onClick={() => setShowFrameModal(false)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer shrink-0"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {frameSuccessMsg && (
-              <div className="p-3 bg-emerald-500/20 border border-emerald-400 text-emerald-200 text-xs font-bold rounded-xl flex items-center gap-2 animate-fadeIn">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>{frameSuccessMsg}</span>
-              </div>
-            )}
-
-            {/* Live Center Preview Box */}
-            <div className="bg-gradient-to-b from-white/10 to-white/5 border border-amber-400/30 rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center gap-2 text-center overflow-visible shadow-inner relative">
-              <span className="text-[10.5px] text-amber-300/90 uppercase tracking-widest font-black flex items-center gap-1.5">
-                <Sparkles className="w-3 h-3 text-amber-400" />
-                लाइव 3D फ्रेम प्रीव्यू (Real-time Live Preview)
-              </span>
-
-              <div className="py-6 my-2 overflow-visible flex items-center justify-center">
-                <AvatarWith3DFrame
-                  avatarUrl={currentUser.avatarUrl}
-                  name={currentUser.fullName}
-                  frame={framePreview}
-                  size="xl"
-                />
-              </div>
-
-              <div className="flex flex-col items-center gap-1">
-                <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5 flex-wrap justify-center">
-                  <span className="text-slate-400">सक्रिय प्रीव्यू:</span>
-                  <span className="text-white bg-amber-500/20 border border-amber-400/40 px-3 py-0.5 rounded-full font-black">
-                    {AVATAR_FRAMES.find((f) => f.id === framePreview)?.name}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-300 max-w-md">
-                  {AVATAR_FRAMES.find((f) => f.id === framePreview)?.description}
-                </p>
-              </div>
-            </div>
-
-            {/* Frame Category Filter Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
-              {[
-                { id: 'all', label: `सभी फ्रेम (${AVATAR_FRAMES.length})` },
-                { id: 'acc', label: `🎖️ ACC स्पेशल (${AVATAR_FRAMES.filter((f) => f.category === 'acc').length})` },
-                { id: 'vip', label: `👑 रॉयल VIP (${AVATAR_FRAMES.filter((f) => f.category === 'vip').length})` },
-                { id: 'elements', label: `🔥 3D एलिमेंट्स (${AVATAR_FRAMES.filter((f) => f.category === 'elements').length})` },
-                { id: 'classic', label: `⚪ क्लासिक (${AVATAR_FRAMES.filter((f) => f.category === 'classic').length})` },
-              ].map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setFrameCategory(cat.id as any)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
-                    frameCategory === cat.id
-                      ? 'bg-amber-400 text-slate-950 font-black shadow-md'
-                      : 'bg-white/10 hover:bg-white/15 text-slate-300'
-                  }`}
-                >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Frame Options Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
-              {AVATAR_FRAMES.filter((f) => frameCategory === 'all' || f.category === frameCategory).map((f) => {
-                const isSelected = framePreview === f.id;
-                return (
+                <div className="flex items-center justify-end gap-2.5 w-full sm:w-auto shrink-0">
                   <button
-                    key={f.id}
                     type="button"
-                    onClick={() => setFramePreview(f.id)}
-                    className={`p-3 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
-                      isSelected
-                        ? 'border-amber-400 bg-amber-500/20 shadow-[0_0_20px_rgba(245,158,11,0.45)] ring-2 ring-amber-400/60'
-                        : 'border-white/10 bg-white/5 hover:bg-white/10'
-                    }`}
+                    onClick={() => setShowFrameModal(false)}
+                    className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-slate-200 font-bold text-xs rounded-xl transition cursor-pointer whitespace-nowrap shrink-0"
                   >
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-xl">{f.icon}</span>
-                        {currentUser.avatarFrame === f.id ? (
-                          <span className="text-[9px] bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 px-2 py-0.5 rounded-full font-bold">
-                            ✓ वर्तमान सक्रिय
-                          </span>
-                        ) : (
-                          <span className="text-[9px] bg-white/10 text-slate-300 px-1.5 py-0.5 rounded font-mono">
-                            {f.category.toUpperCase()}
-                          </span>
-                        )}
-                      </div>
-                      <strong className="text-xs font-black text-white block">{f.name}</strong>
-                      <p className="text-[10px] text-slate-300 mt-1 leading-snug line-clamp-2">{f.desc}</p>
-                    </div>
-
-                    <div className="mt-2.5 pt-1.5 border-t border-white/10 text-[10px] flex items-center justify-between">
-                      <span className="text-amber-300 font-bold">{f.badge}</span>
-                      <span className={isSelected ? 'text-amber-400 font-black' : 'text-slate-400'}>
-                        {isSelected ? '✓ चयनित' : 'देखें'}
-                      </span>
-                    </div>
+                    रद्द करें
                   </button>
-                );
-              })}
-            </div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-white/10">
-              <button
-                type="button"
-                onClick={() => setShowFrameModal(false)}
-                className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-slate-300 font-bold text-xs rounded-xl transition cursor-pointer"
-              >
-                रद्द करें
-              </button>
-
-              <button
-                type="button"
-                disabled={isSavingFrame}
-                onClick={() => handleSelectAndSaveFrame(framePreview)}
-                className="px-7 py-2.5 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-[0_4px_16px_rgba(245,158,11,0.5)] flex items-center gap-2 transition cursor-pointer disabled:opacity-50 border-t border-white/50"
-              >
-                {isSavingFrame ? (
-                  <span className="flex items-center gap-1.5">
-                    <div className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                    <span>सहेज रहे हैं...</span>
-                  </span>
-                ) : (
-                  <>
-                    <CheckCircle2 className="w-4 h-4 text-slate-950" />
-                    <span>✓ यह 3D फ्रेम प्रोफाइल में सेव करें</span>
-                  </>
-                )}
-              </button>
+                  <button
+                    type="button"
+                    disabled={isSavingFrame}
+                    onClick={() => handleSelectAndSaveFrame(framePreview)}
+                    className="flex-1 sm:flex-none px-5 sm:px-6 py-2.5 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-[0_4px_18px_rgba(245,158,11,0.55)] flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50 border-t border-white/50 whitespace-nowrap shrink-0"
+                  >
+                    {isSavingFrame ? (
+                      <span className="flex items-center gap-1.5">
+                        <div className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                        <span>सेव हो रहा है...</span>
+                      </span>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 text-slate-950 shrink-0" />
+                        <span>✓ प्रोफाइल में सेव करें</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* 3D User Notifications & Admin Alerts Modal */}
       {showNotificationModal && (

@@ -50,6 +50,9 @@ import {
   getNextUpcomingFestival,
   getStrictlyUpcomingFestival,
   getFestivalAfter,
+  getActiveAndUpcomingFestivals,
+  getAutoDynamicFestivalPosters,
+  isFestivalItemExpired,
   DynamicSlide,
   PanchangInfo,
   FestivalEvent,
@@ -73,162 +76,28 @@ export interface FestiveArticleSlide {
   imageUrl?: string;
 }
 
-export const FESTIVE_ARTICLE_SLIDES: FestiveArticleSlide[] = [
-  {
-    id: 'dhanteras',
-    badge: '🪙 धनतेरस विशेष शुभकामना 2026',
-    festivalName: 'धनतेरस (Dhanteras)',
-    tagline: 'समृद्धि, सुख एवं आत्मनिर्भरता का महापर्व',
-    title: 'इस धनतेरस करें अपनी असली कमाई की शुरुआत',
-    description: 'सोना-चांदी और बर्तनों की खरीदारी के साथ इस पावन धनतेरस पर केवल ₹249 में लें ACC लाइफटाइम स्टूडेंट 🆔 सदस्यता। फिजूलखर्च छोड़कर जीवनभर के लिए अपने मोबाइल को बनाएं आमदनी का साधन!',
-    highlightPoints: [
-      '₹249 वन-टाइम एक्टिवेशन (कोई रिन्यूअल फीस नहीं)',
-      'SWIS: 3.30% फिक्स्ड रिचार्ज कमीशन सीधे वॉलेट में',
-      'TWIS: ₹150 प्रति सफल रेफरल सीधा बैंक / UPI',
-      'कुबेर महाराज व मां लक्ष्मी का आशीर्वाद आपके घर आए'
-    ],
-    ctaText: 'धनतेरस ऑफर में जॉइन करें (₹249)',
-    ctaTarget: 'register',
-    gradient: 'from-amber-600 via-yellow-600 to-amber-700',
-    borderColor: 'border-yellow-400/60',
-    accentBg: 'bg-yellow-400 text-slate-950',
-    accentText: 'text-yellow-200',
-    iconEmoji: '💰',
-    imageUrl: './images/dhanteras_festival_banner_1793965565116.jpg',
-  },
-  {
-    id: 'diwali',
-    badge: '🪔 दीपोत्सव महापर्व विशेष 2026',
-    festivalName: 'दीपावली (Diwali)',
-    tagline: 'तमसो मा ज्योतिर्गमय • खुशियों का प्रकाश',
-    title: 'दीपावली की हार्दिक शुभकामनाएं • हर घर आत्मनिर्भरता का दीया',
-    description: 'दीपोत्सव के इस पावन पर्व पर मां लक्ष्मी आपके जीवन को धन, धान्य और यश से परिपूर्ण करें। ACC परिवार के साथ जुड़कर छात्र अपनी पढ़ाई के साथ-साथ आत्मनिर्भर बनकर परिवार का सहारा बन रहे हैं।',
-    highlightPoints: [
-      'कॉलेज के साथ रोजाना 1-2 घंटे में पॉकेट मनी अर्निंग',
-      'हर रिचार्ज पर ₹10 से ₹50 की बचत + कमीशन',
-      '2 दोस्तों को जोड़ते ही ₹300 (लागत तुरंत वसूल)',
-      'अंधकार से उजाले की ओर—Start Young, Retire Young'
-    ],
-    ctaText: 'दिवाली पर सदस्य बनें (₹249)',
-    ctaTarget: 'register',
-    gradient: 'from-purple-900 via-indigo-900 to-rose-900',
-    borderColor: 'border-amber-400/50',
-    accentBg: 'bg-amber-400 text-slate-950',
-    accentText: 'text-amber-200',
-    iconEmoji: '🪔',
-    imageUrl: './images/diwali_deepotsav_banner_1793965580091.jpg',
-  },
-  {
-    id: 'govardhan',
-    badge: '🏔️ गोवर्धन पूजा एवं अन्नकूट उत्सव',
-    festivalName: 'गोवर्धन पूजा (Govardhan Puja)',
-    tagline: 'एकता, प्रकृति पूजन और टीम वर्क की शक्ति',
-    title: 'गोवर्धन पूजा की मंगलकामनाएं • TWIS टीम वर्क से बड़ी सफलता',
-    description: 'जिस प्रकार भगवान श्रीकृष्ण ने गोवर्धन पर्वत को अपनी कनिष्ठिका उंगली पर उठाकर पूरे ब्रजवासियों को एकजुट किया, उसी प्रकार ACC का TWIS (Team Work Income System) छात्रों को एकता की ताकत से आत्मनिर्भर बनाता है।',
-    highlightPoints: [
-      'TWIS (Team Work Income System): ₹150 प्रति रेफरल',
-      'टीम बनाएं और अनलिमिटेड पैसिव इनकम का मार्ग खोलें',
-      'प्रकृति संरक्षण व डिजिटल भारत मिशन का हिस्सा बनें',
-      'कम्युनिटी सपोर्ट व सीनियर मेंटर्स का 24x7 मार्गदर्शन'
-    ],
-    ctaText: 'TWIS टीम वर्क जॉइन करें',
-    ctaTarget: 'register',
-    gradient: 'from-emerald-800 via-teal-900 to-slate-900',
-    borderColor: 'border-emerald-400/50',
-    accentBg: 'bg-emerald-400 text-slate-950',
-    accentText: 'text-emerald-200',
-    iconEmoji: '🏔️',
-    imageUrl: './images/govardhan_bhaidooj_banner_1793965611440.jpg',
-  },
-  {
-    id: 'bhaidooj',
-    badge: '✨ भाई दूज मंगलपर्व 2026',
-    festivalName: 'भाई दूज (Bhai Dooj)',
-    tagline: 'भाई-बहन के अटूट स्नेह और समर्पण का प्रतीक',
-    title: 'भाई दूज की बधाई • भाई/बहन को दें आत्मनिर्भरता का उपहार',
-    description: 'इस भाई दूज पर केवल मिठाई नहीं, बल्कि अपने भाई या बहन को आत्मनिर्भर भविष्य का उपहार दें। ₹249 में ACC सदस्यता उपहार देकर उन्हें पढ़ाई के साथ अपनी खुद की पॉकेट मनी कमाने योग्य बनाएं।',
-    highlightPoints: [
-      'बहन/भाई के लिए 100% सुरक्षित वर्क फ्रॉम फोन अवसर',
-      'घर बैठे मोबाइल रिचार्ज व डिजिटल सर्विसेज से कमाई',
-      'लाइफटाइम डिजिटल 🆔 कार्ड और ऑफिशियल रियल ऐप',
-      'सुरक्षा, मान-सम्मान और आर्थिक स्वतंत्रता की गारंटी'
-    ],
-    ctaText: 'भाई दूज गिफ्ट रजिस्ट्रेशन (₹249)',
-    ctaTarget: 'register',
-    gradient: 'from-rose-800 via-pink-900 to-purple-950',
-    borderColor: 'border-rose-400/50',
-    accentBg: 'bg-rose-400 text-slate-950',
-    accentText: 'text-rose-200',
-    iconEmoji: '✨',
-    imageUrl: './images/govardhan_bhaidooj_banner_1793965611440.jpg',
-  },
-  {
-    id: 'chhath',
-    badge: '🌅 लोक आस्था का महापर्व छठ पूजा',
-    festivalName: 'छठ पूजा (Chhath Puja)',
-    tagline: 'उदीयमान व अस्ताचलगामी सूर्यदेव की आराधना',
-    title: 'महापर्व छठ पूजा की शुभकामनाएं • निष्ठा व अनुशासन का संकल्प',
-    description: 'छठी मइया और भगवान भास्कर का आशीर्वाद आपके संपूर्ण परिवार पर बना रहे। छठ पूजा हमें सिखाती है कि कड़ी मेहनत, निष्ठा और समर्पण से हर लक्ष्य प्राप्त किया जा सकता है। ACC में छात्र इसी अनुशासन से आगे बढ़ रहे हैं।',
-    highlightPoints: [
-      'पवित्रता, अनुशासन और छात्र स्वावलंबन का संकल्प',
-      '₹249 वन-टाइम में डिजिटल भारत के साथ कदम से कदम',
-      'सीधे आपके बैंक / UPI खाते में सुरक्षित व पारदर्शी ट्रांसफर',
-      'छठी मइया की कृपा से जीवन में आए यश, कीर्ति व धन'
-    ],
-    ctaText: 'छठ महापर्व पर शुरुआत करें',
-    ctaTarget: 'register',
-    gradient: 'from-orange-700 via-red-800 to-amber-900',
-    borderColor: 'border-orange-400/50',
-    accentBg: 'bg-orange-400 text-slate-950',
-    accentText: 'text-orange-200',
-    iconEmoji: '🌅',
-    imageUrl: './images/chhath_puja_banner_1793965595973.jpg',
-  },
-  {
-    id: 'value249',
-    badge: '💡 ₹249 का सच • आँखें खोलने वाला विश्लेषण',
-    festivalName: '₹249 में क्या मिलेगा? (Value Breakdown)',
-    tagline: 'पिज़्ज़ा-बर्गर का ख़र्च बनाम लाइफटाइम अर्निंग सिस्टम',
-    title: 'यहाँ-वहाँ ₹249 उड़ाने से बेहतर है ACC में निवेश करना!',
-    description: 'लोग ₹249 का पिज़्ज़ा, फ़ास्ट-फ़ूड, कोल्डड्रिंक या बेकार मोबाइल पैक में बिना सोचे-समझे ख़र्च कर देते हैं, जिससे शून्य रिटर्न मिलता है। वही ₹249 ACC में आपको लाइफटाइम 🆔, 3.30% रिचार्ज कमीशन और ₹150 प्रति रेफरल अर्निंग देता है!',
-    highlightPoints: [
-      '❌ फ़ास्ट फ़ूड / मूवी टिकट: ₹249 ख़र्च = 10 मिनट में ख़त्म, ₹0 रिटर्न',
-      ' ACC सदस्यता: ₹249 निवेश = आजीवन कमाई व बचत का प्लेटफॉर्म',
-      'सिर्फ 2 दोस्तों को रेफर किया तो ₹300 कमाई (पूरा पैसा तुरंत वापस)',
-      '1 साल में रिचार्ज करके ₹1,500 से ₹3,000 की पक्की बचत'
-    ],
-    ctaText: 'समझदारी दिखाएं • ₹249 एक्टिवेट करें',
-    ctaTarget: 'register',
-    gradient: 'from-blue-900 via-slate-900 to-[#17212b]',
-    borderColor: 'border-blue-400/50',
-    accentBg: 'bg-[#2874f0] text-white',
-    accentText: 'text-sky-200',
-    iconEmoji: '🍕',
-    imageUrl: './images/acc_student_earning_banner_1793965628499.jpg',
-  },
-  {
-    id: 'swistwis',
-    badge: '⚡🤝 SWIS + TWIS फुल फॉर्म व पूरी जानकारी',
-    festivalName: 'SWIS & TWIS Complete Roadmap',
-    tagline: 'Self Work + Team Work = अनलिमिटेड छात्र कमाई',
-    title: 'SWIS और TWIS क्या है? पूरा सच और फुल फॉर्म जानें',
-    description: 'SWIS (Self Work Income System) में अपने व दूसरों के रिचार्ज पर 3.30% फिक्स्ड कमीशन मिलता है। TWIS (Team Work Income System) में कॉलेज दोस्तों को जोड़ने पर हर सफल एक्टिवेशन पर ₹150 सीधा बैंक / UPI में मिलता है!',
-    highlightPoints: [
-      'SWIS = Self Work Income System (सेल्फ वर्क इनकम सिस्टम)',
-      'TWIS = Team Work Income System (टीम वर्क इनकम सिस्टम)',
-      'अन्य ऐप्स (GPay/PhonePe) फीस काटते हैं, ACC 3.30% कमीशन देता है',
-      '100% वेरिफाइड कम्युनिटी, रियल ऐप APK और 24x7 एडमिन सपोर्ट'
-    ],
-    ctaText: 'SWIS व TWIS से आज ही कमाना शुरू करें',
-    ctaTarget: 'register',
-    gradient: 'from-emerald-900 via-cyan-950 to-blue-950',
-    borderColor: 'border-cyan-400/50',
-    accentBg: 'bg-emerald-400 text-slate-950',
-    accentText: 'text-emerald-200',
-    iconEmoji: '🚀',
-    imageUrl: './images/acc_student_earning_banner_1793965628499.jpg',
-  }
-];
+export const FESTIVE_ARTICLE_SLIDES: FestiveArticleSlide[] = getActiveAndUpcomingFestivals().map((fest) => ({
+  id: fest.id,
+  badge: fest.badge,
+  festivalName: fest.hindiName,
+  tagline: fest.tagline,
+  title: fest.greetingTitle,
+  description: fest.greetingMessage,
+  highlightPoints: [
+    `शुभ तिथि: ${fest.tithi}`,
+    `शुभ मुहूर्त: ${fest.shubhMuhurat}`,
+    `शुभ लग्न: ${fest.lagan}`,
+    `पूजा विधि: ${fest.pujaVidhi}`,
+  ],
+  ctaText: fest.ctaText,
+  ctaTarget: (fest.ctaTarget as ActiveWindow) || 'register',
+  gradient: fest.colorGradient,
+  borderColor: 'border-amber-400/60',
+  accentBg: 'bg-amber-400 text-slate-950',
+  accentText: fest.accentColor || 'text-amber-200',
+  iconEmoji: fest.iconEmoji,
+  imageUrl: fest.imageUrl,
+}));
 
 interface HomeViewProps {
   onNavigate: (view: ActiveWindow) => void;
@@ -288,8 +157,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const [previewBannerImage, setPreviewBannerImage] = useState<string | null>(null);
   const [showPanchangModal, setShowPanchangModal] = useState<boolean>(false);
 
-  // 1-second live ticker for real-time countdown, live Panchang, and auto-removing passed festivals
+  // 1-second live countdown ticker (lightweight); regenerate full Panchang & 7-slide deck every 60s or on rollover
   useEffect(() => {
+    let lastMinuteKey = '';
     const timer = setInterval(() => {
       const now = new Date();
       const upcoming = getNextUpcomingFestival(now);
@@ -297,12 +167,18 @@ export const HomeView: React.FC<HomeViewProps> = ({
       const secondaryFestival = upcomingCountdown.isPast
         ? getStrictlyUpcomingFestival(now)
         : getFestivalAfter(upcoming.id);
-      setNextFestival(upcoming);
-      setLivePanchang(getLivePanchangDetails(now));
+
+      setNextFestival((prev) => (prev.id === upcoming.id ? prev : upcoming));
       setCountdownTicker(upcomingCountdown);
-      setStrictlyNextFestival(secondaryFestival);
+      setStrictlyNextFestival((prev) => (prev.id === secondaryFestival.id ? prev : secondaryFestival));
       setStrictlyNextCountdown(calculateFestivalCountdown(secondaryFestival.date, now));
-      setDynamicSlides(generateDynamicHomeSlides(now));
+
+      const minuteKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}-${now.getMinutes()}-${upcoming.id}`;
+      if (minuteKey !== lastMinuteKey) {
+        lastMinuteKey = minuteKey;
+        setLivePanchang(getLivePanchangDetails(now));
+        setDynamicSlides(generateDynamicHomeSlides(now));
+      }
     }, 1000);
     return () => clearInterval(timer);
   }, []);
@@ -1088,6 +964,40 @@ export const HomeView: React.FC<HomeViewProps> = ({
           </div>
         </div>
 
+        {/* Quick Jump Chips for Today & Upcoming Festivals (Auto-Removed When Passed) */}
+        <div className="relative z-10 flex items-center gap-1.5 overflow-x-auto pb-2 mb-3 no-scrollbar">
+          {dynamicSlides.map((s, idx) => {
+            const isSelected = currentSlideIndex === idx;
+            const isTodaySlide = s.type === 'festival_today';
+            const isUpcomingSlide = s.type === 'upcoming_festival';
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setCurrentSlideIndex(idx)}
+                className={`px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-black whitespace-nowrap border transition cursor-pointer flex items-center gap-1 shrink-0 ${
+                  isSelected
+                    ? isTodaySlide
+                      ? 'bg-emerald-400 text-slate-950 border-emerald-200 shadow-md'
+                      : isUpcomingSlide
+                      ? 'bg-amber-400 text-slate-950 border-yellow-200 shadow-md'
+                      : 'bg-white text-slate-950 border-white shadow-md'
+                    : 'bg-black/45 hover:bg-black/65 text-slate-200 border-white/15'
+                }`}
+              >
+                <span>{s.iconEmoji}</span>
+                <span>
+                  {isTodaySlide
+                    ? `आज: ${s.festivalOrDayTitle.replace(/^आज:\s*/, '')}`
+                    : isUpcomingSlide
+                    ? `आने वाला: ${s.festivalOrDayTitle.replace(/^आगामी:\s*/, '')}`
+                    : `सुविचार ${idx + 1}`}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
         {/* Active Dynamic Slide Display */}
         {(() => {
           const slide = dynamicSlides[currentSlideIndex] || dynamicSlides[0];
@@ -1098,7 +1008,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               className={`relative z-10 bg-gradient-to-r ${slide.gradient} rounded-xl p-5 sm:p-7 md:p-8 border-2 ${slide.borderColor} shadow-2xl animate-fadeIn space-y-4`}
             >
               <div className="flex flex-col lg:flex-row items-center lg:items-start justify-between gap-5">
-                {/* 8K HD Poster Image - 100% Full Uncropped View */}
+                {/* 8K HD Poster Image - 100% Full Uncropped View Matched to Active/Upcoming Festival */}
                 {slide.imageUrl && (
                   <div className="w-full lg:w-[380px] xl:w-[440px] shrink-0 flex flex-col gap-1.5">
                     <div 
@@ -1110,11 +1020,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         src={slide.imageUrl}
                         alt=""
                         aria-hidden="true"
+                        referrerPolicy="no-referrer"
                         className="absolute inset-0 w-full h-full object-cover blur-md opacity-35 scale-105 pointer-events-none"
                       />
                       <img
                         src={slide.imageUrl}
                         alt={slide.festivalOrDayTitle}
+                        referrerPolicy="no-referrer"
                         className="relative z-10 w-full h-full object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)] group-hover:scale-[1.02] transition-transform duration-300"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent flex items-end justify-between p-2.5 z-20 pointer-events-none">
@@ -1128,7 +1040,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       </div>
                     </div>
                     <div className="flex items-center justify-between text-[10px] text-amber-200/90 px-1 font-semibold">
-                      <span>✨ 8K HD रियल पोस्टर (ऑटो-अपडेट)</span>
+                      <span>✨ त्योहार अनुरूप रियल इमेज (ऑटो-अपडेट)</span>
                       <button
                         type="button"
                         onClick={() => setPreviewBannerImage(slide.imageUrl || null)}
@@ -1140,7 +1052,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   </div>
                 )}
 
-                <div className="space-y-2 flex-1 min-w-0">
+                <div className="space-y-2.5 flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[11px] font-black px-3 py-1 rounded-full shadow-md bg-amber-400 text-slate-950">
                       {slide.badge}
@@ -1154,7 +1066,23 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     {slide.mainHeadline}
                   </h3>
 
-                  <p className="text-xs sm:text-sm text-white/95 leading-relaxed font-medium max-w-3xl">
+                  {/* Dedicated Highlighted Festival Greeting Message Box */}
+                  {slide.greetingMessage && (
+                    <div className="p-3 sm:p-3.5 rounded-xl bg-gradient-to-r from-amber-400/20 via-yellow-300/15 to-orange-500/20 border border-amber-300/60 shadow-md">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-yellow-300 block mb-1">
+                        {slide.type === 'festival_today'
+                          ? '💌 आज का पावन शुभकामना संदेश:'
+                          : slide.type === 'upcoming_festival'
+                          ? '💌 आने वाले त्यौहार का शुभकामना संदेश:'
+                          : '💌 आज का शुभ संदेश:'}
+                      </span>
+                      <p className="text-xs sm:text-sm font-bold text-white leading-relaxed">
+                        {slide.greetingMessage}
+                      </p>
+                    </div>
+                  )}
+
+                  <p className="text-xs sm:text-sm text-white/90 leading-relaxed font-medium max-w-3xl">
                     {slide.description}
                   </p>
 
@@ -1489,13 +1417,19 @@ export const HomeView: React.FC<HomeViewProps> = ({
         </div>
       </div>
 
-      {/* PROMOTIONAL POSTERS / BANNERS SECTION (DYNAMICALLY MANAGED BY ADMIN) */}
-      {siteConfig.promotionalPosters && siteConfig.promotionalPosters.filter((p) => p.isActive).length > 0 && (
-        <div className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {siteConfig.promotionalPosters
-              .filter((p) => p.isActive)
-              .map((poster) => (
+      {/* PROMOTIONAL POSTERS / BANNERS SECTION (AUTO-REMOVES PASSED FESTIVALS + SHOWS LIVE FESTIVAL BANNERS) */}
+      {(() => {
+        const now = new Date();
+        const customActivePosters = (siteConfig.promotionalPosters || []).filter(
+          (p) => p.isActive && !p.id.startsWith('auto_poster_') && !isFestivalItemExpired(p, now)
+        );
+        const liveAutoPosters = getAutoDynamicFestivalPosters(now);
+        const combinedPosters = [...liveAutoPosters, ...customActivePosters];
+        if (combinedPosters.length === 0) return null;
+        return (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {combinedPosters.map((poster) => (
                 <div
                   key={poster.id}
                   className="relative overflow-hidden bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white rounded-xl p-5 shadow-sm border border-amber-400/40 flex flex-col justify-between"
@@ -1560,7 +1494,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
               ))}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* DYNAMIC SERVICES SECTION (ADD & REMOVE FULLY CONTROLLED BY ADMIN) */}
       <div className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 space-y-6 shadow-sm">
@@ -1996,6 +1931,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               <img
                 src={previewBannerImage}
                 alt="ACC Festival Poster 100% Full View"
+                referrerPolicy="no-referrer"
                 className="max-w-full max-h-[75vh] object-contain rounded-lg shadow-2xl"
               />
             </div>

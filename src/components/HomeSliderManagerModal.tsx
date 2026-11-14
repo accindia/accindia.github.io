@@ -24,6 +24,13 @@ import {
 } from 'lucide-react';
 import { HomeSliderPhoto, SiteConfig, ActiveWindow } from '../types';
 import { compressImage } from '../utils/imageCompressor';
+import {
+  getNextUpcomingFestival,
+  getStrictlyUpcomingFestival,
+} from '../utils/festivalPanchangEngine';
+import studentEarningImg from '../assets/images/acc_student_earning_banner_1793965628499.jpg';
+import accOfficialLogoImg from '../assets/images/acc_official_logo_1793842923620.jpg';
+import makarSankrantiImg from '../assets/images/makar_sankranti_festive_1794642506856.jpg';
 
 interface HomeSliderManagerModalProps {
   isOpen: boolean;
@@ -207,10 +214,12 @@ export const HomeSliderManagerModal: React.FC<HomeSliderManagerModalProps> = ({
 
   // 🎯 "एडमिन पैनल में जो स्लाइडर का बटन है वो स्वागत 3संदेश इफेक्ट का पॉप up system ka है"
   const handleApplyWelcome3Messages = () => {
+    const activeFest = getNextUpcomingFestival();
+    const nextFest = getStrictlyUpcomingFestival();
     const welcomeSlides: HomeSliderPhoto[] = [
       {
         id: `welcome_msg_1_${Date.now()}`,
-        imageUrl: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=1200&q=80',
+        imageUrl: studentEarningImg,
         title: '🎉 स्वागत संदेश 1: Achievers Club Community में हार्दिक स्वागत!',
         subtitle: 'Start Young, Retire Young - भारत का सबसे भरोसेमंद युवा स्वावलंबन व लर्निंग प्लेटफॉर्म',
         category: 'celebration',
@@ -223,7 +232,7 @@ export const HomeSliderManagerModal: React.FC<HomeSliderManagerModalProps> = ({
       },
       {
         id: `welcome_msg_2_${Date.now()}`,
-        imageUrl: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=1200&q=80',
+        imageUrl: accOfficialLogoImg,
         title: '⚡ स्वागत संदेश 2: SWIS रिचार्ज सेवा (3.30% पक्की बचत)',
         subtitle: 'Airtel, Jio, Vi, BSNL, DTH रिचार्ज पर पाएँ 3.30% लाइफटाइम कमीशन सीधे अपने वॉलेट में',
         category: 'service',
@@ -236,7 +245,7 @@ export const HomeSliderManagerModal: React.FC<HomeSliderManagerModalProps> = ({
       },
       {
         id: `welcome_msg_3_${Date.now()}`,
-        imageUrl: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1200&q=80',
+        imageUrl: studentEarningImg,
         title: '💼 स्वागत संदेश 3: TWIS छात्र रेफरल आमदनी (₹150 प्रति दोस्त)',
         subtitle: 'हर सफल रेफरल पर ₹150 सीधा बैंक / UPI पेआउट। पढ़ाई के साथ बनाएं निश्चित पॉकेट मनी',
         category: 'income',
@@ -249,25 +258,25 @@ export const HomeSliderManagerModal: React.FC<HomeSliderManagerModalProps> = ({
       },
       {
         id: `welcome_festive_4_${Date.now()}`,
-        imageUrl: 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=1200&q=80',
-        title: '🪔 आगामी पावन पर्व: देवउठनी एकादशी व तुलसी विवाह',
-        subtitle: 'शुभ मांगलिक कार्यों का शुभारंभ व भगवान श्री हरि विष्णु का पावन आशीर्वाद',
+        imageUrl: activeFest.imageUrl,
+        title: `${activeFest.iconEmoji} पावन पर्व: ${activeFest.hindiName}`,
+        subtitle: activeFest.greetingMessage,
         category: 'festive',
-        actionUrl: 'register',
-        actionLabel: 'शुभ पर्व संकल्प के साथ जॉइन करें',
+        actionUrl: activeFest.ctaTarget || 'register',
+        actionLabel: activeFest.ctaText || 'शुभ पर्व संकल्प के साथ जॉइन करें',
         congratulationEffect: true,
         order: 3,
         isActive: true,
         createdAt: new Date().toISOString(),
       },
       {
-        id: `welcome_id_5_${Date.now()}`,
-        imageUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1200&q=80',
-        title: '🪪 डिजिटल 🆔 कार्ड व प्राइवेसी सुरक्षा कवच',
-        subtitle: 'अपनी प्रोफाइल फोटो, नाम, फोन व डिजिटल ID को जब चाहें पब्लिक या प्राइवेट रखें',
-        category: 'idcard',
-        actionUrl: 'idcard',
-        actionLabel: 'डिजिटल ID कार्ड देखें',
+        id: `welcome_upcoming_5_${Date.now()}`,
+        imageUrl: nextFest.imageUrl,
+        title: `⏳ आने वाला त्यौहार: ${nextFest.hindiName}`,
+        subtitle: nextFest.upcomingGreetingMessage || nextFest.greetingMessage,
+        category: 'festive',
+        actionUrl: nextFest.ctaTarget || 'register',
+        actionLabel: nextFest.ctaText || 'आगामी पर्व विशेष ₹249',
         congratulationEffect: true,
         order: 4,
         isActive: true,
@@ -275,7 +284,7 @@ export const HomeSliderManagerModal: React.FC<HomeSliderManagerModalProps> = ({
       },
       {
         id: `welcome_app_6_${Date.now()}`,
-        imageUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
+        imageUrl: accOfficialLogoImg,
         title: '📱 ऑफिशियल Android App व 24x7 हेल्प चैट',
         subtitle: 'Google Android APK डाउनलोड करें व कम्युनिटी मेंबर्स से सीधे लाइव कनेक्ट रहें',
         category: 'announcement',
@@ -288,7 +297,7 @@ export const HomeSliderManagerModal: React.FC<HomeSliderManagerModalProps> = ({
       },
       {
         id: `welcome_daily_7_${Date.now()}`,
-        imageUrl: 'https://images.unsplash.com/photo-1470240731273-7821a6eeb6bd?auto=format&fit=crop&w=1200&q=80',
+        imageUrl: makarSankrantiImg,
         title: '🌅 दैनिक सुविचार व सुप्रभात प्रेरणा',
         subtitle: 'प्रतिदिन पंचांग, शुभ मुहूर्त व प्रेरक विचारों के साथ करें नए दिन की शुरुआत',
         category: 'general',

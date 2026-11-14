@@ -171,8 +171,9 @@ export const WelcomeWindow: React.FC<WelcomeWindowProps> = ({
   const [currentTimeStr, setCurrentTimeStr] = useState<string>('');
   const [currentDateStr, setCurrentDateStr] = useState<string>('');
 
-  // Live IST Clock
+  // Live IST Clock (active only while modal is open)
   useEffect(() => {
+    if (!isOpen) return;
     const updateTime = () => {
       const now = new Date();
       setCurrentTimeStr(
@@ -201,7 +202,7 @@ export const WelcomeWindow: React.FC<WelcomeWindowProps> = ({
     updateTime();
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
-  }, [isAutoMode]);
+  }, [isOpen, isAutoMode]);
 
   // Trigger celebration confetti when opened
   useEffect(() => {

@@ -1,72 +1,328 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ACC community documents
+
+    // ===============================================================
+    // ACC INDIA - ZERO-DELETION & SCHEMA-VALIDATED SECURITY RULES
+    // Every user profile, transaction, passbook entry, withdrawal,
+    // referral, message, and audit trail is permanently protected
+    // against deletion (allow delete: if false).
+    // ===============================================================
+
+    function isValidId(id) {
+      return id is string
+        && id.size() >= 2
+        && id.size() <= 128
+        && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidOptionalString(data, key, maxLen) {
+      return !(key in data)
+        || data[key] == null
+        || (data[key] is string && data[key].size() <= maxLen);
+    }
+
+    function isValidOptionalNumber(data, key, minVal, maxVal) {
+      return !(key in data)
+        || data[key] == null
+        || (data[key] is number && data[key] >= minVal && data[key] <= maxVal);
+    }
+
+    function isValidOptionalBool(data, key) {
+      return !(key in data)
+        || data[key] == null
+        || data[key] is bool;
+    }
+
+    // 1. Member validation matching Member entity
+    function isValidMember(data) {
+      return data.keys().hasAll(['accId', 'fullName', 'mobile', 'plan', 'status'])
+        && data.accId is string && data.accId.size() >= 3 && data.accId.size() <= 64
+        && data.accId.matches('^[A-Za-z0-9_\\-]+$')
+        && data.fullName is string && data.fullName.size() >= 1 && data.fullName.size() <= 120
+        && data.mobile is string && data.mobile.size() <= 20
+        && data.plan in ['SWIS', 'TWIS', 'COMBO']
+        && data.status in ['verified', 'pending', 'rejected']
+        && isValidOptionalString(data, 'id', 128)
+        && isValidOptionalString(data, 'whatsapp', 20)
+        && isValidOptionalString(data, 'email', 160)
+        && isValidOptionalString(data, 'sponsorId', 64)
+        && isValidOptionalString(data, 'sponsorName', 120)
+        && isValidOptionalString(data, 'utrNumber', 64)
+        && isValidOptionalString(data, 'createdAt', 64)
+        && isValidOptionalString(data, 'avatarUrl', 450000)
+        && isValidOptionalString(data, 'paymentScreenshotUrl', 650000)
+        && isValidOptionalString(data, 'personalQrUrl', 450000)
+        && isValidOptionalNumber(data, 'walletBalance', 0, 10000000)
+        && isValidOptionalNumber(data, 'totalEarnings', 0, 10000000)
+        && isValidOptionalNumber(data, 'swisEarnings', 0, 10000000)
+        && isValidOptionalNumber(data, 'twisEarnings', 0, 10000000)
+        && isValidOptionalNumber(data, 'rechargesCount', 0, 1000000)
+        && isValidOptionalNumber(data, 'referralsCount', 0, 1000000)
+        && isValidOptionalBool(data, 'isActive');
+    }
+
+    function isValidMemberUpdate(incoming, existing) {
+      return isValidMember(incoming)
+        && incoming.accId == existing.accId
+        && (!('id' in existing) || incoming.id == existing.id)
+        && (!('createdAt' in existing) || incoming.createdAt == existing.createdAt);
+    }
+
+    // 2. RechargeTransaction validation (Append-only)
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['id', 'accId', 'amount', 'commissionEarned'])
+        && data.id is string && data.id.size() >= 2 && data.id.size() <= 128
+        && data.accId is string && data.accId.size() >= 3 && data.accId.size() <= 64
+        && data.amount is number && data.amount > 0 && data.amount <= 500000
+        && data.commissionEarned is number && data.commissionEarned >= 0 && data.commissionEarned <= 50000
+        && isValidOptionalString(data, 'serviceType', 64)
+        && isValidOptionalString(data, 'operator', 80)
+        && isValidOptionalString(data, 'accountNumber', 64)
+        && isValidOptionalString(data, 'timestamp', 64)
+        && isValidOptionalString(data, 'referenceId', 80);
+    }
+
+    // 3. ReferralRecord validation (Append-only)
+    function isValidReferral(data) {
+      return data.keys().hasAll(['id', 'referrerAccId', 'referredAccId', 'bonusAmount'])
+        && data.id is string && data.id.size() >= 2 && data.id.size() <= 128
+        && data.referrerAccId is string && data.referrerAccId.size() >= 3 && data.referrerAccId.size() <= 64
+        && data.referredAccId is string && data.referredAccId.size() >= 3 && data.referredAccId.size() <= 64
+        && data.bonusAmount is number && data.bonusAmount >= 0 && data.bonusAmount <= 10000
+        && isValidOptionalString(data, 'referredName', 120)
+        && isValidOptionalString(data, 'date', 32);
+    }
+
+    // 4. WithdrawalRequest validation
+    function isValidWithdrawal(data) {
+      return data.keys().hasAll(['id', 'accId', 'amount', 'status'])
+        && data.id is string && data.id.size() >= 2 && data.id.size() <= 128
+        && data.accId is string && data.accId.size() >= 3 && data.accId.size() <= 64
+        && data.amount is number && data.amount > 0 && data.amount <= 1000000
+        && data.status in ['pending', 'approved', 'rejected']
+        && isValidOptionalString(data, 'memberName', 120)
+        && isValidOptionalString(data, 'upiId', 120)
+        && isValidOptionalString(data, 'requestedAt', 64)
+        && isValidOptionalString(data, 'processedAt', 64)
+        && isValidOptionalString(data, 'notes', 400);
+    }
+
+    // 5. PassbookEntry validation (Immutable core financial fields)
+    function isValidPassbookEntry(data) {
+      return data.keys().hasAll(['id', 'accId', 'type', 'amount', 'timestamp', 'status'])
+        && data.id is string && data.id.size() >= 2 && data.id.size() <= 128
+        && data.accId is string && data.accId.size() >= 3 && data.accId.size() <= 64
+        && data.type in ['CREDIT', 'DEBIT']
+        && data.amount is number && data.amount >= 0 && data.amount <= 1000000
+        && data.timestamp is string && data.timestamp.size() <= 64
+        && data.status in ['COMPLETED', 'PENDING', 'REJECTED']
+        && isValidOptionalString(data, 'memberName', 120)
+        && isValidOptionalString(data, 'category', 40)
+        && isValidOptionalString(data, 'title', 200)
+        && isValidOptionalString(data, 'description', 500)
+        && isValidOptionalString(data, 'referenceId', 80)
+        && isValidOptionalNumber(data, 'balanceAfter', 0, 10000000);
+    }
+
+    // 6. SiteConfig validation
+    function isValidSiteConfig(data) {
+      return data is map
+        && isValidOptionalString(data, 'helplinePhone', 40)
+        && isValidOptionalString(data, 'whatsappNumber', 40)
+        && isValidOptionalString(data, 'officialEmail', 160)
+        && isValidOptionalString(data, 'officialAddress', 400)
+        && isValidOptionalString(data, 'websiteUrl', 200)
+        && isValidOptionalString(data, 'telegramLink', 200)
+        && isValidOptionalString(data, 'adminSignatoryName', 120)
+        && isValidOptionalString(data, 'adminSignatoryTitle', 120)
+        && isValidOptionalString(data, 'upiId', 120)
+        && isValidOptionalString(data, 'upiReceiverName', 120)
+        && isValidOptionalString(data, 'announcementMarquee', 2000)
+        && isValidOptionalString(data, 'configUpdatedAt', 64)
+        && isValidOptionalNumber(data, 'activationFee', 0, 100000);
+    }
+
+    // 7. ProfileEditAuditLog validation (Append-only immutable audit history)
+    function isValidAuditLog(data) {
+      return data.keys().hasAll(['id', 'accId', 'timestamp', 'changes'])
+        && data.id is string && data.id.size() >= 2 && data.id.size() <= 128
+        && data.accId is string && data.accId.size() >= 3 && data.accId.size() <= 64
+        && data.timestamp is string && data.timestamp.size() <= 64
+        && data.changes is list && data.changes.size() <= 50
+        && isValidOptionalString(data, 'memberName', 160);
+    }
+
+    // 8. PrivateMessage validation
+    function isValidPrivateMessage(data) {
+      return data.keys().hasAll(['id', 'userAccId', 'senderRole', 'senderAccId', 'senderName', 'text', 'timestamp'])
+        && data.id is string && data.id.size() >= 2 && data.id.size() <= 128
+        && data.userAccId is string && data.userAccId.size() >= 1 && data.userAccId.size() <= 128
+        && data.senderRole in ['admin', 'user']
+        && data.senderAccId is string && data.senderAccId.size() >= 1 && data.senderAccId.size() <= 64
+        && data.senderName is string && data.senderName.size() <= 120
+        && data.text is string && data.text.size() <= 5000
+        && data.timestamp is string && data.timestamp.size() <= 64
+        && isValidOptionalString(data, 'mediaUrl', 650000)
+        && isValidOptionalBool(data, 'isRead');
+    }
+
+    // 9. ChatGroup validation
+    function isValidChatGroup(data) {
+      return data.keys().hasAll(['id', 'name', 'creatorAccId', 'creatorName', 'members', 'createdAt'])
+        && data.id is string && data.id.size() >= 2 && data.id.size() <= 128
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 120
+        && data.creatorAccId is string && data.creatorAccId.size() >= 2 && data.creatorAccId.size() <= 64
+        && data.creatorName is string && data.creatorName.size() <= 120
+        && data.members is list && data.members.size() <= 500
+        && data.createdAt is string && data.createdAt.size() <= 64
+        && isValidOptionalString(data, 'description', 500);
+    }
+
+    // 10. Friendship validation
+    function isValidFriendship(data) {
+      return data.keys().hasAll(['id', 'user1AccId', 'user2AccId', 'status', 'requesterAccId', 'createdAt'])
+        && data.id is string && data.id.size() >= 2 && data.id.size() <= 128
+        && data.user1AccId is string && data.user1AccId.size() >= 3 && data.user1AccId.size() <= 64
+        && data.user2AccId is string && data.user2AccId.size() >= 3 && data.user2AccId.size() <= 64
+        && data.status in ['pending', 'accepted', 'declined']
+        && data.requesterAccId is string && data.requesterAccId.size() >= 3 && data.requesterAccId.size() <= 64
+        && data.createdAt is string && data.createdAt.size() <= 64;
+    }
+
+    // 11. SocialNotification validation
+    function isValidSocialNotification(data) {
+      return data.keys().hasAll(['id', 'recipientAccId', 'senderAccId', 'type', 'title', 'timestamp'])
+        && data.id is string && data.id.size() >= 2 && data.id.size() <= 128
+        && data.recipientAccId is string && data.recipientAccId.size() >= 3 && data.recipientAccId.size() <= 64
+        && data.senderAccId is string && data.senderAccId.size() >= 3 && data.senderAccId.size() <= 64
+        && data.type in ['message', 'friend_request', 'friend_accept', 'profile_view', 'group_invite']
+        && data.title is string && data.title.size() <= 160
+        && data.timestamp is string && data.timestamp.size() <= 64
+        && isValidOptionalString(data, 'body', 500)
+        && isValidOptionalBool(data, 'isRead');
+    }
+
+    // 12. ProfileView validation
+    function isValidProfileView(data) {
+      return data.keys().hasAll(['targetAccId', 'visitorAccId', 'visitedAt'])
+        && data.targetAccId is string && data.targetAccId.size() >= 3 && data.targetAccId.size() <= 64
+        && data.visitorAccId is string && data.visitorAccId.size() >= 3 && data.visitorAccId.size() <= 64
+        && data.visitedAt is string && data.visitedAt.size() <= 64;
+    }
+
+    // ===============================================================
+    // COLLECTION RULES (DELETE PERMANENTLY LOCKED TO FALSE)
+    // ===============================================================
+
     match /members/{memberId} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if request.auth != null;
+      allow get: if isValidId(memberId);
+      allow list: if true;
+      allow create: if isValidId(memberId) && isValidMember(request.resource.data);
+      allow update: if isValidId(memberId) && isValidMemberUpdate(request.resource.data, resource.data);
+      allow delete: if false;
     }
+
     match /transactions/{transactionId} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if request.auth != null;
+      allow get: if isValidId(transactionId);
+      allow list: if true;
+      allow create: if isValidId(transactionId) && isValidTransaction(request.resource.data);
+      allow update: if false;
+      allow delete: if false;
     }
+
     match /referrals/{referralId} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if request.auth != null;
+      allow get: if isValidId(referralId);
+      allow list: if true;
+      allow create: if isValidId(referralId) && isValidReferral(request.resource.data);
+      allow update: if false;
+      allow delete: if false;
     }
+
     match /withdrawals/{withdrawalId} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if request.auth != null;
+      allow get: if isValidId(withdrawalId);
+      allow list: if true;
+      allow create: if isValidId(withdrawalId) && isValidWithdrawal(request.resource.data);
+      allow update: if isValidId(withdrawalId)
+        && isValidWithdrawal(request.resource.data)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.accId == resource.data.accId
+        && request.resource.data.amount == resource.data.amount
+        && request.resource.data.requestedAt == resource.data.requestedAt;
+      allow delete: if false;
     }
+
+    match /passbook_entries/{entryId} {
+      allow get: if isValidId(entryId);
+      allow list: if true;
+      allow create: if isValidId(entryId) && isValidPassbookEntry(request.resource.data);
+      allow update: if isValidId(entryId)
+        && isValidPassbookEntry(request.resource.data)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.accId == resource.data.accId
+        && request.resource.data.amount == resource.data.amount
+        && request.resource.data.type == resource.data.type;
+      allow delete: if false;
+    }
+
     match /settings/{settingId} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if request.auth != null;
+      allow get: if isValidId(settingId);
+      allow list: if true;
+      allow create, update: if isValidId(settingId) && isValidSiteConfig(request.resource.data);
+      allow delete: if false;
     }
+
     match /profile_audit_logs/{auditId} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if request.auth != null;
+      allow get: if isValidId(auditId);
+      allow list: if true;
+      allow create: if isValidId(auditId) && isValidAuditLog(request.resource.data);
+      allow update: if false;
+      allow delete: if false;
     }
+
     match /private_messages/{messageId} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if request.auth != null;
+      allow get: if isValidId(messageId);
+      allow list: if true;
+      allow create: if isValidId(messageId) && isValidPrivateMessage(request.resource.data);
+      allow update: if isValidId(messageId)
+        && isValidPrivateMessage(request.resource.data)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.senderAccId == resource.data.senderAccId;
+      allow delete: if false;
     }
+
     match /chat_groups/{groupId} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if request.auth != null;
+      allow get: if isValidId(groupId);
+      allow list: if true;
+      allow create, update: if isValidId(groupId) && isValidChatGroup(request.resource.data);
+      allow delete: if false;
     }
+
     match /friendships/{friendshipId} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if request.auth != null;
+      allow get: if isValidId(friendshipId);
+      allow list: if true;
+      allow create, update: if isValidId(friendshipId) && isValidFriendship(request.resource.data);
+      allow delete: if false;
     }
+
     match /social_notifications/{notificationId} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if request.auth != null;
+      allow get: if isValidId(notificationId);
+      allow list: if true;
+      allow create, update: if isValidId(notificationId) && isValidSocialNotification(request.resource.data);
+      allow delete: if false;
     }
+
     match /profile_views/{viewId} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if request.auth != null;
+      allow get: if isValidId(viewId);
+      allow list: if true;
+      allow create: if isValidId(viewId) && isValidProfileView(request.resource.data);
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // Default Catch-All Deny
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

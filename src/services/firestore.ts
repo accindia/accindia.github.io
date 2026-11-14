@@ -9,8 +9,21 @@ import {
   where,
   onSnapshot,
 } from 'firebase/firestore';
-import { db } from './firebase';
-import { Member, RechargeTransaction, ReferralRecord, WithdrawalRequest, SiteConfig, ProfileEditAuditLog, PrivateMessage } from '../types';
+import { auth, db } from './firebase';
+import { LocalDb } from './localDb';
+import {
+  Member,
+  RechargeTransaction,
+  ReferralRecord,
+  WithdrawalRequest,
+  SiteConfig,
+  ProfileEditAuditLog,
+  PrivateMessage,
+  PassbookEntry,
+  ChatGroup,
+  Friendship,
+  SocialNotification,
+} from '../types';
 import { ensureSafeFirestoreSize } from '../utils/imageCompressor';
 
 // Collections
@@ -18,13 +31,111 @@ const MEMBERS_COL = 'members';
 const TRANSACTIONS_COL = 'transactions';
 const REFERRALS_COL = 'referrals';
 const WITHDRAWALS_COL = 'withdrawals';
+const PASSBOOK_COL = 'passbook_entries';
 const SETTINGS_COL = 'settings';
 const SITE_CONFIG_DOC = 'site_config';
+const AUDIT_LOGS_COL = 'profile_audit_logs';
+const PRIVATE_MESSAGES_COL = 'private_messages';
+const CHAT_GROUPS_COL = 'chat_groups';
+const FRIENDSHIPS_COL = 'friendships';
+const SOCIAL_NOTIFICATIONS_COL = 'social_notifications';
 
-const QUOTA_STORAGE_KEY = 'acc_firestore_write_quota_utc_day';
+const QUOTA_STORAGE_KEY = 'acc_firestore_write_quota_pt_day';
+const PENDING_SYNC_QUEUE_KEY = 'acc_pending_cloud_sync_v1';
 
-function getTodayUtcKey(): string {
-  return new Date().toISOString().slice(0, 10);
+// Required OperationType & Error Info per Firebase security guidelines
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  };
+}
+
+export function handleFirestoreError(
+  error: unknown,
+  operationType: OperationType,
+  path: string | null,
+  rethrow: boolean = false
+): FirestoreErrorInfo {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid ?? null,
+      email: auth.currentUser?.email ?? null,
+      emailVerified: auth.currentUser?.emailVerified ?? null,
+      isAnonymous: auth.currentUser?.isAnonymous ?? null,
+      tenantId: auth.currentUser?.tenantId ?? null,
+      providerInfo:
+        auth.currentUser?.providerData?.map((provider) => ({
+          providerId: provider.providerId,
+          email: provider.email,
+        })) || [],
+    },
+    operationType,
+    path,
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  if (rethrow) {
+    throw new Error(JSON.stringify(errInfo));
+  }
+  return errInfo;
+}
+
+export function isFirestorePermissionError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { code?: string; message?: string };
+  const code = String(e.code || '').toLowerCase();
+  const msg = String(e.message || '').toLowerCase();
+  return code === 'permission-denied' || msg.includes('missing or insufficient permissions');
+}
+
+export function isFirestoreNotFoundError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { code?: string; message?: string };
+  const code = String(e.code || '').toLowerCase();
+  const msg = String(e.message || '').toLowerCase();
+  return code === 'not-found' || msg.includes('no document to update');
+}
+
+function sanitizeDocId(rawId: string): string {
+  const cleaned = String(rawId || 'doc_item')
+    .trim()
+    .replace(/[^a-zA-Z0-9_\-]/g, '_');
+  const sliced = cleaned.slice(0, 128);
+  return sliced.length >= 2 ? sliced : `id_${sliced || 'item'}`;
+}
+
+// Google Firestore free daily quota resets at Midnight Pacific Time (America/Los_Angeles)
+function getTodayQuotaDayKey(): string {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Los_Angeles',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
 }
 
 let inMemoryQuotaPausedDay: string | null = null;
@@ -32,7 +143,7 @@ let quotaLoggedOnce = false;
 const quotaListeners = new Set<(exhausted: boolean) => void>();
 
 // Bounded client timeout so Firestore WriteStream backoff never leaves UI Save buttons stuck forever
-function withTimeout<T>(promise: Promise<T>, ms = 4500, label = 'Firestore operation'): Promise<T> {
+function withTimeout<T>(promise: Promise<T>, ms = 5000, label = 'Firestore operation'): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
       reject(new Error(`${label} timed out after ${ms}ms`));
@@ -77,7 +188,7 @@ export function isFirestoreDocumentSizeError(err: unknown): boolean {
 }
 
 export function isFirestoreWritePaused(): boolean {
-  const today = getTodayUtcKey();
+  const today = getTodayQuotaDayKey();
   if (inMemoryQuotaPausedDay === today) return true;
   try {
     if (typeof localStorage !== 'undefined' && localStorage.getItem(QUOTA_STORAGE_KEY) === today) {
@@ -95,7 +206,7 @@ export function isFirestoreWritePaused(): boolean {
 }
 
 export function markFirestoreWritePaused(err?: unknown): void {
-  const today = getTodayUtcKey();
+  const today = getTodayQuotaDayKey();
   inMemoryQuotaPausedDay = today;
   try {
     if (typeof localStorage !== 'undefined') {
@@ -110,7 +221,7 @@ export function markFirestoreWritePaused(err?: unknown): void {
   if (!quotaLoggedOnce) {
     quotaLoggedOnce = true;
     console.warn(
-      '⚠️ Firestore daily free-tier write quota reached for today; cloud writes paused cleanly and saved locally until daily reset.',
+      '⚠️ Firestore daily free-tier write quota reached for today; cloud writes queued locally & in IndexedDB until reset.',
       err
     );
   }
@@ -120,6 +231,135 @@ export function markFirestoreWritePaused(err?: unknown): void {
     } catch {
       // ignore
     }
+  });
+}
+
+// ============================================================================
+// PERSISTENT OFFLINE & QUOTA-PAUSE CLOUD SYNC QUEUE (Zero Data Loss Guarantee)
+// ============================================================================
+export interface PendingCloudWrite {
+  key: string;
+  collection: string;
+  docId: string;
+  mode: 'set' | 'merge' | 'update';
+  data: Record<string, any>;
+  queuedAt: string;
+  retryCount: number;
+}
+
+let inMemoryPendingQueue: PendingCloudWrite[] | null = null;
+let activeFlushPromise: Promise<{ flushed: number; remaining: number }> | null = null;
+const pendingCountListeners = new Set<(count: number) => void>();
+
+function notifyPendingCountListeners() {
+  const count = inMemoryPendingQueue ? inMemoryPendingQueue.length : 0;
+  pendingCountListeners.forEach((cb) => {
+    try {
+      cb(count);
+    } catch {
+      // ignore
+    }
+  });
+}
+
+async function loadPendingQueue(): Promise<PendingCloudWrite[]> {
+  if (inMemoryPendingQueue) return inMemoryPendingQueue;
+  try {
+    const idbQueue = await LocalDb.get<PendingCloudWrite[]>(PENDING_SYNC_QUEUE_KEY);
+    if (Array.isArray(idbQueue)) {
+      inMemoryPendingQueue = idbQueue;
+      return inMemoryPendingQueue;
+    }
+  } catch {
+    // fallback to localStorage
+  }
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem(PENDING_SYNC_QUEUE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          inMemoryPendingQueue = parsed;
+          return inMemoryPendingQueue;
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+  inMemoryPendingQueue = [];
+  return inMemoryPendingQueue;
+}
+
+function savePendingQueueSync(queueList: PendingCloudWrite[]): void {
+  inMemoryPendingQueue = queueList;
+  LocalDb.set(PENDING_SYNC_QUEUE_KEY, queueList).catch(() => {});
+  try {
+    if (typeof localStorage !== 'undefined') {
+      if (queueList.length === 0) {
+        localStorage.removeItem(PENDING_SYNC_QUEUE_KEY);
+      } else {
+        // Keep compact mirror in localStorage if under size limit
+        const serialized = JSON.stringify(queueList);
+        if (serialized.length < 1500000) {
+          localStorage.setItem(PENDING_SYNC_QUEUE_KEY, serialized);
+        }
+      }
+    }
+  } catch {
+    // IndexedDB preserves full queue safely
+  }
+  notifyPendingCountListeners();
+}
+
+async function enqueuePendingWrite(
+  collectionName: string,
+  docId: string,
+  mode: 'set' | 'merge' | 'update',
+  data: Record<string, any>
+): Promise<void> {
+  const safeId = sanitizeDocId(docId);
+  const key = `${collectionName}::${safeId}`;
+  const queueList = await loadPendingQueue();
+  const next = [...queueList];
+  const idx = next.findIndex((q) => q.key === key);
+
+  if (idx >= 0) {
+    const existing = next[idx];
+    const resolvedMode: 'set' | 'merge' | 'update' =
+      existing.mode === 'set' || mode === 'set'
+        ? 'set'
+        : existing.mode === 'merge' || mode === 'merge'
+        ? 'merge'
+        : 'update';
+    next[idx] = {
+      key,
+      collection: collectionName,
+      docId: safeId,
+      mode: resolvedMode,
+      data: { ...existing.data, ...data },
+      queuedAt: new Date().toISOString(),
+      retryCount: existing.retryCount || 0,
+    };
+  } else {
+    next.push({
+      key,
+      collection: collectionName,
+      docId: safeId,
+      mode,
+      data,
+      queuedAt: new Date().toISOString(),
+      retryCount: 0,
+    });
+  }
+
+  savePendingQueueSync(next);
+}
+
+// Auto-replay queued writes when device comes back online
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    FirestoreService.flushPendingSyncQueue().catch(() => {});
   });
 }
 
@@ -175,6 +415,33 @@ export function sanitizeMember(data: any, fallbackId?: string): Member {
   };
 }
 
+async function prepareCleanMember(member: Member): Promise<Member> {
+  const cleanMember: Member = JSON.parse(JSON.stringify(member));
+
+  if (cleanMember.paymentScreenshotUrl && cleanMember.paymentScreenshotUrl.startsWith('data:image')) {
+    try {
+      cleanMember.paymentScreenshotUrl = await ensureSafeFirestoreSize(cleanMember.paymentScreenshotUrl, 600, 0.65);
+    } catch {
+      // ignore
+    }
+  }
+  if (cleanMember.avatarUrl && cleanMember.avatarUrl.startsWith('data:image')) {
+    try {
+      cleanMember.avatarUrl = await ensureSafeFirestoreSize(cleanMember.avatarUrl, 300, 0.7);
+    } catch {
+      // ignore
+    }
+  }
+  if (cleanMember.personalQrUrl && cleanMember.personalQrUrl.startsWith('data:image')) {
+    try {
+      cleanMember.personalQrUrl = await ensureSafeFirestoreSize(cleanMember.personalQrUrl, 300, 0.7);
+    } catch {
+      // ignore
+    }
+  }
+  return cleanMember;
+}
+
 export const FirestoreService = {
   isWriteQuotaPaused(): boolean {
     return isFirestoreWritePaused();
@@ -200,6 +467,8 @@ export const FirestoreService = {
         // ignore
       }
     });
+    // Trigger pending sync flush automatically on manual retry
+    this.flushPendingSyncQueue().catch(() => {});
   },
 
   subscribeToQuotaStatus(cb: (exhausted: boolean) => void): () => void {
@@ -208,6 +477,97 @@ export const FirestoreService = {
     return () => {
       quotaListeners.delete(cb);
     };
+  },
+
+  async getPendingSyncCount(): Promise<number> {
+    const q = await loadPendingQueue();
+    return q.length;
+  },
+
+  subscribeToPendingSyncCount(cb: (count: number) => void): () => void {
+    pendingCountListeners.add(cb);
+    loadPendingQueue().then((q) => cb(q.length)).catch(() => cb(0));
+    return () => {
+      pendingCountListeners.delete(cb);
+    };
+  },
+
+  async queueWriteForSync(
+    collectionName: string,
+    docId: string,
+    mode: 'set' | 'merge' | 'update',
+    data: Record<string, any>
+  ): Promise<void> {
+    await enqueuePendingWrite(collectionName, docId, mode, data);
+  },
+
+  // Replays queued offline / quota-paused writes safely without losing any user records
+  async flushPendingSyncQueue(): Promise<{ flushed: number; remaining: number }> {
+    if (activeFlushPromise) return activeFlushPromise;
+
+    activeFlushPromise = (async () => {
+      const queueList = await loadPendingQueue();
+      if (queueList.length === 0) {
+        return { flushed: 0, remaining: 0 };
+      }
+      if (isFirestoreWritePaused() || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
+        return { flushed: 0, remaining: queueList.length };
+      }
+
+      let flushed = 0;
+      const remainingQueue: PendingCloudWrite[] = [];
+
+      for (let i = 0; i < queueList.length; i++) {
+        const item = queueList[i];
+        if (isFirestoreWritePaused()) {
+          remainingQueue.push(...queueList.slice(i));
+          break;
+        }
+        try {
+          const ref = doc(db, item.collection, sanitizeDocId(item.docId));
+          if (item.mode === 'update') {
+            try {
+              await withTimeout(updateDoc(ref, item.data), 5000, `flush update ${item.collection}`);
+            } catch (updErr) {
+              if (isFirestoreNotFoundError(updErr)) {
+                await withTimeout(setDoc(ref, item.data, { merge: true }), 5000, `flush merge fallback ${item.collection}`);
+              } else {
+                throw updErr;
+              }
+            }
+          } else if (item.mode === 'merge') {
+            await withTimeout(setDoc(ref, item.data, { merge: true }), 5000, `flush merge ${item.collection}`);
+          } else {
+            await withTimeout(setDoc(ref, item.data), 5000, `flush set ${item.collection}`);
+          }
+          flushed++;
+        } catch (err) {
+          if (isFirestoreQuotaError(err)) {
+            markFirestoreWritePaused(err);
+            remainingQueue.push(...queueList.slice(i));
+            break;
+          }
+          if (isFirestorePermissionError(err)) {
+            handleFirestoreError(err, OperationType.WRITE, `${item.collection}/${item.docId}`);
+            // Drop permanently malformed/invalid item only after 3 attempts to avoid blocking queue forever
+            if ((item.retryCount || 0) < 2) {
+              remainingQueue.push({ ...item, retryCount: (item.retryCount || 0) + 1 });
+            }
+          } else {
+            remainingQueue.push({ ...item, retryCount: (item.retryCount || 0) + 1 });
+          }
+        }
+      }
+
+      savePendingQueueSync(remainingQueue);
+      return { flushed, remaining: remainingQueue.length };
+    })();
+
+    try {
+      return await activeFlushPromise;
+    } finally {
+      activeFlushPromise = null;
+    }
   },
 
   // Sync seed member or check if exists
@@ -221,23 +581,22 @@ export const FirestoreService = {
     try {
       const snap = await getDocs(collection(db, MEMBERS_COL));
       if (snap.empty) {
-        console.log('Seeding initial members to Firestore...');
         for (const m of seedMembers) {
           if (isFirestoreWritePaused()) return;
           const clean = JSON.parse(JSON.stringify(m));
-          await setDoc(doc(db, MEMBERS_COL, m.accId), clean);
+          await setDoc(doc(db, MEMBERS_COL, sanitizeDocId(m.accId)), clean);
         }
         for (const tx of seedTransactions) {
           if (isFirestoreWritePaused()) return;
-          await setDoc(doc(db, TRANSACTIONS_COL, tx.id), JSON.parse(JSON.stringify(tx)));
+          await setDoc(doc(db, TRANSACTIONS_COL, sanitizeDocId(tx.id)), JSON.parse(JSON.stringify(tx)));
         }
         for (const r of seedReferrals) {
           if (isFirestoreWritePaused()) return;
-          await setDoc(doc(db, REFERRALS_COL, r.id), JSON.parse(JSON.stringify(r)));
+          await setDoc(doc(db, REFERRALS_COL, sanitizeDocId(r.id)), JSON.parse(JSON.stringify(r)));
         }
         for (const w of seedWithdrawals) {
           if (isFirestoreWritePaused()) return;
-          await setDoc(doc(db, WITHDRAWALS_COL, w.id), JSON.parse(JSON.stringify(w)));
+          await setDoc(doc(db, WITHDRAWALS_COL, sanitizeDocId(w.id)), JSON.parse(JSON.stringify(w)));
         }
       }
     } catch (err) {
@@ -245,7 +604,11 @@ export const FirestoreService = {
         markFirestoreWritePaused(err);
         return;
       }
-      console.warn('Firestore initial seeding error (will use local fallback):', err);
+      if (isFirestorePermissionError(err)) {
+        handleFirestoreError(err, OperationType.WRITE, MEMBERS_COL);
+      } else {
+        console.warn('Firestore initial seeding error (will use local fallback):', err);
+      }
     }
   },
 
@@ -258,6 +621,8 @@ export const FirestoreService = {
     } catch (err) {
       if (isFirestoreQuotaError(err)) {
         markFirestoreWritePaused(err);
+      } else if (isFirestorePermissionError(err)) {
+        handleFirestoreError(err, OperationType.LIST, MEMBERS_COL);
       } else {
         console.warn('Error fetching members from Firestore:', err);
       }
@@ -266,44 +631,29 @@ export const FirestoreService = {
   },
 
   async saveMember(member: Member): Promise<boolean> {
-    if (isFirestoreWritePaused()) return false;
+    const cleanMember = await prepareCleanMember(member);
+    const docId = sanitizeDocId(cleanMember.accId);
+
+    if (isFirestoreWritePaused()) {
+      await enqueuePendingWrite(MEMBERS_COL, docId, 'set', cleanMember);
+      return false;
+    }
     try {
-      const cleanMember: Member = JSON.parse(JSON.stringify(member));
-
-      // Guard against Firestore 1MB document limit by safely compressing all images
-      if (cleanMember.paymentScreenshotUrl && cleanMember.paymentScreenshotUrl.startsWith('data:image')) {
-        try {
-          cleanMember.paymentScreenshotUrl = await ensureSafeFirestoreSize(cleanMember.paymentScreenshotUrl, 600, 0.65);
-        } catch {
-          // ignore
-        }
-      }
-
-      if (cleanMember.avatarUrl && cleanMember.avatarUrl.startsWith('data:image')) {
-        try {
-          cleanMember.avatarUrl = await ensureSafeFirestoreSize(cleanMember.avatarUrl, 300, 0.7);
-        } catch {
-          // ignore
-        }
-      }
-
-      if (cleanMember.personalQrUrl && cleanMember.personalQrUrl.startsWith('data:image')) {
-        try {
-          cleanMember.personalQrUrl = await ensureSafeFirestoreSize(cleanMember.personalQrUrl, 300, 0.7);
-        } catch {
-          // ignore
-        }
-      }
-
-      await withTimeout(setDoc(doc(db, MEMBERS_COL, cleanMember.accId), cleanMember), 5000, 'saveMember');
+      await withTimeout(setDoc(doc(db, MEMBERS_COL, docId), cleanMember), 5000, 'saveMember');
       return true;
     } catch (err) {
       if (isFirestoreQuotaError(err)) {
         markFirestoreWritePaused(err);
+        await enqueuePendingWrite(MEMBERS_COL, docId, 'set', cleanMember);
+        return false;
+      }
+      if (isFirestorePermissionError(err)) {
+        handleFirestoreError(err, OperationType.WRITE, `${MEMBERS_COL}/${docId}`);
         return false;
       }
       if (!isFirestoreDocumentSizeError(err)) {
-        console.warn('Error saving member to Firestore (saved locally):', err);
+        console.warn('Error saving member to Firestore (queued safely for retry):', err);
+        await enqueuePendingWrite(MEMBERS_COL, docId, 'set', cleanMember);
         return false;
       }
       console.warn('Member payload exceeded 1MB Firestore limit, attempting compact retry...');
@@ -318,7 +668,7 @@ export const FirestoreService = {
         if (fallbackMember.personalQrUrl && fallbackMember.personalQrUrl.length > 50000) {
           fallbackMember.personalQrUrl = '';
         }
-        await setDoc(doc(db, MEMBERS_COL, fallbackMember.accId), fallbackMember);
+        await withTimeout(setDoc(doc(db, MEMBERS_COL, docId), fallbackMember), 4500, 'saveMember fallback');
         return true;
       } catch (retryErr) {
         if (isFirestoreQuotaError(retryErr)) markFirestoreWritePaused(retryErr);
@@ -328,43 +678,70 @@ export const FirestoreService = {
     }
   },
 
-  async updateMember(accId: string, updates: Partial<Member>): Promise<boolean> {
-    if (isFirestoreWritePaused()) return false;
+  async updateMember(accId: string, updates: Partial<Member>, fullMemberFallback?: Member): Promise<boolean> {
+    const cleanUpdates: Partial<Member> = JSON.parse(JSON.stringify(updates));
+    if (cleanUpdates.paymentScreenshotUrl && cleanUpdates.paymentScreenshotUrl.startsWith('data:image')) {
+      try {
+        cleanUpdates.paymentScreenshotUrl = await ensureSafeFirestoreSize(cleanUpdates.paymentScreenshotUrl, 600, 0.65);
+      } catch {
+        // ignore
+      }
+    }
+    if (cleanUpdates.avatarUrl && cleanUpdates.avatarUrl.startsWith('data:image')) {
+      try {
+        cleanUpdates.avatarUrl = await ensureSafeFirestoreSize(cleanUpdates.avatarUrl, 300, 0.7);
+      } catch {
+        // ignore
+      }
+    }
+    if (cleanUpdates.personalQrUrl && cleanUpdates.personalQrUrl.startsWith('data:image')) {
+      try {
+        cleanUpdates.personalQrUrl = await ensureSafeFirestoreSize(cleanUpdates.personalQrUrl, 300, 0.7);
+      } catch {
+        // ignore
+      }
+    }
+
+    const docId = sanitizeDocId(accId);
+    if (isFirestoreWritePaused()) {
+      if (fullMemberFallback) {
+        const cleanFull = await prepareCleanMember({ ...fullMemberFallback, ...cleanUpdates });
+        await enqueuePendingWrite(MEMBERS_COL, docId, 'set', cleanFull);
+      } else {
+        await enqueuePendingWrite(MEMBERS_COL, docId, 'update', cleanUpdates);
+      }
+      return false;
+    }
+
     try {
-      const cleanUpdates: Partial<Member> = JSON.parse(JSON.stringify(updates));
-      if (cleanUpdates.paymentScreenshotUrl && cleanUpdates.paymentScreenshotUrl.startsWith('data:image')) {
-        try {
-          cleanUpdates.paymentScreenshotUrl = await ensureSafeFirestoreSize(cleanUpdates.paymentScreenshotUrl, 600, 0.65);
-        } catch {
-          // ignore
-        }
-      }
-
-      if (cleanUpdates.avatarUrl && cleanUpdates.avatarUrl.startsWith('data:image')) {
-        try {
-          cleanUpdates.avatarUrl = await ensureSafeFirestoreSize(cleanUpdates.avatarUrl, 300, 0.7);
-        } catch {
-          // ignore
-        }
-      }
-
-      if (cleanUpdates.personalQrUrl && cleanUpdates.personalQrUrl.startsWith('data:image')) {
-        try {
-          cleanUpdates.personalQrUrl = await ensureSafeFirestoreSize(cleanUpdates.personalQrUrl, 300, 0.7);
-        } catch {
-          // ignore
-        }
-      }
-
-      const ref = doc(db, MEMBERS_COL, accId);
+      const ref = doc(db, MEMBERS_COL, docId);
       await withTimeout(updateDoc(ref, cleanUpdates), 5000, 'updateMember');
       return true;
     } catch (err) {
+      if (isFirestoreNotFoundError(err) && fullMemberFallback) {
+        return this.saveMember({ ...fullMemberFallback, ...cleanUpdates });
+      }
       if (isFirestoreQuotaError(err)) {
         markFirestoreWritePaused(err);
+        if (fullMemberFallback) {
+          const cleanFull = await prepareCleanMember({ ...fullMemberFallback, ...cleanUpdates });
+          await enqueuePendingWrite(MEMBERS_COL, docId, 'set', cleanFull);
+        } else {
+          await enqueuePendingWrite(MEMBERS_COL, docId, 'update', cleanUpdates);
+        }
         return false;
       }
-      console.warn('Error updating member in Firestore:', err);
+      if (isFirestorePermissionError(err)) {
+        handleFirestoreError(err, OperationType.UPDATE, `${MEMBERS_COL}/${docId}`);
+        return false;
+      }
+      console.warn('Error updating member in Firestore (queued for retry):', err);
+      await enqueuePendingWrite(
+        MEMBERS_COL,
+        docId,
+        fullMemberFallback ? 'set' : 'update',
+        fullMemberFallback ? await prepareCleanMember({ ...fullMemberFallback, ...cleanUpdates }) : cleanUpdates
+      );
       return false;
     }
   },
@@ -380,7 +757,6 @@ export const FirestoreService = {
     const cleanUtr = utr.trim();
 
     try {
-      // 1. Query mobile
       if (cleanMob) {
         const qMob = query(collection(db, MEMBERS_COL), where('mobile', '==', cleanMob));
         const snapMob = await getDocs(qMob);
@@ -392,7 +768,6 @@ export const FirestoreService = {
         }
       }
 
-      // 2. Query email
       if (cleanEmail) {
         const qEmail = query(collection(db, MEMBERS_COL), where('email', '==', cleanEmail));
         const snapEmail = await getDocs(qEmail);
@@ -404,7 +779,6 @@ export const FirestoreService = {
         }
       }
 
-      // 3. Query UTR
       if (cleanUtr && cleanUtr.length >= 6) {
         const qUtr = query(collection(db, MEMBERS_COL), where('utrNumber', '==', cleanUtr));
         const snapUtr = await getDocs(qUtr);
@@ -429,21 +803,18 @@ export const FirestoreService = {
     if (!raw) return null;
 
     try {
-      // 1. Check exact ACC ID doc
-      const idUpper = raw.toUpperCase();
+      const idUpper = sanitizeDocId(raw.toUpperCase());
       const docSnap = await getDoc(doc(db, MEMBERS_COL, idUpper));
       if (docSnap.exists()) {
         return sanitizeMember(docSnap.data(), docSnap.id);
       }
 
-      // 2. Query by mobile
       const qMob = query(collection(db, MEMBERS_COL), where('mobile', '==', raw));
       const snapMob = await getDocs(qMob);
       if (!snapMob.empty) {
         return sanitizeMember(snapMob.docs[0].data(), snapMob.docs[0].id);
       }
 
-      // 3. Query by email
       const qEmail = query(collection(db, MEMBERS_COL), where('email', '==', raw.toLowerCase()));
       const snapEmail = await getDocs(qEmail);
       if (!snapEmail.empty) {
@@ -468,7 +839,7 @@ export const FirestoreService = {
       const snapMob = await getDocs(qMob);
       if (!snapMob.empty) {
         for (const d of snapMob.docs) {
-          const m = d.data() as Member;
+          const m = sanitizeMember(d.data(), d.id);
           if (
             m.email.toLowerCase() === cleanQuery ||
             m.fullName.toLowerCase().includes(cleanQuery) ||
@@ -477,8 +848,7 @@ export const FirestoreService = {
             return m;
           }
         }
-        // If matched by mobile alone
-        return snapMob.docs[0].data() as Member;
+        return sanitizeMember(snapMob.docs[0].data(), snapMob.docs[0].id);
       }
     } catch (e) {
       console.warn('recoverMemberCredentials error:', e);
@@ -491,18 +861,33 @@ export const FirestoreService = {
       const snap = await getDocs(collection(db, TRANSACTIONS_COL));
       return snap.docs.map((d) => d.data() as RechargeTransaction);
     } catch (err) {
-      console.warn('Error fetching transactions from Firestore:', err);
+      if (isFirestorePermissionError(err)) handleFirestoreError(err, OperationType.LIST, TRANSACTIONS_COL);
+      else console.warn('Error fetching transactions from Firestore:', err);
       return [];
     }
   },
 
-  async saveTransaction(tx: RechargeTransaction): Promise<void> {
-    if (isFirestoreWritePaused()) return;
+  async saveTransaction(tx: RechargeTransaction): Promise<boolean> {
+    const cleanTx = JSON.parse(JSON.stringify(tx));
+    const docId = sanitizeDocId(tx.id);
+    if (isFirestoreWritePaused()) {
+      await enqueuePendingWrite(TRANSACTIONS_COL, docId, 'set', cleanTx);
+      return false;
+    }
     try {
-      await setDoc(doc(db, TRANSACTIONS_COL, tx.id), JSON.parse(JSON.stringify(tx)));
+      await withTimeout(setDoc(doc(db, TRANSACTIONS_COL, docId), cleanTx), 4500, 'saveTransaction');
+      return true;
     } catch (err) {
-      if (isFirestoreQuotaError(err)) markFirestoreWritePaused(err);
-      else console.warn('Error saving transaction in Firestore:', err);
+      if (isFirestoreQuotaError(err)) {
+        markFirestoreWritePaused(err);
+        await enqueuePendingWrite(TRANSACTIONS_COL, docId, 'set', cleanTx);
+      } else if (isFirestorePermissionError(err)) {
+        handleFirestoreError(err, OperationType.WRITE, `${TRANSACTIONS_COL}/${docId}`);
+      } else {
+        console.warn('Error saving transaction in Firestore (queued):', err);
+        await enqueuePendingWrite(TRANSACTIONS_COL, docId, 'set', cleanTx);
+      }
+      return false;
     }
   },
 
@@ -511,18 +896,33 @@ export const FirestoreService = {
       const snap = await getDocs(collection(db, REFERRALS_COL));
       return snap.docs.map((d) => d.data() as ReferralRecord);
     } catch (err) {
-      console.warn('Error fetching referrals from Firestore:', err);
+      if (isFirestorePermissionError(err)) handleFirestoreError(err, OperationType.LIST, REFERRALS_COL);
+      else console.warn('Error fetching referrals from Firestore:', err);
       return [];
     }
   },
 
-  async saveReferral(refRecord: ReferralRecord): Promise<void> {
-    if (isFirestoreWritePaused()) return;
+  async saveReferral(refRecord: ReferralRecord): Promise<boolean> {
+    const cleanRef = JSON.parse(JSON.stringify(refRecord));
+    const docId = sanitizeDocId(refRecord.id);
+    if (isFirestoreWritePaused()) {
+      await enqueuePendingWrite(REFERRALS_COL, docId, 'set', cleanRef);
+      return false;
+    }
     try {
-      await setDoc(doc(db, REFERRALS_COL, refRecord.id), JSON.parse(JSON.stringify(refRecord)));
+      await withTimeout(setDoc(doc(db, REFERRALS_COL, docId), cleanRef), 4500, 'saveReferral');
+      return true;
     } catch (err) {
-      if (isFirestoreQuotaError(err)) markFirestoreWritePaused(err);
-      else console.warn('Error saving referral in Firestore:', err);
+      if (isFirestoreQuotaError(err)) {
+        markFirestoreWritePaused(err);
+        await enqueuePendingWrite(REFERRALS_COL, docId, 'set', cleanRef);
+      } else if (isFirestorePermissionError(err)) {
+        handleFirestoreError(err, OperationType.WRITE, `${REFERRALS_COL}/${docId}`);
+      } else {
+        console.warn('Error saving referral in Firestore (queued):', err);
+        await enqueuePendingWrite(REFERRALS_COL, docId, 'set', cleanRef);
+      }
+      return false;
     }
   },
 
@@ -531,29 +931,225 @@ export const FirestoreService = {
       const snap = await getDocs(collection(db, WITHDRAWALS_COL));
       return snap.docs.map((d) => d.data() as WithdrawalRequest);
     } catch (err) {
-      console.warn('Error fetching withdrawals from Firestore:', err);
+      if (isFirestorePermissionError(err)) handleFirestoreError(err, OperationType.LIST, WITHDRAWALS_COL);
+      else console.warn('Error fetching withdrawals from Firestore:', err);
       return [];
     }
   },
 
-  async saveWithdrawal(wd: WithdrawalRequest): Promise<void> {
-    if (isFirestoreWritePaused()) return;
+  async saveWithdrawal(wd: WithdrawalRequest): Promise<boolean> {
+    const cleanWd = JSON.parse(JSON.stringify(wd));
+    const docId = sanitizeDocId(wd.id);
+    if (isFirestoreWritePaused()) {
+      await enqueuePendingWrite(WITHDRAWALS_COL, docId, 'set', cleanWd);
+      return false;
+    }
     try {
-      await setDoc(doc(db, WITHDRAWALS_COL, wd.id), JSON.parse(JSON.stringify(wd)));
+      await withTimeout(setDoc(doc(db, WITHDRAWALS_COL, docId), cleanWd), 4500, 'saveWithdrawal');
+      return true;
     } catch (err) {
-      if (isFirestoreQuotaError(err)) markFirestoreWritePaused(err);
-      else console.warn('Error saving withdrawal in Firestore:', err);
+      if (isFirestoreQuotaError(err)) {
+        markFirestoreWritePaused(err);
+        await enqueuePendingWrite(WITHDRAWALS_COL, docId, 'set', cleanWd);
+      } else if (isFirestorePermissionError(err)) {
+        handleFirestoreError(err, OperationType.WRITE, `${WITHDRAWALS_COL}/${docId}`);
+      } else {
+        console.warn('Error saving withdrawal in Firestore (queued):', err);
+        await enqueuePendingWrite(WITHDRAWALS_COL, docId, 'set', cleanWd);
+      }
+      return false;
     }
   },
 
-  async updateWithdrawal(id: string, updates: Partial<WithdrawalRequest>): Promise<void> {
-    if (isFirestoreWritePaused()) return;
+  async updateWithdrawal(
+    id: string,
+    updates: Partial<WithdrawalRequest>,
+    fullFallback?: WithdrawalRequest
+  ): Promise<boolean> {
+    const cleanUpdates = JSON.parse(JSON.stringify(updates));
+    const docId = sanitizeDocId(id);
+    if (isFirestoreWritePaused()) {
+      await enqueuePendingWrite(
+        WITHDRAWALS_COL,
+        docId,
+        fullFallback ? 'set' : 'update',
+        fullFallback ? JSON.parse(JSON.stringify({ ...fullFallback, ...cleanUpdates })) : cleanUpdates
+      );
+      return false;
+    }
     try {
-      const ref = doc(db, WITHDRAWALS_COL, id);
-      await updateDoc(ref, JSON.parse(JSON.stringify(updates)));
+      const ref = doc(db, WITHDRAWALS_COL, docId);
+      await withTimeout(updateDoc(ref, cleanUpdates), 4500, 'updateWithdrawal');
+      return true;
     } catch (err) {
-      if (isFirestoreQuotaError(err)) markFirestoreWritePaused(err);
-      else console.warn('Error updating withdrawal in Firestore:', err);
+      if (isFirestoreNotFoundError(err) && fullFallback) {
+        return this.saveWithdrawal({ ...fullFallback, ...cleanUpdates });
+      }
+      if (isFirestoreQuotaError(err)) {
+        markFirestoreWritePaused(err);
+        await enqueuePendingWrite(
+          WITHDRAWALS_COL,
+          docId,
+          fullFallback ? 'set' : 'update',
+          fullFallback ? JSON.parse(JSON.stringify({ ...fullFallback, ...cleanUpdates })) : cleanUpdates
+        );
+      } else if (isFirestorePermissionError(err)) {
+        handleFirestoreError(err, OperationType.UPDATE, `${WITHDRAWALS_COL}/${docId}`);
+      } else {
+        console.warn('Error updating withdrawal in Firestore (queued):', err);
+        await enqueuePendingWrite(
+          WITHDRAWALS_COL,
+          docId,
+          fullFallback ? 'set' : 'update',
+          fullFallback ? JSON.parse(JSON.stringify({ ...fullFallback, ...cleanUpdates })) : cleanUpdates
+        );
+      }
+      return false;
+    }
+  },
+
+  // Passbook Ledger Sync (Full Financial History Persistence)
+  async getPassbookEntries(): Promise<PassbookEntry[]> {
+    try {
+      const snap = await getDocs(collection(db, PASSBOOK_COL));
+      return snap.docs.map((d) => d.data() as PassbookEntry);
+    } catch (err) {
+      if (isFirestorePermissionError(err)) handleFirestoreError(err, OperationType.LIST, PASSBOOK_COL);
+      else console.warn('Error fetching passbook entries from Firestore:', err);
+      return [];
+    }
+  },
+
+  async savePassbookEntry(entry: PassbookEntry): Promise<boolean> {
+    const cleanEntry = JSON.parse(JSON.stringify(entry));
+    const docId = sanitizeDocId(entry.id);
+    if (isFirestoreWritePaused()) {
+      await enqueuePendingWrite(PASSBOOK_COL, docId, 'set', cleanEntry);
+      return false;
+    }
+    try {
+      await withTimeout(setDoc(doc(db, PASSBOOK_COL, docId), cleanEntry, { merge: true }), 4500, 'savePassbookEntry');
+      return true;
+    } catch (err) {
+      if (isFirestoreQuotaError(err)) {
+        markFirestoreWritePaused(err);
+        await enqueuePendingWrite(PASSBOOK_COL, docId, 'set', cleanEntry);
+      } else if (isFirestorePermissionError(err)) {
+        handleFirestoreError(err, OperationType.WRITE, `${PASSBOOK_COL}/${docId}`);
+      } else {
+        console.warn('Error saving passbook entry in Firestore (queued):', err);
+        await enqueuePendingWrite(PASSBOOK_COL, docId, 'set', cleanEntry);
+      }
+      return false;
+    }
+  },
+
+  // Social: Chat Groups Sync
+  async getChatGroups(): Promise<ChatGroup[]> {
+    try {
+      const snap = await getDocs(collection(db, CHAT_GROUPS_COL));
+      return snap.docs.map((d) => d.data() as ChatGroup);
+    } catch (err) {
+      if (isFirestorePermissionError(err)) handleFirestoreError(err, OperationType.LIST, CHAT_GROUPS_COL);
+      else console.warn('Error fetching chat groups from Firestore:', err);
+      return [];
+    }
+  },
+
+  async saveChatGroup(group: ChatGroup): Promise<boolean> {
+    const cleanGroup = JSON.parse(JSON.stringify(group));
+    const docId = sanitizeDocId(group.id);
+    if (isFirestoreWritePaused()) {
+      await enqueuePendingWrite(CHAT_GROUPS_COL, docId, 'set', cleanGroup);
+      return false;
+    }
+    try {
+      await withTimeout(setDoc(doc(db, CHAT_GROUPS_COL, docId), cleanGroup, { merge: true }), 4500, 'saveChatGroup');
+      return true;
+    } catch (err) {
+      if (isFirestoreQuotaError(err)) {
+        markFirestoreWritePaused(err);
+        await enqueuePendingWrite(CHAT_GROUPS_COL, docId, 'set', cleanGroup);
+      } else if (isFirestorePermissionError(err)) {
+        handleFirestoreError(err, OperationType.WRITE, `${CHAT_GROUPS_COL}/${docId}`);
+      } else {
+        await enqueuePendingWrite(CHAT_GROUPS_COL, docId, 'set', cleanGroup);
+      }
+      return false;
+    }
+  },
+
+  // Social: Friendships Sync
+  async getFriendships(): Promise<Friendship[]> {
+    try {
+      const snap = await getDocs(collection(db, FRIENDSHIPS_COL));
+      return snap.docs.map((d) => d.data() as Friendship);
+    } catch (err) {
+      if (isFirestorePermissionError(err)) handleFirestoreError(err, OperationType.LIST, FRIENDSHIPS_COL);
+      else console.warn('Error fetching friendships from Firestore:', err);
+      return [];
+    }
+  },
+
+  async saveFriendship(friendship: Friendship): Promise<boolean> {
+    const cleanFr = JSON.parse(JSON.stringify(friendship));
+    const docId = sanitizeDocId(friendship.id);
+    if (isFirestoreWritePaused()) {
+      await enqueuePendingWrite(FRIENDSHIPS_COL, docId, 'set', cleanFr);
+      return false;
+    }
+    try {
+      await withTimeout(setDoc(doc(db, FRIENDSHIPS_COL, docId), cleanFr, { merge: true }), 4500, 'saveFriendship');
+      return true;
+    } catch (err) {
+      if (isFirestoreQuotaError(err)) {
+        markFirestoreWritePaused(err);
+        await enqueuePendingWrite(FRIENDSHIPS_COL, docId, 'set', cleanFr);
+      } else if (isFirestorePermissionError(err)) {
+        handleFirestoreError(err, OperationType.WRITE, `${FRIENDSHIPS_COL}/${docId}`);
+      } else {
+        await enqueuePendingWrite(FRIENDSHIPS_COL, docId, 'set', cleanFr);
+      }
+      return false;
+    }
+  },
+
+  // Social: Notifications Sync
+  async getSocialNotifications(): Promise<SocialNotification[]> {
+    try {
+      const snap = await getDocs(collection(db, SOCIAL_NOTIFICATIONS_COL));
+      return snap.docs.map((d) => d.data() as SocialNotification);
+    } catch (err) {
+      if (isFirestorePermissionError(err)) handleFirestoreError(err, OperationType.LIST, SOCIAL_NOTIFICATIONS_COL);
+      else console.warn('Error fetching social notifications from Firestore:', err);
+      return [];
+    }
+  },
+
+  async saveSocialNotification(notification: SocialNotification): Promise<boolean> {
+    const cleanNotif = JSON.parse(JSON.stringify(notification));
+    const docId = sanitizeDocId(notification.id);
+    if (isFirestoreWritePaused()) {
+      await enqueuePendingWrite(SOCIAL_NOTIFICATIONS_COL, docId, 'set', cleanNotif);
+      return false;
+    }
+    try {
+      await withTimeout(
+        setDoc(doc(db, SOCIAL_NOTIFICATIONS_COL, docId), cleanNotif, { merge: true }),
+        4500,
+        'saveSocialNotification'
+      );
+      return true;
+    } catch (err) {
+      if (isFirestoreQuotaError(err)) {
+        markFirestoreWritePaused(err);
+        await enqueuePendingWrite(SOCIAL_NOTIFICATIONS_COL, docId, 'set', cleanNotif);
+      } else if (isFirestorePermissionError(err)) {
+        handleFirestoreError(err, OperationType.WRITE, `${SOCIAL_NOTIFICATIONS_COL}/${docId}`);
+      } else {
+        await enqueuePendingWrite(SOCIAL_NOTIFICATIONS_COL, docId, 'set', cleanNotif);
+      }
+      return false;
     }
   },
 
@@ -585,6 +1181,7 @@ export const FirestoreService = {
           },
           (error) => {
             if (isFirestoreQuotaError(error)) markFirestoreWritePaused(error);
+            else if (isFirestorePermissionError(error)) handleFirestoreError(error, OperationType.LIST, MEMBERS_COL);
             else console.warn('Firestore subscribeToMembers error:', error);
           }
         );
@@ -602,11 +1199,12 @@ export const FirestoreService = {
     };
   },
 
-  // Real-time listener for a single member document (e.g. user dashboard live approval status)
+  // Real-time listener for a single member document
   subscribeToSingleMember(accId: string, onUpdate: (member: Member | null) => void) {
+    const docId = sanitizeDocId(accId);
     try {
       return onSnapshot(
-        doc(db, MEMBERS_COL, accId),
+        doc(db, MEMBERS_COL, docId),
         (snapshot) => {
           if (snapshot.exists()) {
             onUpdate(sanitizeMember(snapshot.data(), snapshot.id));
@@ -616,6 +1214,7 @@ export const FirestoreService = {
         },
         (error) => {
           if (isFirestoreQuotaError(error)) markFirestoreWritePaused(error);
+          else if (isFirestorePermissionError(error)) handleFirestoreError(error, OperationType.GET, `${MEMBERS_COL}/${docId}`);
           else console.warn('Firestore subscribeToSingleMember error:', error);
         }
       );
@@ -636,6 +1235,7 @@ export const FirestoreService = {
         },
         (error) => {
           if (isFirestoreQuotaError(error)) markFirestoreWritePaused(error);
+          else if (isFirestorePermissionError(error)) handleFirestoreError(error, OperationType.LIST, WITHDRAWALS_COL);
           else console.warn('Firestore subscribeToWithdrawals error:', error);
         }
       );
@@ -657,6 +1257,7 @@ export const FirestoreService = {
       return { exists: false, data: null, error: false };
     } catch (err) {
       if (isFirestoreQuotaError(err)) markFirestoreWritePaused(err);
+      else if (isFirestorePermissionError(err)) handleFirestoreError(err, OperationType.GET, `${SETTINGS_COL}/${SITE_CONFIG_DOC}`);
       else console.warn('Firestore getSiteConfig error:', err);
       return { exists: false, data: null, error: true };
     }
@@ -669,34 +1270,37 @@ export const FirestoreService = {
 
   // Save dynamic site config to Firestore with automatic compression for slider images
   async saveSiteConfig(config: SiteConfig): Promise<boolean> {
-    if (isFirestoreWritePaused()) return false;
+    const clean: SiteConfig = JSON.parse(JSON.stringify(config));
+
+    if (clean.homeSliderPhotos && Array.isArray(clean.homeSliderPhotos)) {
+      for (const p of clean.homeSliderPhotos) {
+        if (p.imageUrl && p.imageUrl.startsWith('data:image') && p.imageUrl.length > 80000) {
+          try {
+            p.imageUrl = await ensureSafeFirestoreSize(p.imageUrl, 700, 0.62);
+          } catch {
+            // ignore
+          }
+        }
+      }
+    }
+    if (clean.celebrationPopups && Array.isArray(clean.celebrationPopups)) {
+      for (const p of clean.celebrationPopups) {
+        if (p.imageUrl && p.imageUrl.startsWith('data:image') && p.imageUrl.length > 80000) {
+          try {
+            p.imageUrl = await ensureSafeFirestoreSize(p.imageUrl, 700, 0.62);
+          } catch {
+            // ignore
+          }
+        }
+      }
+    }
+
+    if (isFirestoreWritePaused()) {
+      await enqueuePendingWrite(SETTINGS_COL, SITE_CONFIG_DOC, 'merge', clean);
+      return false;
+    }
+
     try {
-      const clean: SiteConfig = JSON.parse(JSON.stringify(config));
-
-      // Safeguard slider & celebration popup photos: compress each image to keep document within 1MB Firestore limit
-      if (clean.homeSliderPhotos && Array.isArray(clean.homeSliderPhotos)) {
-        for (const p of clean.homeSliderPhotos) {
-          if (p.imageUrl && p.imageUrl.startsWith('data:image') && p.imageUrl.length > 80000) {
-            try {
-              p.imageUrl = await ensureSafeFirestoreSize(p.imageUrl, 700, 0.62);
-            } catch {
-              // ignore
-            }
-          }
-        }
-      }
-      if (clean.celebrationPopups && Array.isArray(clean.celebrationPopups)) {
-        for (const p of clean.celebrationPopups) {
-          if (p.imageUrl && p.imageUrl.startsWith('data:image') && p.imageUrl.length > 80000) {
-            try {
-              p.imageUrl = await ensureSafeFirestoreSize(p.imageUrl, 700, 0.62);
-            } catch {
-              // ignore
-            }
-          }
-        }
-      }
-
       await withTimeout(
         setDoc(doc(db, SETTINGS_COL, SITE_CONFIG_DOC), clean, { merge: true }),
         4500,
@@ -707,10 +1311,16 @@ export const FirestoreService = {
     } catch (err) {
       if (isFirestoreQuotaError(err)) {
         markFirestoreWritePaused(err);
+        await enqueuePendingWrite(SETTINGS_COL, SITE_CONFIG_DOC, 'merge', clean);
+        return false;
+      }
+      if (isFirestorePermissionError(err)) {
+        handleFirestoreError(err, OperationType.WRITE, `${SETTINGS_COL}/${SITE_CONFIG_DOC}`);
         return false;
       }
       if (!isFirestoreDocumentSizeError(err)) {
-        console.warn('Firestore saveSiteConfig error (saved locally):', err);
+        console.warn('Firestore saveSiteConfig error (queued):', err);
+        await enqueuePendingWrite(SETTINGS_COL, SITE_CONFIG_DOC, 'merge', clean);
         return false;
       }
       console.warn('SiteConfig exceeded 1MB Firestore limit, attempting compact retry...');
@@ -775,6 +1385,7 @@ export const FirestoreService = {
           },
           (error) => {
             if (isFirestoreQuotaError(error)) markFirestoreWritePaused(error);
+            else if (isFirestorePermissionError(error)) handleFirestoreError(error, OperationType.GET, `${SETTINGS_COL}/${SITE_CONFIG_DOC}`);
             else console.warn('Firestore subscribeToSiteConfig error:', error);
           }
         );
@@ -794,13 +1405,25 @@ export const FirestoreService = {
 
   // Save profile edit audit log
   async saveAuditLog(log: ProfileEditAuditLog): Promise<boolean> {
-    if (isFirestoreWritePaused()) return false;
+    const cleanLog = JSON.parse(JSON.stringify(log));
+    const docId = sanitizeDocId(log.id);
+    if (isFirestoreWritePaused()) {
+      await enqueuePendingWrite(AUDIT_LOGS_COL, docId, 'set', cleanLog);
+      return false;
+    }
     try {
-      await setDoc(doc(db, 'profile_audit_logs', log.id), JSON.parse(JSON.stringify(log)));
+      await withTimeout(setDoc(doc(db, AUDIT_LOGS_COL, docId), cleanLog), 4500, 'saveAuditLog');
       return true;
     } catch (err) {
-      if (isFirestoreQuotaError(err)) markFirestoreWritePaused(err);
-      else console.warn('Firestore saveAuditLog error:', err);
+      if (isFirestoreQuotaError(err)) {
+        markFirestoreWritePaused(err);
+        await enqueuePendingWrite(AUDIT_LOGS_COL, docId, 'set', cleanLog);
+      } else if (isFirestorePermissionError(err)) {
+        handleFirestoreError(err, OperationType.WRITE, `${AUDIT_LOGS_COL}/${docId}`);
+      } else {
+        console.warn('Firestore saveAuditLog error (queued):', err);
+        await enqueuePendingWrite(AUDIT_LOGS_COL, docId, 'set', cleanLog);
+      }
       return false;
     }
   },
@@ -808,12 +1431,13 @@ export const FirestoreService = {
   // Fetch all profile edit audit logs
   async getAuditLogs(): Promise<ProfileEditAuditLog[]> {
     try {
-      const snap = await getDocs(collection(db, 'profile_audit_logs'));
+      const snap = await getDocs(collection(db, AUDIT_LOGS_COL));
       return snap.docs
         .map((d) => d.data() as ProfileEditAuditLog)
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     } catch (err) {
-      console.warn('Firestore getAuditLogs error:', err);
+      if (isFirestorePermissionError(err)) handleFirestoreError(err, OperationType.LIST, AUDIT_LOGS_COL);
+      else console.warn('Firestore getAuditLogs error:', err);
       return [];
     }
   },
@@ -822,7 +1446,7 @@ export const FirestoreService = {
   subscribeToAuditLogs(onUpdate: (logs: ProfileEditAuditLog[]) => void): () => void {
     try {
       return onSnapshot(
-        collection(db, 'profile_audit_logs'),
+        collection(db, AUDIT_LOGS_COL),
         (snap) => {
           const logs = snap.docs
             .map((d) => d.data() as ProfileEditAuditLog)
@@ -831,7 +1455,8 @@ export const FirestoreService = {
         },
         (error) => {
           if (isFirestoreQuotaError(error)) markFirestoreWritePaused(error);
-          else console.warn('Firestore subscribeToAuditLogs error (permission or network):', error);
+          else if (isFirestorePermissionError(error)) handleFirestoreError(error, OperationType.LIST, AUDIT_LOGS_COL);
+          else console.warn('Firestore subscribeToAuditLogs error:', error);
         }
       );
     } catch (e) {
@@ -842,21 +1467,32 @@ export const FirestoreService = {
 
   // Save private message
   async savePrivateMessage(msg: PrivateMessage): Promise<boolean> {
-    if (isFirestoreWritePaused()) return false;
-    try {
-      const cleanMsg: PrivateMessage = JSON.parse(JSON.stringify(msg));
-      if (cleanMsg.mediaUrl && cleanMsg.mediaUrl.startsWith('data:image')) {
-        try {
-          cleanMsg.mediaUrl = await ensureSafeFirestoreSize(cleanMsg.mediaUrl, 800, 0.7);
-        } catch {
-          // ignore
-        }
+    const cleanMsg: PrivateMessage = JSON.parse(JSON.stringify(msg));
+    if (cleanMsg.mediaUrl && cleanMsg.mediaUrl.startsWith('data:image')) {
+      try {
+        cleanMsg.mediaUrl = await ensureSafeFirestoreSize(cleanMsg.mediaUrl, 800, 0.7);
+      } catch {
+        // ignore
       }
-      await setDoc(doc(db, 'private_messages', msg.id), cleanMsg);
+    }
+    const docId = sanitizeDocId(msg.id);
+    if (isFirestoreWritePaused()) {
+      await enqueuePendingWrite(PRIVATE_MESSAGES_COL, docId, 'set', cleanMsg);
+      return false;
+    }
+    try {
+      await withTimeout(setDoc(doc(db, PRIVATE_MESSAGES_COL, docId), cleanMsg), 4500, 'savePrivateMessage');
       return true;
     } catch (err) {
-      if (isFirestoreQuotaError(err)) markFirestoreWritePaused(err);
-      else console.warn('Firestore savePrivateMessage error:', err);
+      if (isFirestoreQuotaError(err)) {
+        markFirestoreWritePaused(err);
+        await enqueuePendingWrite(PRIVATE_MESSAGES_COL, docId, 'set', cleanMsg);
+      } else if (isFirestorePermissionError(err)) {
+        handleFirestoreError(err, OperationType.WRITE, `${PRIVATE_MESSAGES_COL}/${docId}`);
+      } else {
+        console.warn('Firestore savePrivateMessage error (queued):', err);
+        await enqueuePendingWrite(PRIVATE_MESSAGES_COL, docId, 'set', cleanMsg);
+      }
       return false;
     }
   },
@@ -864,14 +1500,15 @@ export const FirestoreService = {
   // Get private messages
   async getPrivateMessages(userAccId?: string): Promise<PrivateMessage[]> {
     try {
-      const snap = await getDocs(collection(db, 'private_messages'));
+      const snap = await getDocs(collection(db, PRIVATE_MESSAGES_COL));
       let msgs = snap.docs.map((d) => d.data() as PrivateMessage);
       if (userAccId) {
         msgs = msgs.filter((m) => (m.userAccId || '').toUpperCase() === userAccId.toUpperCase());
       }
       return msgs.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     } catch (err) {
-      console.warn('Firestore getPrivateMessages error:', err);
+      if (isFirestorePermissionError(err)) handleFirestoreError(err, OperationType.LIST, PRIVATE_MESSAGES_COL);
+      else console.warn('Firestore getPrivateMessages error:', err);
       return [];
     }
   },
@@ -880,16 +1517,18 @@ export const FirestoreService = {
   subscribeToPrivateMessages(userAccId: string, onUpdate: (msgs: PrivateMessage[]) => void): () => void {
     try {
       return onSnapshot(
-        collection(db, 'private_messages'),
+        collection(db, PRIVATE_MESSAGES_COL),
         (snap) => {
-          const msgs = snap.docs
-            .map((d) => d.data() as PrivateMessage)
-            .filter((m) => (m.userAccId || '').toUpperCase() === userAccId.toUpperCase())
-            .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-          onUpdate(msgs);
+          const all = snap.docs.map((d) => d.data() as PrivateMessage);
+          const filtered = userAccId
+            ? all.filter((m) => (m.userAccId || '').toUpperCase() === userAccId.toUpperCase())
+            : all;
+          filtered.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+          onUpdate(filtered);
         },
         (error) => {
           if (isFirestoreQuotaError(error)) markFirestoreWritePaused(error);
+          else if (isFirestorePermissionError(error)) handleFirestoreError(error, OperationType.LIST, PRIVATE_MESSAGES_COL);
           else console.warn('Firestore subscribeToPrivateMessages error:', error);
         }
       );

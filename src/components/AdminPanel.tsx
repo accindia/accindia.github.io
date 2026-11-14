@@ -413,34 +413,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
     // 1. Initial background sync with Firestore
     refreshData();
 
-    // 2. Real-time Firestore snapshot listener for instant multi-device updates
+    // 2. Real-time Firestore snapshot listener (non-destructive 2-way merge protects newer local edits)
     const unsubscribeMembers = FirestoreService.subscribeToMembers((cloudMembers) => {
       if (cloudMembers && cloudMembers.length > 0) {
-        const mergedMap = new Map<string, Member>();
-        // Add existing local & seed
-        StorageService.getMembers().forEach((m) => {
-          if (m && (m.accId || m.id)) {
-            mergedMap.set((m.accId || m.id).toUpperCase(), m);
-          }
-        });
-        // Overwrite with cloud authoritative members
-        cloudMembers.forEach((m) => {
-          if (m && (m.accId || m.id)) {
-            mergedMap.set((m.accId || m.id).toUpperCase(), m);
-          }
-        });
-        const combined = Array.from(mergedMap.values());
-        combined.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        const combined = StorageService.mergeMembersWithCloud(cloudMembers, true);
         setMembers(combined);
-        StorageService.saveMembers(combined);
       }
     });
 
-    // 3. Real-time Firestore listener for withdrawals
+    // 3. Real-time Firestore listener for withdrawals (non-destructive merge)
     const unsubscribeWithdrawals = FirestoreService.subscribeToWithdrawals((cloudWds) => {
       if (cloudWds && cloudWds.length > 0) {
-        setWithdrawals(cloudWds);
-        StorageService.saveWithdrawals(cloudWds);
+        const mergedWds = StorageService.mergeWithdrawalsWithCloud(cloudWds, true);
+        setWithdrawals(mergedWds);
       }
     });
 
@@ -455,17 +440,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
       }
     });
 
-    // 5. Real-time audit logs listener
+    // 5. Real-time audit logs listener (non-destructive union merge)
     const unsubscribeAuditLogs = FirestoreService.subscribeToAuditLogs((cloudLogs) => {
       if (cloudLogs && cloudLogs.length > 0) {
-        setAuditLogs(cloudLogs);
+        setAuditLogs(StorageService.mergeAuditLogsWithCloud(cloudLogs, true));
       }
     });
 
-    // 6. Real-time private messages listener for user notifications
+    // 6. Real-time private messages listener (non-destructive union merge)
     const unsubscribePrivateMessages = FirestoreService.subscribeToPrivateMessages('', (cloudMsgs) => {
       if (cloudMsgs && cloudMsgs.length > 0) {
-        setAdminMessages(cloudMsgs);
+        setAdminMessages(StorageService.mergePrivateMessagesWithCloud(cloudMsgs, true));
       }
     });
 
@@ -757,45 +742,52 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
   const refreshData = async () => {
     setIsCloudSyncing(true);
     try {
-      const cloudMembers = await FirestoreService.getMembers();
-      if (cloudMembers && cloudMembers.length > 0) {
-        const mergedMap = new Map<string, Member>();
-        StorageService.getMembers().forEach((m) => {
-          if (m && (m.accId || m.id)) {
-            mergedMap.set((m.accId || m.id).toUpperCase(), m);
-          }
-        });
-        cloudMembers.forEach((m) => {
-          if (m && (m.accId || m.id)) {
-            mergedMap.set((m.accId || m.id).toUpperCase(), m);
-          }
-        });
-        const combined = Array.from(mergedMap.values());
-        combined.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-        setMembers(combined);
-        StorageService.saveMembers(combined);
-      } else {
-        setMembers(StorageService.getMembers());
+      // Flush any queued offline/quota-paused writes first if quota allows
+      if (!FirestoreService.isWriteQuotaPaused()) {
+        await FirestoreService.flushPendingSyncQueue();
       }
 
-      const cloudWds = await FirestoreService.getWithdrawals();
-      if (cloudWds && cloudWds.length > 0) {
-        setWithdrawals(cloudWds);
-        StorageService.saveWithdrawals(cloudWds);
-      } else {
-        setWithdrawals(StorageService.getWithdrawals());
-      }
+      const [cloudMembers, cloudWds, cloudAudits, cloudTxs, cloudRefs, cloudPassbook] = await Promise.all([
+        FirestoreService.getMembers(),
+        FirestoreService.getWithdrawals(),
+        FirestoreService.getAuditLogs(),
+        FirestoreService.getTransactions(),
+        FirestoreService.getReferrals(),
+        FirestoreService.getPassbookEntries(),
+      ]);
 
-      const cloudAudits = await FirestoreService.getAuditLogs();
-      if (cloudAudits && cloudAudits.length > 0) {
-        setAuditLogs(cloudAudits);
-      } else {
-        setAuditLogs(StorageService.getAuditLogs());
-      }
-      setTransactions(StorageService.getTransactions());
-      setReferrals(StorageService.getReferrals());
+      setMembers(
+        cloudMembers.length > 0
+          ? StorageService.mergeMembersWithCloud(cloudMembers, true)
+          : StorageService.getMembers()
+      );
+      setWithdrawals(
+        cloudWds.length > 0
+          ? StorageService.mergeWithdrawalsWithCloud(cloudWds, true)
+          : StorageService.getWithdrawals()
+      );
+      setAuditLogs(
+        cloudAudits.length > 0
+          ? StorageService.mergeAuditLogsWithCloud(cloudAudits, true)
+          : StorageService.getAuditLogs()
+      );
+      setTransactions(
+        cloudTxs.length > 0
+          ? StorageService.mergeTransactionsWithCloud(cloudTxs, true)
+          : StorageService.getTransactions()
+      );
+      setReferrals(
+        cloudRefs.length > 0
+          ? StorageService.mergeReferralsWithCloud(cloudRefs, true)
+          : StorageService.getReferrals()
+      );
+      setAllPassbookEntries(
+        cloudPassbook.length > 0
+          ? StorageService.mergePassbookWithCloud(cloudPassbook, true)
+          : StorageService.getPassbookEntries()
+      );
 
-      setActionSuccess('क्लाउड डेटाबेस (Firestore) से ताज़ा यूजर रिकॉर्ड लोड हो गए!');
+      setActionSuccess('क्लाउड डेटाबेस (Firestore) से ताज़ा यूजर रिकॉर्ड सुरक्षित मर्ज व लोड हो गए!');
       setTimeout(() => setActionSuccess(''), 3000);
     } catch (e) {
       console.warn('refreshData error:', e);
@@ -804,6 +796,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
       setAuditLogs(StorageService.getAuditLogs());
       setTransactions(StorageService.getTransactions());
       setReferrals(StorageService.getReferrals());
+      setAllPassbookEntries(StorageService.getPassbookEntries());
     } finally {
       setIsCloudSyncing(false);
       onRefresh();
@@ -1610,10 +1603,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onRefresh, onNavigate })
             type="button"
             onClick={async () => {
               FirestoreService.clearQuotaPauseForRetry();
+              const queueRes = await FirestoreService.flushPendingSyncQueue();
               const ok = await FirestoreService.saveSiteConfig(siteConfig);
-              if (ok) {
-                setActionSuccess('✓ क्लाउड (Firestore) कनेक्शन पुनः सक्रिय हो गया और सभी सेटिंग्स सफलतापूर्वक सिंक हो गईं!');
-                setTimeout(() => setActionSuccess(''), 4000);
+              if (ok || queueRes.flushed > 0) {
+                setActionSuccess(
+                  `✓ क्लाउड (Firestore) कनेक्शन सक्रिय हो गया! (${queueRes.flushed} लंबित रिकॉर्ड और सेटिंग्स सिंक हो गईं)`
+                );
+                setTimeout(() => setActionSuccess(''), 4500);
               }
             }}
             className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[11px] shadow-xs transition cursor-pointer shrink-0 self-start sm:self-center"

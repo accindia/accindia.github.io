@@ -5,92 +5,216 @@
       "description": "Student community member in Achievers Club Community",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "accId": { "type": "string" },
-        "fullName": { "type": "string" },
-        "mobile": { "type": "string" },
-        "whatsapp": { "type": "string" },
-        "email": { "type": "string" },
-        "plan": { "type": "string" },
-        "status": { "type": "string" },
-        "sponsorId": { "type": "string" },
-        "utrNumber": { "type": "string" },
+        "id": { "type": "string", "maxLength": 128 },
+        "accId": { "type": "string", "maxLength": 64, "pattern": "^[A-Za-z0-9_\\-]+$" },
+        "fullName": { "type": "string", "maxLength": 120 },
+        "mobile": { "type": "string", "maxLength": 20 },
+        "whatsapp": { "type": "string", "maxLength": 20 },
+        "email": { "type": "string", "maxLength": 160 },
+        "plan": { "type": "string", "enum": ["SWIS", "TWIS", "COMBO"] },
+        "status": { "type": "string", "enum": ["verified", "pending", "rejected"] },
+        "isActive": { "type": "boolean" },
+        "role": { "type": "string", "enum": ["member", "admin"] },
+        "sponsorId": { "type": "string", "maxLength": 64 },
+        "sponsorName": { "type": "string", "maxLength": 120 },
+        "utrNumber": { "type": "string", "maxLength": 64 },
         "walletBalance": { "type": "number" },
         "totalEarnings": { "type": "number" },
         "swisEarnings": { "type": "number" },
         "twisEarnings": { "type": "number" },
-        "createdAt": { "type": "string" }
+        "rechargesCount": { "type": "number" },
+        "referralsCount": { "type": "number" },
+        "createdAt": { "type": "string", "maxLength": 64 }
       },
       "required": ["accId", "fullName", "mobile", "plan", "status"]
     },
     "RechargeTransaction": {
       "title": "RechargeTransaction",
-      "description": "SWIS 3.30% mobile recharge transaction",
+      "description": "SWIS 3.30% mobile recharge and utility transaction",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "accId": { "type": "string" },
-        "serviceType": { "type": "string" },
-        "operator": { "type": "string" },
-        "accountNumber": { "type": "string" },
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "accId": { "type": "string", "maxLength": 64 },
+        "serviceType": { "type": "string", "maxLength": 64 },
+        "operator": { "type": "string", "maxLength": 80 },
+        "accountNumber": { "type": "string", "maxLength": 64 },
         "amount": { "type": "number" },
+        "commissionRate": { "type": "number" },
         "commissionEarned": { "type": "number" },
-        "timestamp": { "type": "string" }
+        "status": { "type": "string", "enum": ["SUCCESS", "PENDING", "FAILED"] },
+        "timestamp": { "type": "string", "maxLength": 64 },
+        "referenceId": { "type": "string", "maxLength": 80 }
       },
       "required": ["id", "accId", "amount", "commissionEarned"]
     },
     "ReferralRecord": {
       "title": "ReferralRecord",
-      "description": "TWIS ₹150 referral bonus record",
+      "description": "TWIS ₹150 direct referral bonus record",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "sponsorAccId": { "type": "string" },
-        "referredAccId": { "type": "string" },
-        "referredName": { "type": "string" },
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "referrerAccId": { "type": "string", "maxLength": 64 },
+        "referredAccId": { "type": "string", "maxLength": 64 },
+        "referredName": { "type": "string", "maxLength": 120 },
+        "plan": { "type": "string", "enum": ["SWIS", "TWIS", "COMBO"] },
         "bonusAmount": { "type": "number" },
-        "date": { "type": "string" }
+        "status": { "type": "string", "enum": ["credited", "pending"] },
+        "date": { "type": "string", "maxLength": 32 }
       },
-      "required": ["id", "sponsorAccId", "referredAccId", "bonusAmount"]
+      "required": ["id", "referrerAccId", "referredAccId", "bonusAmount"]
     },
     "WithdrawalRequest": {
       "title": "WithdrawalRequest",
       "description": "Member wallet payout withdrawal request",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "accId": { "type": "string" },
-        "memberName": { "type": "string" },
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "accId": { "type": "string", "maxLength": 64 },
+        "memberName": { "type": "string", "maxLength": 120 },
         "amount": { "type": "number" },
-        "method": { "type": "string" },
-        "status": { "type": "string" },
-        "requestedAt": { "type": "string" }
+        "method": { "type": "string", "enum": ["UPI", "BANK"] },
+        "upiId": { "type": "string", "maxLength": 120 },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "requestedAt": { "type": "string", "maxLength": 64 },
+        "processedAt": { "type": "string", "maxLength": 64 },
+        "notes": { "type": "string", "maxLength": 400 }
       },
       "required": ["id", "accId", "amount", "status"]
     },
-    "SiteConfig": {
-      "title": "SiteConfig",
-      "description": "Dynamic company announcement, contacts, and configuration",
+    "PassbookEntry": {
+      "title": "PassbookEntry",
+      "description": "Member wallet passbook transaction ledger entry",
       "type": "object",
       "properties": {
-        "companyName": { "type": "string" },
-        "helplineNumber": { "type": "string" },
-        "whatsappNumber": { "type": "string" },
-        "supportEmail": { "type": "string" }
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "accId": { "type": "string", "maxLength": 64 },
+        "memberName": { "type": "string", "maxLength": 120 },
+        "type": { "type": "string", "enum": ["CREDIT", "DEBIT"] },
+        "category": { "type": "string", "maxLength": 40 },
+        "title": { "type": "string", "maxLength": 200 },
+        "description": { "type": "string", "maxLength": 500 },
+        "amount": { "type": "number" },
+        "balanceAfter": { "type": "number" },
+        "timestamp": { "type": "string", "maxLength": 64 },
+        "status": { "type": "string", "enum": ["COMPLETED", "PENDING", "REJECTED"] },
+        "referenceId": { "type": "string", "maxLength": 80 },
+        "payoutMethod": { "type": "string", "maxLength": 32 }
+      },
+      "required": ["id", "accId", "type", "amount", "timestamp", "status"]
+    },
+    "SiteConfig": {
+      "title": "SiteConfig",
+      "description": "Dynamic company announcement, contacts, posters, and configuration",
+      "type": "object",
+      "properties": {
+        "helplinePhone": { "type": "string", "maxLength": 40 },
+        "whatsappNumber": { "type": "string", "maxLength": 40 },
+        "officialEmail": { "type": "string", "maxLength": 160 },
+        "officialAddress": { "type": "string", "maxLength": 400 },
+        "websiteUrl": { "type": "string", "maxLength": 200 },
+        "telegramLink": { "type": "string", "maxLength": 200 },
+        "adminSignatoryName": { "type": "string", "maxLength": 120 },
+        "adminSignatoryTitle": { "type": "string", "maxLength": 120 },
+        "activationFee": { "type": "number" },
+        "upiId": { "type": "string", "maxLength": 120 },
+        "upiReceiverName": { "type": "string", "maxLength": 120 },
+        "announcementMarquee": { "type": "string", "maxLength": 2000 },
+        "configUpdatedAt": { "type": "string", "maxLength": 64 }
       }
     },
     "ProfileEditAuditLog": {
       "title": "ProfileEditAuditLog",
-      "description": "Audit trail of profile edits (old vs new values)",
+      "description": "Immutable audit trail of profile edits (old vs new values)",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "accId": { "type": "string" },
-        "fullName": { "type": "string" },
-        "timestamp": { "type": "string" },
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "accId": { "type": "string", "maxLength": 64 },
+        "memberName": { "type": "string", "maxLength": 160 },
+        "timestamp": { "type": "string", "maxLength": 64 },
         "changes": { "type": "array" }
       },
-      "required": ["id", "accId", "timestamp"]
+      "required": ["id", "accId", "timestamp", "changes"]
+    },
+    "PrivateMessage": {
+      "title": "PrivateMessage",
+      "description": "Helpdesk, sponsor, direct member, and community group messages",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userAccId": { "type": "string", "maxLength": 128 },
+        "recipientAccId": { "type": "string", "maxLength": 128 },
+        "chatType": { "type": "string", "enum": ["admin", "sponsor", "member", "group"] },
+        "groupId": { "type": "string", "maxLength": 128 },
+        "senderRole": { "type": "string", "enum": ["admin", "user"] },
+        "senderAccId": { "type": "string", "maxLength": 64 },
+        "senderName": { "type": "string", "maxLength": 120 },
+        "text": { "type": "string", "maxLength": 5000 },
+        "timestamp": { "type": "string", "maxLength": 64 },
+        "isRead": { "type": "boolean" }
+      },
+      "required": ["id", "userAccId", "senderRole", "senderAccId", "senderName", "text", "timestamp"]
+    },
+    "ChatGroup": {
+      "title": "ChatGroup",
+      "description": "ACC Chat & Help community group chat room",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 500 },
+        "creatorAccId": { "type": "string", "maxLength": 64 },
+        "creatorName": { "type": "string", "maxLength": 120 },
+        "members": { "type": "array" },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "lastMessageAt": { "type": "string", "maxLength": 64 },
+        "lastMessageText": { "type": "string", "maxLength": 500 }
+      },
+      "required": ["id", "name", "creatorAccId", "creatorName", "members", "createdAt"]
+    },
+    "Friendship": {
+      "title": "Friendship",
+      "description": "Member-to-member friend connections in ACC Chat & Help",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "user1AccId": { "type": "string", "maxLength": 64 },
+        "user2AccId": { "type": "string", "maxLength": 64 },
+        "status": { "type": "string", "enum": ["pending", "accepted", "declined"] },
+        "requesterAccId": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "acceptedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "user1AccId", "user2AccId", "status", "requesterAccId", "createdAt"]
+    },
+    "SocialNotification": {
+      "title": "SocialNotification",
+      "description": "Social notifications for friend requests, profile views, messages, and group invites",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "recipientAccId": { "type": "string", "maxLength": 64 },
+        "senderAccId": { "type": "string", "maxLength": 64 },
+        "senderName": { "type": "string", "maxLength": 120 },
+        "type": { "type": "string", "enum": ["message", "friend_request", "friend_accept", "profile_view", "group_invite"] },
+        "title": { "type": "string", "maxLength": 160 },
+        "body": { "type": "string", "maxLength": 500 },
+        "timestamp": { "type": "string", "maxLength": 64 },
+        "isRead": { "type": "boolean" }
+      },
+      "required": ["id", "recipientAccId", "senderAccId", "type", "title", "timestamp"]
+    },
+    "ProfileView": {
+      "title": "ProfileView",
+      "description": "Profile view telemetry event record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "targetAccId": { "type": "string", "maxLength": 64 },
+        "visitorAccId": { "type": "string", "maxLength": 64 },
+        "visitorName": { "type": "string", "maxLength": 120 },
+        "visitedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["targetAccId", "visitorAccId", "visitedAt"]
     }
   },
   "firestore": {
@@ -110,13 +234,37 @@
       "schema": "WithdrawalRequest",
       "description": "Wallet payout requests"
     },
+    "/passbook_entries/{entryId}": {
+      "schema": "PassbookEntry",
+      "description": "Member wallet passbook ledger entries synced across devices"
+    },
     "/settings/{settingId}": {
       "schema": "SiteConfig",
-      "description": "Live company settings, posters, and contact info"
+      "description": "Live company settings, posters, sliders, and contact info"
     },
     "/profile_audit_logs/{auditId}": {
       "schema": "ProfileEditAuditLog",
       "description": "Transparent profile modification audit history"
+    },
+    "/private_messages/{messageId}": {
+      "schema": "PrivateMessage",
+      "description": "Private, sponsor, helpdesk, and group chat messages"
+    },
+    "/chat_groups/{groupId}": {
+      "schema": "ChatGroup",
+      "description": "Community group chat rooms"
+    },
+    "/friendships/{friendshipId}": {
+      "schema": "Friendship",
+      "description": "Member friendship connections"
+    },
+    "/social_notifications/{notificationId}": {
+      "schema": "SocialNotification",
+      "description": "Member social notifications"
+    },
+    "/profile_views/{viewId}": {
+      "schema": "ProfileView",
+      "description": "Profile visitor tracking events"
     }
   }
 }

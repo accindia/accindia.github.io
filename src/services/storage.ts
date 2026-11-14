@@ -19,8 +19,13 @@ import {
 } from '../types';
 import { FirestoreService } from './firestore';
 import { LocalDb } from './localDb';
+import {
+  getAutoDynamicFestivalPosters,
+  isFestivalItemExpired,
+} from '../utils/festivalPanchangEngine';
 
 let inMemorySiteConfig: SiteConfig | null = null;
+const memoryKVStore: Record<string, string> = {};
 
 const MEMBERS_KEY = 'acc_members_data_v2';
 const TRANSACTIONS_KEY = 'acc_transactions_data_v2';
@@ -35,6 +40,144 @@ const PASSBOOK_KEY = 'acc_passbook_entries_v2';
 const FRIENDSHIPS_KEY = 'acc_friendships_v1';
 const CHAT_GROUPS_KEY = 'acc_chat_groups_v1';
 const SOCIAL_NOTIFICATIONS_KEY = 'acc_social_notifications_v1';
+
+function safeStorageGet(key: string): string | null {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const val = localStorage.getItem(key);
+      if (val !== null) {
+        memoryKVStore[key] = val;
+        return val;
+      }
+    }
+  } catch {
+    // Ignore restricted/private browser SecurityError
+  }
+  return key in memoryKVStore ? memoryKVStore[key] : null;
+}
+
+function pruneHeavyStorageForQuota(preserveKey?: string): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    // 1. Shrink audit logs to latest 50 compact entries
+    if (preserveKey !== PROFILE_AUDIT_KEY) {
+      const rawAudit = localStorage.getItem(PROFILE_AUDIT_KEY);
+      if (rawAudit && rawAudit.length > 60000) {
+        try {
+          const parsed = JSON.parse(rawAudit);
+          if (Array.isArray(parsed)) {
+            localStorage.setItem(PROFILE_AUDIT_KEY, JSON.stringify(parsed.slice(0, 50)));
+          }
+        } catch {
+          localStorage.removeItem(PROFILE_AUDIT_KEY);
+        }
+      }
+    }
+    // 2. Shrink social notifications to latest 40
+    if (preserveKey !== SOCIAL_NOTIFICATIONS_KEY) {
+      const rawNotifs = localStorage.getItem(SOCIAL_NOTIFICATIONS_KEY);
+      if (rawNotifs && rawNotifs.length > 40000) {
+        try {
+          const parsed = JSON.parse(rawNotifs);
+          if (Array.isArray(parsed)) {
+            localStorage.setItem(SOCIAL_NOTIFICATIONS_KEY, JSON.stringify(parsed.slice(0, 40)));
+          }
+        } catch {
+          localStorage.removeItem(SOCIAL_NOTIFICATIONS_KEY);
+        }
+      }
+    }
+    // 3. Strip heavy base64 attachments in cached private messages inside localStorage
+    if (preserveKey !== PRIVATE_MESSAGES_KEY) {
+      const rawMsgs = localStorage.getItem(PRIVATE_MESSAGES_KEY);
+      if (rawMsgs && rawMsgs.length > 250000) {
+        try {
+          const parsed = JSON.parse(rawMsgs);
+          if (Array.isArray(parsed)) {
+            const compacted = parsed.slice(-300).map((m: Record<string, unknown>) => {
+              if (typeof m.mediaUrl === 'string' && m.mediaUrl.startsWith('data:') && m.mediaUrl.length > 40000) {
+                return { ...m, mediaUrl: '' };
+              }
+              return m;
+            });
+            localStorage.setItem(PRIVATE_MESSAGES_KEY, JSON.stringify(compacted));
+          }
+        } catch {
+          localStorage.removeItem(PRIVATE_MESSAGES_KEY);
+        }
+      }
+    }
+  } catch {
+    // Never throw from quota pruner
+  }
+}
+
+function safeStorageSet(key: string, value: string): boolean {
+  memoryKVStore[key] = value;
+  try {
+    if (typeof localStorage === 'undefined') return true;
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    // QuotaExceededError or SecurityError: prune heavy caches and retry safely
+    pruneHeavyStorageForQuota(key);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(key, value);
+        return true;
+      }
+    } catch {
+      // If saving members array or current user is oversized due to base64 blobs,
+      // persist full copy in IndexedDB and store compact non-crashing mirror in localStorage
+      if (key === MEMBERS_KEY || key === CURRENT_USER_KEY) {
+        try {
+          const parsed = JSON.parse(value);
+          LocalDb.set(key, parsed).catch(() => {});
+          const stripHeavyImages = (m: Member): Member => ({
+            ...m,
+            paymentScreenshotUrl:
+              m.paymentScreenshotUrl && m.paymentScreenshotUrl.startsWith('data:') && m.paymentScreenshotUrl.length > 40000
+                ? ''
+                : m.paymentScreenshotUrl,
+            avatarUrl:
+              key === MEMBERS_KEY && m.avatarUrl && m.avatarUrl.startsWith('data:') && m.avatarUrl.length > 60000
+                ? ''
+                : m.avatarUrl,
+            personalQrUrl:
+              key === MEMBERS_KEY && m.personalQrUrl && m.personalQrUrl.startsWith('data:') && m.personalQrUrl.length > 40000
+                ? ''
+                : m.personalQrUrl,
+            profileVisitors: Array.isArray(m.profileVisitors)
+              ? m.profileVisitors.slice(0, 10).map((v) => ({ ...v, visitorAvatar: undefined }))
+              : m.profileVisitors,
+            editHistory: Array.isArray(m.editHistory) ? m.editHistory.slice(0, 10) : m.editHistory,
+          });
+          const compactPayload = Array.isArray(parsed)
+            ? parsed.map(stripHeavyImages)
+            : parsed && typeof parsed === 'object'
+            ? stripHeavyImages(parsed as Member)
+            : parsed;
+          localStorage.setItem(key, JSON.stringify(compactPayload));
+          return true;
+        } catch {
+          // RAM memoryKVStore + IndexedDB retain full intact data cleanly
+        }
+      }
+    }
+    return false;
+  }
+}
+
+function safeStorageRemove(key: string): void {
+  delete memoryKVStore[key];
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(key);
+    }
+  } catch {
+    // ignore
+  }
+}
 
 export const DEFAULT_SERVICES: AppServiceItem[] = [
   {
@@ -105,50 +248,7 @@ export const DEFAULT_SERVICES: AppServiceItem[] = [
 ];
 
 export const DEFAULT_PROMOTIONAL_POSTERS: PromotionalPoster[] = [
-  {
-    id: 'poster-dhanteras-2026',
-    title: '🪙 धनतेरस महापर्व विशेष • ₹249 में डिजिटल आत्मनिर्भरता',
-    subtitle: 'सोना-चांदी के साथ इस धनतेरस लें ACC लाइफटाइम 🆔 और कमाएं SWIS 3.30% फिक्स्ड रिचार्ज कमीशन!',
-    imageUrl: './images/dhanteras_festival_banner_1793965565116.jpg',
-    ctaText: 'धनतेरस ऑफर में जॉइन करें (₹249)',
-    ctaLink: 'register',
-    badge: '🪙 DHANTERAS SPECIAL',
-    isActive: true,
-    createdAt: '2026-11-01',
-  },
-  {
-    id: 'poster-diwali-2026',
-    title: '🪔 शुभ दीपावली दीपोत्सव • हर घर खुशहाली व आमदनी',
-    subtitle: 'मां लक्ष्मी का आशीर्वाद • कॉलेज के साथ रोजाना ₹500 तक पॉकेट मनी। 2 दोस्तों पर सीधा ₹300 बैंक में!',
-    imageUrl: './images/diwali_deepotsav_banner_1793965580091.jpg',
-    ctaText: 'दिवाली पर सदस्य बनें (₹249)',
-    ctaLink: 'register',
-    badge: '🪔 DIWALI DEEPOTSAV',
-    isActive: true,
-    createdAt: '2026-11-01',
-  },
-  {
-    id: 'poster-chhath-2026',
-    title: '☀️ छठ महापर्व विशेष • भगवान सूर्य व छठी मईया का आशीर्वाद',
-    subtitle: 'पवित्रता, आस्था और युवाओं के उज्ज्वल भविष्य का पावन संकल्प। Start Young, Retire Young!',
-    imageUrl: './images/chhath_puja_banner_1793965595973.jpg',
-    ctaText: 'छठ पर्व पर जुड़ें (₹249)',
-    ctaLink: 'register',
-    badge: '☀️ CHHATH PUJA',
-    isActive: true,
-    createdAt: '2026-11-01',
-  },
-  {
-    id: 'poster-govardhan-bhaidooj-2026',
-    title: '🌾 गोवर्धन पूजा एवं भाई दूज • स्नेह व समृद्धि का उत्सव',
-    subtitle: 'गोवर्धन व भाई दूज पर भाई-बहन मिलकर शुरू करें डिजिटल अर्निंग। जीरो इन्वेस्टमेंट वर्क!',
-    imageUrl: './images/govardhan_bhaidooj_banner_1793965611440.jpg',
-    ctaText: 'भाई दूज ऑफर (₹249)',
-    ctaLink: 'register',
-    badge: '🌾 GOVARDHAN & BHAI DOOJ',
-    isActive: true,
-    createdAt: '2026-11-01',
-  },
+  ...getAutoDynamicFestivalPosters(),
   {
     id: 'poster-student-earning-249',
     title: '🎓 ₹249 स्टूडेंट अर्निंग क्रांति • कॉलेज के साथ पॉकेट मनी',
@@ -599,89 +699,311 @@ try {
   // broadcast channel fallback
 }
 
+const inTabSyncListeners = new Set<() => void>();
+let pendingInTabSyncTimer: ReturnType<typeof setTimeout> | null = null;
+
 export function notifySync() {
   if (channel) {
     try {
       channel.postMessage({ type: 'DATA_UPDATED', timestamp: Date.now() });
-    } catch (e) {
+    } catch {
       // ignore
     }
+  }
+  if (inTabSyncListeners.size > 0 && !pendingInTabSyncTimer) {
+    pendingInTabSyncTimer = setTimeout(() => {
+      pendingInTabSyncTimer = null;
+      inTabSyncListeners.forEach((cb) => {
+        try {
+          cb();
+        } catch {
+          // isolate individual subscriber errors
+        }
+      });
+    }, 0);
   }
 }
 
 export function subscribeToSync(callback: () => void): () => void {
-  if (!channel) return () => {};
+  inTabSyncListeners.add(callback);
   const handler = () => callback();
-  channel.addEventListener('message', handler);
-  window.addEventListener('storage', handler);
+  try {
+    channel?.addEventListener('message', handler);
+  } catch {
+    // ignore
+  }
+  if (typeof window !== 'undefined') {
+    window.addEventListener('storage', handler);
+  }
   return () => {
-    channel?.removeEventListener('message', handler);
-    window.removeEventListener('storage', handler);
+    inTabSyncListeners.delete(callback);
+    try {
+      channel?.removeEventListener('message', handler);
+    } catch {
+      // ignore
+    }
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('storage', handler);
+    }
   };
 }
 
 let activeFirestoreInitPromise: Promise<void> | null = null;
 let firestoreSyncedOnce = false;
 
+const SEED_MEMBER_IDS = new Set(['mem-001', 'mem-002', 'mem-003', 'mem-004', 'mem-005']);
+
+function parseIsoMs(val?: string | null): number {
+  if (!val) return 0;
+  const ms = Date.parse(val);
+  return Number.isFinite(ms) ? ms : 0;
+}
+
 export const StorageService = {
-  // Sync with Firestore on startup (single-flight to prevent duplicate reads/writes)
+  // Non-destructive 2-way union merge helpers (NEVER overwrites newer local or cloud data)
+  mergeMembersWithCloud(cloudMembers: Member[], persist: boolean = true): Member[] {
+    if (!Array.isArray(cloudMembers) || cloudMembers.length === 0) {
+      return this.getMembers();
+    }
+    const local = this.getMembers();
+    const map = new Map<string, Member>();
+
+    local.forEach((m) => {
+      if (m && (m.accId || m.id)) {
+        map.set((m.accId || m.id).toUpperCase(), m);
+      }
+    });
+
+    cloudMembers.forEach((cloudM) => {
+      if (cloudM && (cloudM.accId || cloudM.id)) {
+        const key = (cloudM.accId || cloudM.id).toUpperCase();
+        const existingLocal = map.get(key);
+        if (existingLocal) {
+          const localSessTs = this.parseSessionTimestamp(existingLocal.activeSessionId);
+          const cloudSessTs = this.parseSessionTimestamp(cloudM.activeSessionId);
+          const localEditTs = parseIsoMs(existingLocal.lastEditedAt);
+          const cloudEditTs = parseIsoMs(cloudM.lastEditedAt);
+
+          const keepLocalSession = localSessTs > cloudSessTs;
+          const keepLocalEdits = localEditTs > cloudEditTs;
+          const mergedBase = keepLocalEdits ? { ...cloudM, ...existingLocal } : { ...existingLocal, ...cloudM };
+
+          map.set(key, {
+            ...mergedBase,
+            // Preserve heavy images if either side had them and the other side lost them due to size fallback
+            avatarUrl: mergedBase.avatarUrl || existingLocal.avatarUrl || cloudM.avatarUrl,
+            paymentScreenshotUrl:
+              mergedBase.paymentScreenshotUrl || existingLocal.paymentScreenshotUrl || cloudM.paymentScreenshotUrl,
+            personalQrUrl: mergedBase.personalQrUrl || existingLocal.personalQrUrl || cloudM.personalQrUrl,
+            activeSessionId: keepLocalSession
+              ? existingLocal.activeSessionId
+              : cloudM.activeSessionId || existingLocal.activeSessionId,
+            lastLoginAt: keepLocalSession
+              ? existingLocal.lastLoginAt
+              : cloudM.lastLoginAt || existingLocal.lastLoginAt,
+            lastLoginDevice: keepLocalSession
+              ? existingLocal.lastLoginDevice
+              : cloudM.lastLoginDevice || existingLocal.lastLoginDevice,
+          });
+        } else {
+          map.set(key, cloudM);
+        }
+      }
+    });
+
+    const merged = Array.from(map.values());
+    merged.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    if (persist) {
+      this.saveMembers(merged);
+    }
+    return merged;
+  },
+
+  mergeWithdrawalsWithCloud(cloudWds: WithdrawalRequest[], persist: boolean = true): WithdrawalRequest[] {
+    if (!Array.isArray(cloudWds) || cloudWds.length === 0) {
+      return this.getWithdrawals();
+    }
+    const local = this.getWithdrawals();
+    const map = new Map<string, WithdrawalRequest>();
+    local.forEach((w) => w && w.id && map.set(w.id, w));
+    cloudWds.forEach((cw) => {
+      if (!cw || !cw.id) return;
+      const ex = map.get(cw.id);
+      if (!ex) {
+        map.set(cw.id, cw);
+      } else {
+        // Prefer processed status ('approved'|'rejected') over 'pending'
+        const exDone = ex.status !== 'pending';
+        const cwDone = cw.status !== 'pending';
+        if (cwDone && !exDone) {
+          map.set(cw.id, cw);
+        } else if (exDone && !cwDone) {
+          map.set(cw.id, ex);
+        } else {
+          const cwTs = parseIsoMs(cw.processedAt || cw.requestedAt);
+          const exTs = parseIsoMs(ex.processedAt || ex.requestedAt);
+          map.set(cw.id, cwTs >= exTs ? cw : ex);
+        }
+      }
+    });
+    const merged = Array.from(map.values()).sort(
+      (a, b) => parseIsoMs(b.requestedAt) - parseIsoMs(a.requestedAt)
+    );
+    if (persist) {
+      this.saveWithdrawals(merged);
+    }
+    return merged;
+  },
+
+  mergeTransactionsWithCloud(cloudTxs: RechargeTransaction[], persist: boolean = true): RechargeTransaction[] {
+    if (!Array.isArray(cloudTxs) || cloudTxs.length === 0) return this.getTransactions();
+    const map = new Map<string, RechargeTransaction>();
+    this.getTransactions().forEach((t) => t && t.id && map.set(t.id, t));
+    cloudTxs.forEach((ct) => ct && ct.id && map.set(ct.id, ct));
+    const merged = Array.from(map.values()).sort((a, b) => parseIsoMs(b.timestamp) - parseIsoMs(a.timestamp));
+    if (persist) this.saveTransactions(merged);
+    return merged;
+  },
+
+  mergeReferralsWithCloud(cloudRefs: ReferralRecord[], persist: boolean = true): ReferralRecord[] {
+    if (!Array.isArray(cloudRefs) || cloudRefs.length === 0) return this.getReferrals();
+    const map = new Map<string, ReferralRecord>();
+    this.getReferrals().forEach((r) => r && r.id && map.set(r.id, r));
+    cloudRefs.forEach((cr) => cr && cr.id && map.set(cr.id, cr));
+    const merged = Array.from(map.values()).sort((a, b) => parseIsoMs(b.date) - parseIsoMs(a.date));
+    if (persist) this.saveReferrals(merged);
+    return merged;
+  },
+
+  mergePassbookWithCloud(cloudEntries: PassbookEntry[], persist: boolean = true): PassbookEntry[] {
+    if (!Array.isArray(cloudEntries) || cloudEntries.length === 0) return this.getPassbookEntries();
+    const map = new Map<string, PassbookEntry>();
+    this.getPassbookEntries().forEach((e) => e && e.id && map.set(e.id, e));
+    cloudEntries.forEach((ce) => {
+      if (!ce || !ce.id) return;
+      const ex = map.get(ce.id);
+      if (!ex) {
+        map.set(ce.id, ce);
+      } else {
+        const exFinal = ex.status !== 'PENDING';
+        const ceFinal = ce.status !== 'PENDING';
+        map.set(ce.id, ceFinal || !exFinal ? ce : ex);
+      }
+    });
+    const merged = Array.from(map.values()).sort((a, b) => parseIsoMs(b.timestamp) - parseIsoMs(a.timestamp));
+    if (persist) this.savePassbookEntries(merged);
+    return merged;
+  },
+
+  mergeAuditLogsWithCloud(cloudLogs: ProfileEditAuditLog[], persist: boolean = true): ProfileEditAuditLog[] {
+    if (!Array.isArray(cloudLogs) || cloudLogs.length === 0) return this.getAuditLogs();
+    const map = new Map<string, ProfileEditAuditLog>();
+    this.getAuditLogs().forEach((l) => l && l.id && map.set(l.id, l));
+    cloudLogs.forEach((cl) => cl && cl.id && map.set(cl.id, cl));
+    const merged = Array.from(map.values())
+      .sort((a, b) => parseIsoMs(b.timestamp) - parseIsoMs(a.timestamp))
+      .slice(0, 300);
+    if (persist) {
+      safeStorageSet(PROFILE_AUDIT_KEY, JSON.stringify(merged.slice(0, 200)));
+      LocalDb.set(PROFILE_AUDIT_KEY, merged).catch(() => {});
+      notifySync();
+    }
+    return merged;
+  },
+
+  mergePrivateMessagesWithCloud(cloudMsgs: PrivateMessage[], persist: boolean = true): PrivateMessage[] {
+    if (!Array.isArray(cloudMsgs) || cloudMsgs.length === 0) return this.getPrivateMessages();
+    const map = new Map<string, PrivateMessage>();
+    this.getPrivateMessages().forEach((m) => m && m.id && map.set(m.id, m));
+    cloudMsgs.forEach((cm) => {
+      if (!cm || !cm.id) return;
+      const ex = map.get(cm.id);
+      map.set(cm.id, ex ? { ...ex, ...cm, isRead: Boolean(ex.isRead || cm.isRead) } : cm);
+    });
+    const merged = Array.from(map.values())
+      .sort((a, b) => parseIsoMs(a.timestamp) - parseIsoMs(b.timestamp))
+      .slice(-800);
+    if (persist) {
+      this.savePrivateMessages(merged);
+    }
+    return merged;
+  },
+
+  // Sync with Firestore & IndexedDB on startup (non-destructive, replays offline queue safely)
   async initFirestoreSync() {
     if (firestoreSyncedOnce) return;
     if (activeFirestoreInitPromise) return activeFirestoreInitPromise;
 
     activeFirestoreInitPromise = (async () => {
       try {
-        // Strictly read-only sync on startup: never burn Firestore write units on visitor page loads.
-        // Local SEED_MEMBERS / DEFAULT_SITE_CONFIG act as instant defaults until admin/users save real updates.
-        const cloudMembers = await FirestoreService.getMembers();
-
-        if (cloudMembers.length > 0) {
-          // Merge or populate local cache
-          const local = this.getMembers();
-          const map = new Map<string, Member>();
-          local.forEach(m => {
-            if (m && (m.accId || m.id)) {
-              map.set((m.accId || m.id).toUpperCase(), m);
-            }
-          });
-          cloudMembers.forEach(m => {
-            if (m && (m.accId || m.id)) {
-              map.set((m.accId || m.id).toUpperCase(), m);
-            }
-          });
-          const merged = Array.from(map.values());
-          // Sort newest members first so admin immediately sees new registrations!
-          merged.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-          localStorage.setItem(MEMBERS_KEY, JSON.stringify(merged));
-          notifySync();
-        }
-
-        const cloudTxs = await FirestoreService.getTransactions();
-        if (cloudTxs.length > 0) {
-          localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(cloudTxs));
-          notifySync();
-        }
-
-        const cloudWithdrawals = await FirestoreService.getWithdrawals();
-        if (cloudWithdrawals.length > 0) {
-          localStorage.setItem(WITHDRAWALS_KEY, JSON.stringify(cloudWithdrawals));
-          notifySync();
-        }
-
-        // 0. Hydrate SiteConfig from IndexedDB first (large image store resilient to localStorage 5MB limits)
+        // 1. Hydrate all collections from IndexedDB first (protects against cleared/full localStorage)
         try {
-          const idbConfig = await LocalDb.get<SiteConfig>(SITE_CONFIG_KEY);
+          const [
+            idbMembers,
+            idbTxs,
+            idbRefs,
+            idbWds,
+            idbPassbook,
+            idbMsgs,
+            idbGroups,
+            idbFriends,
+            idbNotifs,
+            idbAudits,
+            idbConfig,
+          ] = await Promise.all([
+            LocalDb.get<Member[]>(MEMBERS_KEY),
+            LocalDb.get<RechargeTransaction[]>(TRANSACTIONS_KEY),
+            LocalDb.get<ReferralRecord[]>(REFERRALS_KEY),
+            LocalDb.get<WithdrawalRequest[]>(WITHDRAWALS_KEY),
+            LocalDb.get<PassbookEntry[]>(PASSBOOK_KEY),
+            LocalDb.get<PrivateMessage[]>(PRIVATE_MESSAGES_KEY),
+            LocalDb.get<ChatGroup[]>(CHAT_GROUPS_KEY),
+            LocalDb.get<Friendship[]>(FRIENDSHIPS_KEY),
+            LocalDb.get<SocialNotification[]>(SOCIAL_NOTIFICATIONS_KEY),
+            LocalDb.get<ProfileEditAuditLog[]>(PROFILE_AUDIT_KEY),
+            LocalDb.get<SiteConfig>(SITE_CONFIG_KEY),
+          ]);
+
+          if (Array.isArray(idbMembers) && idbMembers.length > 0) {
+            const currentLocal = this.getMembers();
+            if (currentLocal.length <= SEED_MEMBERS.length && idbMembers.length >= currentLocal.length) {
+              safeStorageSet(MEMBERS_KEY, JSON.stringify(idbMembers));
+            }
+          }
+          if (Array.isArray(idbTxs) && idbTxs.length > this.getTransactions().length) {
+            safeStorageSet(TRANSACTIONS_KEY, JSON.stringify(idbTxs));
+          }
+          if (Array.isArray(idbRefs) && idbRefs.length > this.getReferrals().length) {
+            safeStorageSet(REFERRALS_KEY, JSON.stringify(idbRefs));
+          }
+          if (Array.isArray(idbWds) && idbWds.length > this.getWithdrawals().length) {
+            safeStorageSet(WITHDRAWALS_KEY, JSON.stringify(idbWds));
+          }
+          if (Array.isArray(idbPassbook) && idbPassbook.length > this.getPassbookEntries().length) {
+            safeStorageSet(PASSBOOK_KEY, JSON.stringify(idbPassbook));
+          }
+          if (Array.isArray(idbMsgs) && idbMsgs.length > this.getPrivateMessages().length) {
+            safeStorageSet(PRIVATE_MESSAGES_KEY, JSON.stringify(idbMsgs));
+          }
+          if (Array.isArray(idbGroups) && idbGroups.length > this.getChatGroups().length) {
+            safeStorageSet(CHAT_GROUPS_KEY, JSON.stringify(idbGroups));
+          }
+          if (Array.isArray(idbFriends) && idbFriends.length > this.getFriendships().length) {
+            safeStorageSet(FRIENDSHIPS_KEY, JSON.stringify(idbFriends));
+          }
+          if (Array.isArray(idbNotifs) && idbNotifs.length > 0 && !safeStorageGet(SOCIAL_NOTIFICATIONS_KEY)) {
+            safeStorageSet(SOCIAL_NOTIFICATIONS_KEY, JSON.stringify(idbNotifs));
+          }
+          if (Array.isArray(idbAudits) && idbAudits.length > this.getAuditLogs().length) {
+            safeStorageSet(PROFILE_AUDIT_KEY, JSON.stringify(idbAudits));
+          }
           if (idbConfig) {
             const currentLocal = this.getSiteConfig();
             const idbTs = idbConfig.configUpdatedAt ? Date.parse(idbConfig.configUpdatedAt) : 0;
             const localTs = currentLocal.configUpdatedAt ? Date.parse(currentLocal.configUpdatedAt) : 0;
             if (!localTs || idbTs >= localTs) {
               inMemorySiteConfig = this.normalizeSiteConfig(idbConfig);
-              try {
-                localStorage.setItem(SITE_CONFIG_KEY, JSON.stringify(inMemorySiteConfig));
-              } catch {
-                // IndexedDB + inMemory holds full media safely even if localStorage is full
-              }
+              safeStorageSet(SITE_CONFIG_KEY, JSON.stringify(inMemorySiteConfig));
               notifySync();
             }
           }
@@ -689,11 +1011,128 @@ export const StorageService = {
           // ignore IndexedDB read errors
         }
 
-        // Read-only site configuration sync (respect newer local/IndexedDB timestamp)
-        const configRes = await FirestoreService.getSiteConfigDetailed();
-        if (configRes.exists && configRes.data) {
-          this.applyCloudSiteConfigIfNewer(configRes.data);
+        // 2. Flush any queued offline/quota-paused writes first if quota is available
+        if (!FirestoreService.isWriteQuotaPaused()) {
+          await FirestoreService.flushPendingSyncQueue();
         }
+
+        // 3. Fetch all Firestore collections in parallel (strictly read-only fetch)
+        const [
+          cloudMembersRes,
+          cloudTxsRes,
+          cloudRefsRes,
+          cloudWdsRes,
+          cloudPassbookRes,
+          cloudMsgsRes,
+          cloudGroupsRes,
+          cloudFriendsRes,
+          cloudNotifsRes,
+          cloudAuditsRes,
+          configRes,
+        ] = await Promise.allSettled([
+          FirestoreService.getMembers(),
+          FirestoreService.getTransactions(),
+          FirestoreService.getReferrals(),
+          FirestoreService.getWithdrawals(),
+          FirestoreService.getPassbookEntries(),
+          FirestoreService.getPrivateMessages(),
+          FirestoreService.getChatGroups(),
+          FirestoreService.getFriendships(),
+          FirestoreService.getSocialNotifications(),
+          FirestoreService.getAuditLogs(),
+          FirestoreService.getSiteConfigDetailed(),
+        ]);
+
+        const cloudMembers = cloudMembersRes.status === 'fulfilled' ? cloudMembersRes.value : [];
+        if (cloudMembers.length > 0) {
+          this.mergeMembersWithCloud(cloudMembers, true);
+        }
+
+        // Safely backfill any non-seed local members missing from Firestore without wasting writes
+        if (!FirestoreService.isWriteQuotaPaused()) {
+          const cloudIds = new Set(cloudMembers.map((m) => (m.accId || m.id || '').toUpperCase()));
+          const localOnlyRealMembers = this.getMembers().filter(
+            (m) => m.accId && !SEED_MEMBER_IDS.has(m.id) && !cloudIds.has(m.accId.toUpperCase())
+          );
+          for (const unsynced of localOnlyRealMembers) {
+            if (FirestoreService.isWriteQuotaPaused()) break;
+            await FirestoreService.saveMember(unsynced);
+          }
+        }
+
+        const cloudTxs = cloudTxsRes.status === 'fulfilled' ? cloudTxsRes.value : [];
+        if (cloudTxs.length > 0) {
+          this.mergeTransactionsWithCloud(cloudTxs, true);
+        }
+
+        const cloudRefs = cloudRefsRes.status === 'fulfilled' ? cloudRefsRes.value : [];
+        if (cloudRefs.length > 0) {
+          this.mergeReferralsWithCloud(cloudRefs, true);
+        }
+
+        const cloudWds = cloudWdsRes.status === 'fulfilled' ? cloudWdsRes.value : [];
+        if (cloudWds.length > 0) {
+          this.mergeWithdrawalsWithCloud(cloudWds, true);
+        }
+
+        const cloudPassbook = cloudPassbookRes.status === 'fulfilled' ? cloudPassbookRes.value : [];
+        if (cloudPassbook.length > 0) {
+          this.mergePassbookWithCloud(cloudPassbook, true);
+        }
+
+        const cloudMsgs = cloudMsgsRes.status === 'fulfilled' ? cloudMsgsRes.value : [];
+        if (cloudMsgs.length > 0) {
+          this.mergePrivateMessagesWithCloud(cloudMsgs, true);
+        }
+
+        const cloudGroups = cloudGroupsRes.status === 'fulfilled' ? cloudGroupsRes.value : [];
+        if (cloudGroups.length > 0) {
+          const gMap = new Map<string, ChatGroup>();
+          this.getChatGroups().forEach((g) => g && g.id && gMap.set(g.id, g));
+          cloudGroups.forEach((cg) => cg && cg.id && gMap.set(cg.id, cg));
+          this.saveChatGroups(Array.from(gMap.values()));
+        }
+
+        const cloudFriends = cloudFriendsRes.status === 'fulfilled' ? cloudFriendsRes.value : [];
+        if (cloudFriends.length > 0) {
+          const fMap = new Map<string, Friendship>();
+          this.getFriendships().forEach((f) => f && f.id && fMap.set(f.id, f));
+          cloudFriends.forEach((cf) => cf && cf.id && fMap.set(cf.id, cf));
+          this.saveFriendships(Array.from(fMap.values()));
+        }
+
+        const cloudNotifs = cloudNotifsRes.status === 'fulfilled' ? cloudNotifsRes.value : [];
+        if (cloudNotifs.length > 0) {
+          try {
+            const rawLocal = safeStorageGet(SOCIAL_NOTIFICATIONS_KEY);
+            const localNotifs: SocialNotification[] = rawLocal ? JSON.parse(rawLocal) : [];
+            const nMap = new Map<string, SocialNotification>();
+            localNotifs.forEach((n) => n && n.id && nMap.set(n.id, n));
+            cloudNotifs.forEach((cn) => {
+              if (!cn || !cn.id) return;
+              const ex = nMap.get(cn.id);
+              nMap.set(cn.id, ex ? { ...ex, ...cn, isRead: Boolean(ex.isRead || cn.isRead) } : cn);
+            });
+            const mergedNotifs = Array.from(nMap.values())
+              .sort((a, b) => parseIsoMs(b.timestamp) - parseIsoMs(a.timestamp))
+              .slice(0, 100);
+            safeStorageSet(SOCIAL_NOTIFICATIONS_KEY, JSON.stringify(mergedNotifs));
+            LocalDb.set(SOCIAL_NOTIFICATIONS_KEY, mergedNotifs).catch(() => {});
+            notifySync();
+          } catch {
+            // ignore
+          }
+        }
+
+        const cloudAudits = cloudAuditsRes.status === 'fulfilled' ? cloudAuditsRes.value : [];
+        if (cloudAudits.length > 0) {
+          this.mergeAuditLogsWithCloud(cloudAudits, true);
+        }
+
+        if (configRes.status === 'fulfilled' && configRes.value.exists && configRes.value.data) {
+          this.applyCloudSiteConfigIfNewer(configRes.value.data);
+        }
+
         firestoreSyncedOnce = true;
       } catch (err) {
         console.warn('Firestore initial sync skipped or offline:', err);
@@ -707,19 +1146,20 @@ export const StorageService = {
 
   getMembers(): Member[] {
     try {
-      const data = localStorage.getItem(MEMBERS_KEY);
+      const data = safeStorageGet(MEMBERS_KEY);
       if (!data) {
-        localStorage.setItem(MEMBERS_KEY, JSON.stringify(SEED_MEMBERS));
+        safeStorageSet(MEMBERS_KEY, JSON.stringify(SEED_MEMBERS));
         return SEED_MEMBERS;
       }
       return JSON.parse(data);
-    } catch (err) {
+    } catch {
       return SEED_MEMBERS;
     }
   },
 
   saveMembers(members: Member[]) {
-    localStorage.setItem(MEMBERS_KEY, JSON.stringify(members));
+    safeStorageSet(MEMBERS_KEY, JSON.stringify(members));
+    LocalDb.set(MEMBERS_KEY, members).catch(() => {});
     notifySync();
   },
 
@@ -756,7 +1196,7 @@ export const StorageService = {
         sponsor.totalEarnings = Number((sponsor.totalEarnings + 150).toFixed(2));
         sponsor.twisEarnings = Number((sponsor.twisEarnings + 150).toFixed(2));
         this.saveMembers(members);
-        await FirestoreService.updateMember(sponsor.accId, sponsor);
+        await FirestoreService.updateMember(sponsor.accId, sponsor, sponsor);
 
         const referrals = this.getReferrals();
         const refRecord: ReferralRecord = {
@@ -803,8 +1243,8 @@ export const StorageService = {
     members[idx] = { ...members[idx], ...updates };
     this.saveMembers(members);
 
-    // Sync to Firestore
-    FirestoreService.updateMember(accId, updates).catch(e => console.warn('Firestore updateMember err:', e));
+    // Sync to Firestore with full member fallback so offline-created accounts never hit 'not-found'
+    FirestoreService.updateMember(accId, updates, members[idx]).catch(e => console.warn('Firestore updateMember err:', e));
     
     // Also update current user if it's the same
     const current = this.getCurrentUser();
@@ -886,7 +1326,7 @@ export const StorageService = {
 
   getAuditLogs(): ProfileEditAuditLog[] {
     try {
-      const data = localStorage.getItem(PROFILE_AUDIT_KEY);
+      const data = safeStorageGet(PROFILE_AUDIT_KEY);
       return data ? JSON.parse(data) : [];
     } catch {
       return [];
@@ -896,18 +1336,16 @@ export const StorageService = {
   saveAuditLog(log: ProfileEditAuditLog): void {
     const current = this.getAuditLogs();
     const updated = [log, ...current];
-    try {
-      localStorage.setItem(PROFILE_AUDIT_KEY, JSON.stringify(updated.slice(0, 1000)));
-    } catch (e) {
-      console.warn('Storage audit log error:', e);
-    }
+    const trimmed = updated.slice(0, 200);
+    safeStorageSet(PROFILE_AUDIT_KEY, JSON.stringify(trimmed));
+    LocalDb.set(PROFILE_AUDIT_KEY, trimmed).catch(() => {});
     FirestoreService.saveAuditLog(log).catch((e) => console.warn('Firestore audit log error:', e));
     notifySync();
   },
 
   getPrivateMessages(userAccId?: string): PrivateMessage[] {
     try {
-      const data = localStorage.getItem(PRIVATE_MESSAGES_KEY);
+      const data = safeStorageGet(PRIVATE_MESSAGES_KEY);
       const msgs: PrivateMessage[] = data ? JSON.parse(data) : [];
       if (userAccId) {
         const needle = userAccId.toUpperCase();
@@ -926,11 +1364,9 @@ export const StorageService = {
   },
 
   savePrivateMessages(messages: PrivateMessage[]): void {
-    try {
-      localStorage.setItem(PRIVATE_MESSAGES_KEY, JSON.stringify(messages.slice(-2000)));
-    } catch (e) {
-      console.warn('Storage savePrivateMessages error:', e);
-    }
+    const trimmed = messages.slice(-800);
+    safeStorageSet(PRIVATE_MESSAGES_KEY, JSON.stringify(trimmed));
+    LocalDb.set(PRIVATE_MESSAGES_KEY, trimmed).catch(() => {});
     notifySync();
   },
 
@@ -973,12 +1409,9 @@ export const StorageService = {
       isRead: false,
     };
     const current = this.getPrivateMessages();
-    const updated = [...current, newMsg];
-    try {
-      localStorage.setItem(PRIVATE_MESSAGES_KEY, JSON.stringify(updated.slice(-2000)));
-    } catch (e) {
-      console.warn('Storage sendPrivateMessage error:', e);
-    }
+    const updated = [...current, newMsg].slice(-800);
+    safeStorageSet(PRIVATE_MESSAGES_KEY, JSON.stringify(updated));
+    LocalDb.set(PRIVATE_MESSAGES_KEY, updated).catch(() => {});
     FirestoreService.savePrivateMessage(newMsg).catch((e) => console.warn('Firestore private msg err:', e));
     notifySync();
     return newMsg;
@@ -988,22 +1421,23 @@ export const StorageService = {
     const current = this.getPrivateMessages();
     let hasChanges = false;
     const needle = (userAccId || '').toUpperCase();
+    const changedMsgs: PrivateMessage[] = [];
     const updated = current.map((m) => {
       const matches =
         (m.userAccId || '').toUpperCase() === needle ||
         (m.recipientAccId || '').toUpperCase() === needle;
       if (matches && m.senderRole !== readerRole && !m.isRead) {
         hasChanges = true;
-        return { ...m, isRead: true };
+        const readMsg = { ...m, isRead: true };
+        changedMsgs.push(readMsg);
+        return readMsg;
       }
       return m;
     });
     if (hasChanges) {
-      try {
-        localStorage.setItem(PRIVATE_MESSAGES_KEY, JSON.stringify(updated));
-      } catch (e) {
-        console.warn('Storage markMessagesAsRead error:', e);
-      }
+      safeStorageSet(PRIVATE_MESSAGES_KEY, JSON.stringify(updated));
+      LocalDb.set(PRIVATE_MESSAGES_KEY, updated).catch(() => {});
+      changedMsgs.slice(-10).forEach((m) => FirestoreService.savePrivateMessage(m).catch(() => {}));
       notifySync();
     }
   },
@@ -1013,6 +1447,7 @@ export const StorageService = {
     let hasChanges = false;
     const needleChannel = (channelKey || '').toUpperCase();
     const needleReader = (readerAccId || '').toUpperCase();
+    const changedMsgs: PrivateMessage[] = [];
     const updated = current.map((m) => {
       if (
         (m.userAccId || '').toUpperCase() === needleChannel &&
@@ -1020,16 +1455,16 @@ export const StorageService = {
         !m.isRead
       ) {
         hasChanges = true;
-        return { ...m, isRead: true };
+        const readMsg = { ...m, isRead: true };
+        changedMsgs.push(readMsg);
+        return readMsg;
       }
       return m;
     });
     if (hasChanges) {
-      try {
-        localStorage.setItem(PRIVATE_MESSAGES_KEY, JSON.stringify(updated));
-      } catch (e) {
-        console.warn('Storage markChannelMessagesAsRead error:', e);
-      }
+      safeStorageSet(PRIVATE_MESSAGES_KEY, JSON.stringify(updated));
+      LocalDb.set(PRIVATE_MESSAGES_KEY, updated).catch(() => {});
+      changedMsgs.slice(-10).forEach((m) => FirestoreService.savePrivateMessage(m).catch(() => {}));
       notifySync();
     }
   },
@@ -1135,19 +1570,20 @@ export const StorageService = {
 
   getTransactions(): RechargeTransaction[] {
     try {
-      const data = localStorage.getItem(TRANSACTIONS_KEY);
+      const data = safeStorageGet(TRANSACTIONS_KEY);
       if (!data) {
-        localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(SEED_TRANSACTIONS));
+        safeStorageSet(TRANSACTIONS_KEY, JSON.stringify(SEED_TRANSACTIONS));
         return SEED_TRANSACTIONS;
       }
       return JSON.parse(data);
-    } catch (err) {
+    } catch {
       return SEED_TRANSACTIONS;
     }
   },
 
   saveTransactions(txs: RechargeTransaction[]) {
-    localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(txs));
+    safeStorageSet(TRANSACTIONS_KEY, JSON.stringify(txs));
+    LocalDb.set(TRANSACTIONS_KEY, txs).catch(() => {});
     notifySync();
   },
 
@@ -1175,7 +1611,7 @@ export const StorageService = {
       user.swisEarnings = Number((user.swisEarnings + tx.commissionEarned).toFixed(2));
       user.rechargesCount += 1;
       this.saveMembers(members);
-      FirestoreService.updateMember(user.accId, user).catch(e => console.warn(e));
+      FirestoreService.updateMember(user.accId, user, user).catch(e => console.warn(e));
 
       const current = this.getCurrentUser();
       if (current && current.accId.toUpperCase() === user.accId.toUpperCase()) {
@@ -1206,37 +1642,39 @@ export const StorageService = {
 
   getReferrals(): ReferralRecord[] {
     try {
-      const data = localStorage.getItem(REFERRALS_KEY);
+      const data = safeStorageGet(REFERRALS_KEY);
       if (!data) {
-        localStorage.setItem(REFERRALS_KEY, JSON.stringify(SEED_REFERRALS));
+        safeStorageSet(REFERRALS_KEY, JSON.stringify(SEED_REFERRALS));
         return SEED_REFERRALS;
       }
       return JSON.parse(data);
-    } catch (err) {
+    } catch {
       return SEED_REFERRALS;
     }
   },
 
   saveReferrals(referrals: ReferralRecord[]) {
-    localStorage.setItem(REFERRALS_KEY, JSON.stringify(referrals));
+    safeStorageSet(REFERRALS_KEY, JSON.stringify(referrals));
+    LocalDb.set(REFERRALS_KEY, referrals).catch(() => {});
     notifySync();
   },
 
   getWithdrawals(): WithdrawalRequest[] {
     try {
-      const data = localStorage.getItem(WITHDRAWALS_KEY);
+      const data = safeStorageGet(WITHDRAWALS_KEY);
       if (!data) {
-        localStorage.setItem(WITHDRAWALS_KEY, JSON.stringify(SEED_WITHDRAWALS));
+        safeStorageSet(WITHDRAWALS_KEY, JSON.stringify(SEED_WITHDRAWALS));
         return SEED_WITHDRAWALS;
       }
       return JSON.parse(data);
-    } catch (err) {
+    } catch {
       return SEED_WITHDRAWALS;
     }
   },
 
   saveWithdrawals(wds: WithdrawalRequest[]) {
-    localStorage.setItem(WITHDRAWALS_KEY, JSON.stringify(wds));
+    safeStorageSet(WITHDRAWALS_KEY, JSON.stringify(wds));
+    LocalDb.set(WITHDRAWALS_KEY, wds).catch(() => {});
     notifySync();
   },
 
@@ -1251,7 +1689,7 @@ export const StorageService = {
     // Deduct from wallet balance
     member.walletBalance = Number((member.walletBalance - request.amount).toFixed(2));
     this.saveMembers(members);
-    FirestoreService.updateMember(member.accId, { walletBalance: member.walletBalance }).catch(e => console.warn(e));
+    FirestoreService.updateMember(member.accId, { walletBalance: member.walletBalance }, member).catch(e => console.warn(e));
 
     const newReq: WithdrawalRequest = {
       ...request,
@@ -1296,9 +1734,13 @@ export const StorageService = {
     item.processedAt = new Date().toISOString();
     if (notes) item.notes = notes;
     this.saveWithdrawals(wds);
-    FirestoreService.updateWithdrawal(withdrawalId, { status: 'approved', processedAt: item.processedAt, notes: item.notes }).catch(e => console.warn(e));
+    FirestoreService.updateWithdrawal(
+      withdrawalId,
+      { status: 'approved', processedAt: item.processedAt, notes: item.notes },
+      item
+    ).catch(e => console.warn(e));
 
-    // Update matching passbook entry to COMPLETED
+    // Update matching passbook entry to COMPLETED & sync to Firestore
     try {
       const entries = this.getPassbookEntries();
       const pbEntry = entries.find(e => e.referenceId === withdrawalId);
@@ -1307,6 +1749,7 @@ export const StorageService = {
         pbEntry.title = '💸 बैंक / UPI निकासी (Payout Approved)';
         if (notes) pbEntry.description = `${pbEntry.description} · ${notes}`;
         this.savePassbookEntries(entries);
+        FirestoreService.savePassbookEntry(pbEntry).catch(() => {});
       }
     } catch {
       // passbook update fallback
@@ -1329,7 +1772,7 @@ export const StorageService = {
     if (member) {
       member.walletBalance = Number((member.walletBalance + item.amount).toFixed(2));
       this.saveMembers(members);
-      FirestoreService.updateMember(member.accId, { walletBalance: member.walletBalance }).catch(e => console.warn(e));
+      FirestoreService.updateMember(member.accId, { walletBalance: member.walletBalance }, member).catch(e => console.warn(e));
 
       // Record Refund Passbook entry
       this.addPassbookEntry({
@@ -1346,7 +1789,7 @@ export const StorageService = {
       });
     }
 
-    // Update original debit entry status to REJECTED
+    // Update original debit entry status to REJECTED & sync to Firestore
     try {
       const entries = this.getPassbookEntries();
       const pbEntry = entries.find(e => e.referenceId === withdrawalId);
@@ -1354,19 +1797,24 @@ export const StorageService = {
         pbEntry.status = 'REJECTED';
         pbEntry.description = `${pbEntry.description} (अस्वीकृत: ${reason})`;
         this.savePassbookEntries(entries);
+        FirestoreService.savePassbookEntry(pbEntry).catch(() => {});
       }
     } catch {
       // ignore
     }
 
     this.saveWithdrawals(wds);
-    FirestoreService.updateWithdrawal(withdrawalId, { status: 'rejected', processedAt: item.processedAt, notes: reason }).catch(e => console.warn(e));
+    FirestoreService.updateWithdrawal(
+      withdrawalId,
+      { status: 'rejected', processedAt: item.processedAt, notes: reason },
+      item
+    ).catch(e => console.warn(e));
     return true;
   },
 
   getPassbookEntries(accId?: string): PassbookEntry[] {
     try {
-      const data = localStorage.getItem(PASSBOOK_KEY);
+      const data = safeStorageGet(PASSBOOK_KEY);
       let entries: PassbookEntry[] = data ? JSON.parse(data) : [];
 
       if (accId) {
@@ -1479,7 +1927,8 @@ export const StorageService = {
   },
 
   savePassbookEntries(entries: PassbookEntry[]) {
-    localStorage.setItem(PASSBOOK_KEY, JSON.stringify(entries));
+    safeStorageSet(PASSBOOK_KEY, JSON.stringify(entries));
+    LocalDb.set(PASSBOOK_KEY, entries).catch(() => {});
     notifySync();
   },
 
@@ -1492,6 +1941,7 @@ export const StorageService = {
     };
     entries.unshift(newEntry);
     this.savePassbookEntries(entries);
+    FirestoreService.savePassbookEntry(newEntry).catch((e) => console.warn('Firestore passbook err:', e));
     return newEntry;
   },
 
@@ -1542,7 +1992,7 @@ export const StorageService = {
       twisEarnings: member.twisEarnings,
       rechargesCount: member.rechargesCount,
       referralsCount: member.referralsCount,
-    }).catch(e => console.warn(e));
+    }, member).catch(e => console.warn(e));
 
     const current = this.getCurrentUser();
     if (current && current.accId.toUpperCase() === member.accId.toUpperCase()) {
@@ -1567,7 +2017,7 @@ export const StorageService = {
 
   getCurrentUser(): Member | null {
     try {
-      const data = localStorage.getItem(CURRENT_USER_KEY);
+      const data = safeStorageGet(CURRENT_USER_KEY);
       if (!data) return null;
       const parsed = JSON.parse(data);
       if (!parsed || typeof parsed !== 'object') return null;
@@ -1602,32 +2052,51 @@ export const StorageService = {
     }
   },
 
-  setCurrentUser(member: Member | null) {
+  setCurrentUser(member: Member | null, silent: boolean = false) {
     if (!member) {
-      localStorage.removeItem(CURRENT_USER_KEY);
+      safeStorageRemove(CURRENT_USER_KEY);
     } else {
+      const normalizedMember = { ...member };
       // Ensure member has an active session ID and keep local session aligned
       if (typeof window !== 'undefined') {
-        let currentSess = localStorage.getItem(CURRENT_SESSION_ID_KEY);
+        let currentSess = safeStorageGet(CURRENT_SESSION_ID_KEY);
         if (!currentSess) {
-          currentSess = member.activeSessionId || `sess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-          localStorage.setItem(CURRENT_SESSION_ID_KEY, currentSess);
+          currentSess =
+            normalizedMember.activeSessionId ||
+            `sess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+          safeStorageSet(CURRENT_SESSION_ID_KEY, currentSess);
         }
-        if (!member.activeSessionId) {
-          member.activeSessionId = currentSess;
+        if (!normalizedMember.activeSessionId) {
+          normalizedMember.activeSessionId = currentSess;
         }
       }
-      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(member));
+      safeStorageSet(CURRENT_USER_KEY, JSON.stringify(normalizedMember));
     }
-    notifySync();
+    if (!silent) {
+      notifySync();
+    }
   },
 
   resetAllData() {
-    localStorage.setItem(MEMBERS_KEY, JSON.stringify(SEED_MEMBERS));
-    localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(SEED_TRANSACTIONS));
-    localStorage.setItem(REFERRALS_KEY, JSON.stringify(SEED_REFERRALS));
-    localStorage.setItem(WITHDRAWALS_KEY, JSON.stringify(SEED_WITHDRAWALS));
-    localStorage.removeItem(CURRENT_USER_KEY);
+    // Automatically preserve a pre-reset backup snapshot in IndexedDB so real data is never permanently lost
+    try {
+      const backupSnapshot = {
+        members: this.getMembers(),
+        transactions: this.getTransactions(),
+        referrals: this.getReferrals(),
+        withdrawals: this.getWithdrawals(),
+        passbookEntries: this.getPassbookEntries(),
+        backedUpAt: new Date().toISOString(),
+      };
+      LocalDb.set('acc_pre_reset_backup_v1', backupSnapshot).catch(() => {});
+    } catch {
+      // ignore backup failure
+    }
+    safeStorageSet(MEMBERS_KEY, JSON.stringify(SEED_MEMBERS));
+    safeStorageSet(TRANSACTIONS_KEY, JSON.stringify(SEED_TRANSACTIONS));
+    safeStorageSet(REFERRALS_KEY, JSON.stringify(SEED_REFERRALS));
+    safeStorageSet(WITHDRAWALS_KEY, JSON.stringify(SEED_WITHDRAWALS));
+    safeStorageRemove(CURRENT_USER_KEY);
     notifySync();
   },
 
@@ -1665,11 +2134,11 @@ export const StorageService = {
   },
 
   getAdminPassword(): string {
-    return localStorage.getItem('acc_admin_security_key') || 'ACCADMIN';
+    return safeStorageGet('acc_admin_security_key') || 'ACCADMIN';
   },
 
   setAdminPassword(newPassword: string): void {
-    localStorage.setItem('acc_admin_security_key', newPassword.trim());
+    safeStorageSet('acc_admin_security_key', newPassword.trim());
   },
 
   approveMember(accId: string, customAppLink?: string): Member | null {
@@ -1735,12 +2204,31 @@ export const StorageService = {
         safe.appDownloadNotice ||
         'केवल अधिकृत ACC वेबसाइट से ही APK डाउनलोड करें। इंस्टालेशन के समय "Install from Unknown Sources" को अनुमति दें।',
       services: Array.isArray(safe.services) ? safe.services : DEFAULT_SERVICES,
-      promotionalPosters:
-        Array.isArray(safe.promotionalPosters) && safe.promotionalPosters.some((p: PromotionalPoster) => Boolean(p.imageUrl))
-          ? safe.promotionalPosters
-          : DEFAULT_PROMOTIONAL_POSTERS,
+      promotionalPosters: (() => {
+        const now = new Date();
+        const storedList: PromotionalPoster[] =
+          Array.isArray(safe.promotionalPosters) && safe.promotionalPosters.some((p: PromotionalPoster) => Boolean(p.imageUrl))
+            ? safe.promotionalPosters
+            : [];
+        const validNonExpiredCustom = storedList.filter(
+          (p) => !p.id.startsWith('auto_poster_') && !isFestivalItemExpired(p, now)
+        );
+        const liveFestivalPosters = getAutoDynamicFestivalPosters(now);
+        const merged = [...liveFestivalPosters, ...validNonExpiredCustom];
+        if (merged.length === 0) {
+          return DEFAULT_PROMOTIONAL_POSTERS.filter((p) => !isFestivalItemExpired(p, now));
+        }
+        const seen = new Set<string>();
+        return merged.filter((p) => {
+          if (seen.has(p.id)) return false;
+          seen.add(p.id);
+          return true;
+        });
+      })(),
       homeSliderPhotos: Array.isArray(safe.homeSliderPhotos) ? safe.homeSliderPhotos : [],
-      celebrationPopups: Array.isArray(safe.celebrationPopups) ? safe.celebrationPopups : [],
+      celebrationPopups: Array.isArray(safe.celebrationPopups)
+        ? safe.celebrationPopups.filter((item: any) => !isFestivalItemExpired(item))
+        : [],
       celebrationPopupTarget: safe.celebrationPopupTarget || 'all',
       celebrationAutoRealTimeFestival: safe.celebrationAutoRealTimeFestival !== false,
     };
@@ -1751,9 +2239,9 @@ export const StorageService = {
       return inMemorySiteConfig;
     }
     try {
-      const data = localStorage.getItem(SITE_CONFIG_KEY);
+      const data = safeStorageGet(SITE_CONFIG_KEY);
       if (!data) {
-        localStorage.setItem(SITE_CONFIG_KEY, JSON.stringify(DEFAULT_SITE_CONFIG));
+        safeStorageSet(SITE_CONFIG_KEY, JSON.stringify(DEFAULT_SITE_CONFIG));
         inMemorySiteConfig = DEFAULT_SITE_CONFIG;
         return DEFAULT_SITE_CONFIG;
       }
@@ -2048,10 +2536,16 @@ export const StorageService = {
   // -------------------------------------------------------------
   // MULTI-DEVICE SESSION MANAGEMENT & SECURITY
   // -------------------------------------------------------------
+  parseSessionTimestamp(sessionId?: string | null): number {
+    if (!sessionId || typeof sessionId !== 'string') return 0;
+    const match = sessionId.match(/^sess_(\d+)_/);
+    return match ? Number(match[1]) || 0 : 0;
+  },
+
   createSessionForUser(member: Member): string {
     const newSessionId = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     if (typeof window !== 'undefined') {
-      localStorage.setItem(CURRENT_SESSION_ID_KEY, newSessionId);
+      safeStorageSet(CURRENT_SESSION_ID_KEY, newSessionId);
     }
     const deviceLabel =
       typeof navigator !== 'undefined' && /mobile|android|iphone|ipad/i.test(navigator.userAgent)
@@ -2069,13 +2563,13 @@ export const StorageService = {
 
   getLocalSessionId(): string | null {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem(CURRENT_SESSION_ID_KEY);
+    return safeStorageGet(CURRENT_SESSION_ID_KEY);
   },
 
   clearSession() {
     if (typeof window !== 'undefined') {
-      localStorage.removeItem(CURRENT_SESSION_ID_KEY);
-      localStorage.removeItem(CURRENT_USER_KEY);
+      safeStorageRemove(CURRENT_SESSION_ID_KEY);
+      safeStorageRemove(CURRENT_USER_KEY);
     }
     notifySync();
   },
@@ -2173,7 +2667,7 @@ export const StorageService = {
   // -------------------------------------------------------------
   getFriendships(): Friendship[] {
     try {
-      const data = localStorage.getItem(FRIENDSHIPS_KEY);
+      const data = safeStorageGet(FRIENDSHIPS_KEY);
       if (!data) return [];
       return JSON.parse(data);
     } catch {
@@ -2182,7 +2676,8 @@ export const StorageService = {
   },
 
   saveFriendships(friendships: Friendship[]) {
-    localStorage.setItem(FRIENDSHIPS_KEY, JSON.stringify(friendships));
+    safeStorageSet(FRIENDSHIPS_KEY, JSON.stringify(friendships));
+    LocalDb.set(FRIENDSHIPS_KEY, friendships).catch(() => {});
     notifySync();
   },
 
@@ -2229,6 +2724,7 @@ export const StorageService = {
         createdAt: new Date().toISOString(),
       };
       this.saveFriendships(list);
+      FirestoreService.saveFriendship(list[existingIdx]).catch(() => {});
       return { success: true, message: 'मित्र अनुरोध पुनः भेजा गया!', friendship: list[existingIdx] };
     }
 
@@ -2243,6 +2739,7 @@ export const StorageService = {
 
     list.unshift(newFriendship);
     this.saveFriendships(list);
+    FirestoreService.saveFriendship(newFriendship).catch(() => {});
 
     // Send notification
     this.sendSocialNotification({
@@ -2270,6 +2767,7 @@ export const StorageService = {
     f.status = 'accepted';
     f.acceptedAt = new Date().toISOString();
     this.saveFriendships(list);
+    FirestoreService.saveFriendship(f).catch(() => {});
 
     const otherAccId = f.user1AccId.toUpperCase() === currentMember.accId.toUpperCase() ? f.user2AccId : f.user1AccId;
 
@@ -2293,10 +2791,11 @@ export const StorageService = {
 
   declineFriendRequest(friendshipId: string): boolean {
     const list = this.getFriendships();
-    const idx = list.findIndex((item) => item.id === friendshipId);
-    if (idx === -1) return false;
-    list.splice(idx, 1);
+    const f = list.find((item) => item.id === friendshipId);
+    if (!f) return false;
+    f.status = 'declined';
     this.saveFriendships(list);
+    FirestoreService.saveFriendship(f).catch(() => {});
     return true;
   },
 
@@ -2334,7 +2833,7 @@ export const StorageService = {
   // -------------------------------------------------------------
   getChatGroups(): ChatGroup[] {
     try {
-      const data = localStorage.getItem(CHAT_GROUPS_KEY);
+      const data = safeStorageGet(CHAT_GROUPS_KEY);
       if (!data) {
         // Initial Seed Community Group
         const seedGroup: ChatGroup = {
@@ -2352,7 +2851,7 @@ export const StorageService = {
           lastMessageAt: new Date().toISOString(),
           lastMessageText: 'नमस्ते अचीवर्स! ACC CHAT & HELP में आप सभी का स्वागत है।',
         };
-        localStorage.setItem(CHAT_GROUPS_KEY, JSON.stringify([seedGroup]));
+        safeStorageSet(CHAT_GROUPS_KEY, JSON.stringify([seedGroup]));
         return [seedGroup];
       }
       return JSON.parse(data);
@@ -2362,7 +2861,8 @@ export const StorageService = {
   },
 
   saveChatGroups(groups: ChatGroup[]) {
-    localStorage.setItem(CHAT_GROUPS_KEY, JSON.stringify(groups));
+    safeStorageSet(CHAT_GROUPS_KEY, JSON.stringify(groups));
+    LocalDb.set(CHAT_GROUPS_KEY, groups).catch(() => {});
     notifySync();
   },
 
@@ -2405,6 +2905,7 @@ export const StorageService = {
 
     groups.unshift(newGroup);
     this.saveChatGroups(groups);
+    FirestoreService.saveChatGroup(newGroup).catch(() => {});
 
     // Send a welcome message in the group
     this.sendPrivateMessage({
@@ -2444,7 +2945,7 @@ export const StorageService = {
   // -------------------------------------------------------------
   getSocialNotifications(accId: string): SocialNotification[] {
     try {
-      const data = localStorage.getItem(SOCIAL_NOTIFICATIONS_KEY);
+      const data = safeStorageGet(SOCIAL_NOTIFICATIONS_KEY);
       if (!data) return [];
       const list: SocialNotification[] = JSON.parse(data);
       const needle = (accId || '').toUpperCase();
@@ -2458,11 +2959,14 @@ export const StorageService = {
 
   saveSocialNotification(notification: SocialNotification) {
     try {
-      const data = localStorage.getItem(SOCIAL_NOTIFICATIONS_KEY);
+      const data = safeStorageGet(SOCIAL_NOTIFICATIONS_KEY);
       const list: SocialNotification[] = data ? JSON.parse(data) : [];
       list.unshift(notification);
       // Keep max 100 notifications
-      localStorage.setItem(SOCIAL_NOTIFICATIONS_KEY, JSON.stringify(list.slice(0, 100)));
+      const trimmed = list.slice(0, 100);
+      safeStorageSet(SOCIAL_NOTIFICATIONS_KEY, JSON.stringify(trimmed));
+      LocalDb.set(SOCIAL_NOTIFICATIONS_KEY, trimmed).catch(() => {});
+      FirestoreService.saveSocialNotification(notification).catch(() => {});
       notifySync();
     } catch (e) {
       console.warn('saveSocialNotification error:', e);
@@ -2481,13 +2985,15 @@ export const StorageService = {
 
   markNotificationAsRead(id: string) {
     try {
-      const data = localStorage.getItem(SOCIAL_NOTIFICATIONS_KEY);
+      const data = safeStorageGet(SOCIAL_NOTIFICATIONS_KEY);
       if (!data) return;
       const list: SocialNotification[] = JSON.parse(data);
       const target = list.find((n) => n.id === id);
       if (target) {
         target.isRead = true;
-        localStorage.setItem(SOCIAL_NOTIFICATIONS_KEY, JSON.stringify(list));
+        safeStorageSet(SOCIAL_NOTIFICATIONS_KEY, JSON.stringify(list));
+        LocalDb.set(SOCIAL_NOTIFICATIONS_KEY, list).catch(() => {});
+        FirestoreService.saveSocialNotification(target).catch(() => {});
         notifySync();
       }
     } catch {}
@@ -2495,16 +3001,20 @@ export const StorageService = {
 
   markAllNotificationsAsRead(accId: string) {
     try {
-      const data = localStorage.getItem(SOCIAL_NOTIFICATIONS_KEY);
+      const data = safeStorageGet(SOCIAL_NOTIFICATIONS_KEY);
       if (!data) return;
       const list: SocialNotification[] = JSON.parse(data);
       const needle = accId.toUpperCase();
+      const changed: SocialNotification[] = [];
       list.forEach((n) => {
-        if ((n.recipientAccId || '').toUpperCase() === needle) {
+        if ((n.recipientAccId || '').toUpperCase() === needle && !n.isRead) {
           n.isRead = true;
+          changed.push(n);
         }
       });
-      localStorage.setItem(SOCIAL_NOTIFICATIONS_KEY, JSON.stringify(list));
+      safeStorageSet(SOCIAL_NOTIFICATIONS_KEY, JSON.stringify(list));
+      LocalDb.set(SOCIAL_NOTIFICATIONS_KEY, list).catch(() => {});
+      changed.slice(0, 10).forEach((n) => FirestoreService.saveSocialNotification(n).catch(() => {}));
       notifySync();
     } catch {}
   },

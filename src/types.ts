@@ -375,6 +375,8 @@ export interface PromotionalPoster {
   badge?: string;
   isActive: boolean;
   createdAt: string;
+  festivalDate?: string; // YYYY-MM-DD of associated festival
+  expiresAt?: string; // YYYY-MM-DD after which poster auto-hides
 }
 
 export interface HomeSliderPhoto {
@@ -401,6 +403,7 @@ export interface CelebrationPopupItem {
   actionLabel?: string;
   enableCelebrationEffect?: boolean;
   createdAt?: string;
+  festivalDate?: string; // YYYY-MM-DD if festival-tied
 }
 
 export interface SiteConfig {

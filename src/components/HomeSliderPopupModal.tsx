@@ -215,6 +215,7 @@ export const HomeSliderPopupModal: React.FC<HomeSliderPopupModalProps> = ({
             key={currentPhoto.id || currentIndex}
             src={currentPhoto.imageUrl}
             alt={currentPhoto.title || `ACC Announcement ${currentIndex + 1}`}
+            referrerPolicy="no-referrer"
             className="w-full h-auto max-h-[68vh] object-contain select-none transition-all duration-300"
             loading="eager"
           />

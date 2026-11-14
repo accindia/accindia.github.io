@@ -534,11 +534,11 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
   );
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col font-sans select-none">
+    <div className="h-[100dvh] max-h-[100dvh] w-full bg-slate-950 text-white flex flex-col font-sans select-none overflow-hidden">
       {/* ------------------------------------------------------------- */}
       {/* 1. TOP BRANDED HEADER (ACC CHAT & HELP)                        */}
       {/* ------------------------------------------------------------- */}
-      <header className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-amber-500/30 px-3 sm:px-6 py-2.5 sm:py-3 shadow-lg">
+      <header className="shrink-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-amber-500/30 px-[clamp(0.5rem,2vw,1.5rem)] py-[clamp(0.45rem,1.2vh,0.75rem)] shadow-lg">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
           {/* Brand Logo & Title */}
           <div className="flex items-center gap-2.5 sm:gap-3">
@@ -717,22 +717,22 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
       </header>
 
       {/* ------------------------------------------------------------- */}
-      {/* 2. MAIN BODY CONTENT TABS                                     */}
+      {/* 2. MAIN BODY CONTENT TABS (Auto-Fit Any Screen Size)          */}
       {/* ------------------------------------------------------------- */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-2 sm:p-4 flex flex-col overflow-hidden">
+      <main className="flex-1 min-h-0 min-w-0 max-w-7xl w-full mx-auto p-[clamp(0.35rem,1.2vw,1rem)] flex flex-col overflow-hidden">
         {/* ============================================================= */}
         {/* TAB 1: CHATS (1-ON-1 & GROUPS)                                */}
         {/* ============================================================= */}
         {activeTab === 'chats' && (
-          <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-3 h-[calc(100vh-140px)] min-h-[500px]">
+          <div className="flex-1 min-h-0 min-w-0 h-full grid grid-cols-1 sm:grid-cols-12 gap-[clamp(0.4rem,1.1vw,0.75rem)]">
             {/* Conversations Sidebar (Left) */}
             <div
               className={`${
-                selectedConversationKey ? 'hidden md:flex' : 'flex'
-              } md:col-span-4 lg:col-span-3 flex-col bg-slate-900/90 rounded-2xl border border-slate-800 overflow-hidden shadow-xl`}
+                selectedConversationKey ? 'hidden sm:flex' : 'flex'
+              } sm:col-span-5 md:col-span-4 lg:col-span-3 min-h-0 min-w-0 h-full flex-col bg-slate-900/90 rounded-xl sm:rounded-2xl border border-slate-800 overflow-hidden shadow-xl`}
             >
               {/* Search Bar */}
-              <div className="p-3 border-b border-slate-800/80">
+              <div className="shrink-0 p-2.5 sm:p-3 border-b border-slate-800/80">
                 <div className="relative">
                   <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
@@ -746,7 +746,7 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
               </div>
 
               {/* Pinned Quick Channels */}
-              <div className="p-2 space-y-1.5 border-b border-slate-800/60 bg-slate-950/40">
+              <div className="shrink-0 p-2 space-y-1.5 border-b border-slate-800/60 bg-slate-950/40">
                 {/* 1. Direct Sponsor Chat Button */}
                 {currentUser.sponsorId && (
                   <button
@@ -754,27 +754,27 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
                       const sp = allMembers.find((m) => m.accId.toUpperCase() === currentUser.sponsorId.toUpperCase());
                       if (sp) openDirectChatWithMember(sp);
                     }}
-                    className={`w-full p-2 rounded-xl flex items-center justify-between text-left transition-all ${
+                    className={`w-full p-2 rounded-xl flex items-center justify-between gap-2 text-left transition-all ${
                       selectedRecipientMember?.accId.toUpperCase() === currentUser.sponsorId.toUpperCase()
                         ? 'bg-amber-500/20 border border-amber-500/60 text-amber-200'
                         : 'bg-slate-800/60 hover:bg-slate-800 border border-slate-700/50 text-slate-200'
                     }`}
                   >
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center font-bold text-xs text-slate-950 shadow">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center font-bold text-xs text-slate-950 shadow shrink-0">
                         👑
                       </div>
-                      <div className="leading-tight">
-                        <p className="text-xs font-bold text-white flex items-center gap-1">
-                          <span>स्पॉन्सर से सीधी बात</span>
-                          <span className="text-[10px] text-amber-400">★</span>
+                      <div className="leading-tight min-w-0 flex-1">
+                        <p className="text-xs font-bold text-white flex items-center gap-1 truncate">
+                          <span className="truncate">स्पॉन्सर से सीधी बात</span>
+                          <span className="text-[10px] text-amber-400 shrink-0">★</span>
                         </p>
-                        <p className="text-[10px] text-slate-400 truncate max-w-[130px]">
+                        <p className="text-[10px] text-slate-400 truncate">
                           {currentUser.sponsorName || currentUser.sponsorId}
                         </p>
                       </div>
                     </div>
-                    <span className="text-[10px] bg-amber-500/20 text-amber-300 font-bold px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] bg-amber-500/20 text-amber-300 font-bold px-1.5 py-0.5 rounded shrink-0">
                       1-क्लिक
                     </span>
                   </button>
@@ -784,18 +784,18 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
                 {groups.length > 0 && (
                   <button
                     onClick={() => openGroupChat(groups[0])}
-                    className={`w-full p-2 rounded-xl flex items-center justify-between text-left transition-all ${
+                    className={`w-full p-2 rounded-xl flex items-center justify-between gap-2 text-left transition-all ${
                       selectedGroup?.id === groups[0].id
                         ? 'bg-amber-500/20 border border-amber-500/60 text-amber-200'
                         : 'bg-slate-800/60 hover:bg-slate-800 border border-slate-700/50 text-slate-200'
                     }`}
                   >
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center font-bold text-xs text-slate-950 shadow">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center font-bold text-xs text-slate-950 shadow shrink-0">
                         🇮🇳
                       </div>
-                      <div className="leading-tight">
-                        <p className="text-xs font-bold text-white truncate max-w-[130px]">
+                      <div className="leading-tight min-w-0 flex-1">
+                        <p className="text-xs font-bold text-white truncate">
                           {groups[0].name}
                         </p>
                         <p className="text-[10px] text-slate-400">
@@ -803,7 +803,7 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
                         </p>
                       </div>
                     </div>
-                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-1.5 py-0.5 rounded shrink-0">
                       ग्रुप
                     </span>
                   </button>
@@ -811,7 +811,7 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
               </div>
 
               {/* Members Conversation List */}
-              <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1 overscroll-contain">
                 <p className="px-2 py-1 text-[10px] font-black tracking-wider text-slate-400 uppercase">
                   सदस्य एवं मित्र (Conversations)
                 </p>
@@ -870,68 +870,75 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
               </div>
             </div>
 
-            {/* Chat Box (Right) */}
+            {/* Chat Box (Right) - Auto-Adjusts to Any Screen Size */}
             <div
               className={`${
-                !selectedConversationKey ? 'hidden md:flex' : 'flex'
-              } md:col-span-8 lg:col-span-9 flex-col bg-slate-900/90 rounded-2xl border border-slate-800 overflow-hidden shadow-xl`}
+                !selectedConversationKey ? 'hidden sm:flex' : 'flex'
+              } sm:col-span-7 md:col-span-8 lg:col-span-9 min-h-0 min-w-0 h-full flex-col bg-slate-900/90 rounded-xl sm:rounded-2xl border border-slate-800 overflow-hidden shadow-xl`}
             >
               {selectedConversationKey ? (
                 <>
                   {/* Chat Conversation Top Header */}
-                  <div className="p-3 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
+                  <div className="shrink-0 px-[clamp(0.5rem,1.5vw,0.85rem)] py-[clamp(0.45rem,1.2vh,0.75rem)] bg-slate-950/85 border-b border-slate-800 flex items-center justify-between gap-2 min-w-0">
+                    <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1 overflow-hidden">
                       <button
+                        type="button"
                         onClick={() => setSelectedConversationKey('')}
-                        className="md:hidden p-1.5 rounded-lg bg-slate-800 text-slate-300"
+                        className="sm:hidden p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 shrink-0 cursor-pointer"
+                        title="सभी चैट देखें"
+                        aria-label="सभी चैट देखें"
                       >
                         <ArrowLeft className="w-4 h-4" />
                       </button>
 
                       {selectedGroup ? (
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center font-bold text-base text-slate-950 shadow-md">
+                        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center font-bold text-sm sm:text-base text-slate-950 shadow-md shrink-0">
                             {selectedGroup.name.match(/^[\p{Emoji}\u200d]+/u)?.[0] || '🏢'}
                           </div>
-                          <div>
+                          <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <h3 className="text-sm font-black text-white">{selectedGroup.name}</h3>
+                              <h3 className="text-[clamp(0.78rem,1.6vw,0.95rem)] font-black text-white truncate">
+                                {selectedGroup.name}
+                              </h3>
                               {isGroupAdmin(selectedGroup, currentUser.accId) && (
-                                <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-purple-700 to-indigo-700 text-purple-100 border border-purple-400/50 shadow-xs">
+                                <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-purple-700 to-indigo-700 text-purple-100 border border-purple-400/50 shadow-xs shrink-0">
                                   <Crown className="w-2.5 h-2.5 text-amber-300 fill-amber-300" />
                                   <span>You're Admin</span>
                                 </span>
                               )}
                             </div>
-                            <p className="text-[10px] text-slate-400 flex items-center gap-1.5 flex-wrap">
+                            <p className="text-[clamp(0.62rem,1.2vw,0.7rem)] text-slate-400 flex items-center gap-1.5 flex-wrap truncate">
                               <span>👥 {selectedGroup.members.length} सदस्य</span>
                               <span>•</span>
-                              <span className="text-amber-400 font-bold">
+                              <span className="text-amber-400 font-bold truncate">
                                 👑 एडमिन: {selectedGroup.creatorName}
                               </span>
                             </p>
                           </div>
                         </div>
                       ) : selectedRecipientMember ? (
-                        <div className="flex items-center gap-2.5">
-                          <AvatarWith3DFrame
-                            avatarUrl={selectedRecipientMember.avatarUrl}
-                            name={selectedRecipientMember.fullName}
-                            frame={selectedRecipientMember.avatarFrame || 'acc_medallion'}
-                            size="sm"
-                          />
-                          <div>
-                            <div className="flex items-center gap-1.5">
-                              <h3 className="text-sm font-black text-white">
+                        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
+                          <div className="shrink-0">
+                            <AvatarWith3DFrame
+                              avatarUrl={selectedRecipientMember.avatarUrl}
+                              name={selectedRecipientMember.fullName}
+                              frame={selectedRecipientMember.avatarFrame || 'acc_medallion'}
+                              size="sm"
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <h3 className="text-[clamp(0.78rem,1.6vw,0.95rem)] font-black text-white truncate">
                                 {selectedRecipientMember.fullName}
                               </h3>
-                              <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[9px] font-mono font-bold">
+                              <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[9px] font-mono font-bold shrink-0">
                                 @{selectedRecipientMember.username || selectedRecipientMember.accId}
                               </span>
                             </div>
-                            <p className="text-[10px] text-emerald-400 flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                              <span>ऑनलाइन • ACC {selectedRecipientMember.plan} Member</span>
+                            <p className="text-[clamp(0.62rem,1.2vw,0.7rem)] text-emerald-400 flex items-center gap-1 truncate">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                              <span className="truncate">ऑनलाइन • ACC {selectedRecipientMember.plan} Member</span>
                             </p>
                           </div>
                         </div>
@@ -939,15 +946,15 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
                     </div>
 
                     {/* Chat Actions */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                       {selectedGroup && (
                         <button
                           type="button"
                           onClick={() => setGroupMembersModalOpen(true)}
-                          className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                          className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] sm:text-xs font-bold border border-slate-700 flex items-center gap-1 transition cursor-pointer shadow-xs whitespace-nowrap"
                           title="ग्रुप सदस्यों की सूची व बैज देखें"
                         >
-                          <Users className="w-3.5 h-3.5 text-amber-400" />
+                          <Users className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                           <span>सदस्य ({selectedGroup.members.length})</span>
                         </button>
                       )}
@@ -956,9 +963,9 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
                         <>
                           <button
                             onClick={() => handleVisitProfile(selectedRecipientMember)}
-                            className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 flex items-center gap-1 transition-colors"
+                            className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] sm:text-xs font-bold border border-slate-700 flex items-center gap-1 transition-colors whitespace-nowrap"
                           >
-                            <Eye className="w-3.5 h-3.5 text-amber-400" />
+                            <Eye className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                             <span className="hidden sm:inline">प्रोफ़ाइल देखें</span>
                           </button>
 
@@ -968,9 +975,9 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
                               alert(res.message);
                               reloadData();
                             }}
-                            className="px-2.5 py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-bold border border-amber-500/40 flex items-center gap-1 transition-colors"
+                            className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[11px] sm:text-xs font-bold border border-amber-500/40 flex items-center gap-1 transition-colors whitespace-nowrap"
                           >
-                            <UserPlus className="w-3.5 h-3.5" />
+                            <UserPlus className="w-3.5 h-3.5 shrink-0" />
                             <span className="hidden sm:inline">मित्र बनाएं</span>
                           </button>
                         </>
@@ -979,7 +986,7 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
                   </div>
 
                   {/* Messages Bubble Area */}
-                  <div className="flex-1 p-3 sm:p-4 overflow-y-auto space-y-3 bg-gradient-to-b from-slate-950/70 to-slate-900/90">
+                  <div className="flex-1 min-h-0 p-[clamp(0.5rem,1.5vw,1rem)] overflow-y-auto space-y-2.5 sm:space-y-3 bg-gradient-to-b from-slate-950/70 to-slate-900/90 overscroll-contain">
                     {/* Welcome Banner */}
                     <div className="text-center py-2">
                       <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700/60 text-[11px] text-slate-400">
@@ -1144,12 +1151,12 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
                   </div>
 
                   {/* Quick Emojis Bar */}
-                  <div className="px-3 py-1.5 bg-slate-950/90 border-t border-slate-800 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                  <div className="shrink-0 px-2.5 sm:px-3 py-1 bg-slate-950/90 border-t border-slate-800 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
                     {QUICK_EMOJIS.map((emoji) => (
                       <button
                         key={emoji}
                         onClick={() => setMessageText((prev) => prev + emoji)}
-                        className="p-1 hover:bg-slate-800 rounded-lg text-sm transition-transform active:scale-125"
+                        className="p-1 hover:bg-slate-800 rounded-lg text-sm transition-transform active:scale-125 shrink-0"
                       >
                         {emoji}
                       </button>
@@ -1159,13 +1166,13 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
                   {/* Message Input Form */}
                   <form
                     onSubmit={handleSendMessage}
-                    className="p-2 sm:p-3 bg-slate-950 border-t border-slate-800 flex items-center gap-2"
+                    className="shrink-0 p-2 sm:p-3 bg-slate-950 border-t border-slate-800 flex items-center gap-2 min-w-0"
                   >
                     {/* Attachment Button */}
                     <button
                       type="button"
                       onClick={() => setAttachModalOpen(true)}
-                      className="p-2 rounded-xl bg-slate-800 text-slate-300 hover:text-amber-400 hover:bg-slate-700 transition-colors"
+                      className="p-2 rounded-xl bg-slate-800 text-slate-300 hover:text-amber-400 hover:bg-slate-700 transition-colors shrink-0"
                       title="फोटो, वीडियो या लिंक जोड़ें"
                     >
                       <Paperclip className="w-4 h-4" />
@@ -1177,14 +1184,14 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
                       placeholder="संदेश लिखें (Type a message)..."
                       value={messageText}
                       onChange={(e) => setMessageText(e.target.value)}
-                      className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                      className="flex-1 min-w-0 w-full px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
                     />
 
                     {/* Send Button */}
                     <button
                       type="submit"
                       disabled={!messageText.trim()}
-                      className="p-2 sm:p-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 active:scale-95 transition-all shadow-md"
+                      className="p-2 sm:p-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 active:scale-95 transition-all shadow-md shrink-0"
                     >
                       <Send className="w-4 h-4 sm:w-5 sm:h-5" />
                     </button>
@@ -1209,7 +1216,7 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
         {/* TAB 2: FRIENDS & NETWORK (FACEBOOK-STYLE SOCIAL GRAPH)        */}
         {/* ============================================================= */}
         {activeTab === 'friends' && (
-          <div className="flex-1 flex flex-col space-y-4 overflow-y-auto">
+          <div className="flex-1 min-h-0 flex flex-col space-y-4 overflow-y-auto pb-4">
             {/* Friends Sub-navigation & Group Action */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 border-b border-slate-800 pb-2">
               <div className="flex items-center gap-1.5 overflow-x-auto">
@@ -1530,7 +1537,7 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
         {/* TAB 3: GROUPS (COMMUNITY GROUPS & GROUP CHATS)                */}
         {/* ============================================================= */}
         {activeTab === 'groups' && (
-          <div className="flex-1 flex flex-col space-y-4 overflow-y-auto">
+          <div className="flex-1 min-h-0 flex flex-col space-y-4 overflow-y-auto pb-4">
             {/* Top Bar with Create Group Button */}
             <div className="flex items-center justify-between gap-3 bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
               <div>
@@ -1603,7 +1610,7 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
         {/* TAB 4: MEMBER PROFILE & PROFILE VIEWS (FACEBOOK-STYLE)         */}
         {/* ============================================================= */}
         {activeTab === 'profile' && viewedMember && (
-          <div className="flex-1 flex flex-col space-y-4 overflow-y-auto">
+          <div className="flex-1 min-h-0 flex flex-col space-y-4 overflow-y-auto pb-4">
             {/* Facebook-style Profile Card */}
             <div className="bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-800 overflow-hidden shadow-2xl">
               {/* Cover Gradient / Photo */}
@@ -1804,7 +1811,7 @@ export const AccChatAndHelpHub: React.FC<AccChatAndHelpHubProps> = ({
         {/* TAB 5: SOCIAL NOTIFICATIONS                                  */}
         {/* ============================================================= */}
         {activeTab === 'notifications' && (
-          <div className="flex-1 flex flex-col space-y-3 overflow-y-auto max-w-3xl mx-auto w-full">
+          <div className="flex-1 min-h-0 flex flex-col space-y-3 overflow-y-auto max-w-3xl mx-auto w-full pb-4">
             <div className="flex items-center justify-between bg-slate-900 p-3 rounded-xl border border-slate-800">
               <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
                 <Bell className="w-4 h-4 text-amber-400" />
