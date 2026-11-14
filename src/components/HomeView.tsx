@@ -262,22 +262,22 @@ export const HomeView: React.FC<HomeViewProps> = ({
   }, [celebrationSignature]);
 
   return (
-    <div className="space-y-5 sm:space-y-6 max-w-7xl mx-auto px-1 sm:px-0">
+    <div className="space-y-5 sm:space-y-7 max-w-7xl mx-auto px-2 sm:px-3 lg:px-0">
       {/* Logged in member indicator bar when viewing Home page */}
       {currentUser && (
-        <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white px-3.5 py-2.5 rounded-2xl border border-blue-400/40 shadow-sm flex flex-col xs:flex-row items-center justify-between gap-2.5 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
-            <span className="text-slate-200">
-              आप <strong>{currentUser.fullName}</strong> ({currentUser.accId}) के रूप में लॉगिन हैं।
+        <div className="bg-slate-900 text-white px-4 py-3 rounded-2xl border border-slate-700/80 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3 text-xs sm:text-sm">
+          <div className="flex items-center gap-2.5 text-center sm:text-left">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="text-slate-100">
+              आप <strong className="text-white">{currentUser.fullName}</strong> ({currentUser.accId}) के रूप में लॉगिन हैं
             </span>
           </div>
           <button
             type="button"
             onClick={() => onNavigate(currentUser.role === 'admin' ? 'admin' : 'dashboard')}
-            className="px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition shadow-xs cursor-pointer shrink-0"
+            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs transition cursor-pointer shrink-0"
           >
-            {currentUser.role === 'admin' ? 'एडमिन पैनल में जाएं →' : 'विद्यार्थी डैशबोर्ड में जाएं →'}
+            {currentUser.role === 'admin' ? 'एडमिन पैनल खोलें →' : 'मेरा डैशबोर्ड खोलें →'}
           </button>
         </div>
       )}
@@ -320,163 +320,179 @@ export const HomeView: React.FC<HomeViewProps> = ({
       />
 
       {/* ========================================================================= */}
-      {/* 5 TO 10 SECOND INSTANT GATEWAY: ACC क्या है और आपको आगे क्या करना है? */}
+      {/* STUDENT-FRIENDLY CLEAR GATEWAY: 3 PILLARS + SIMPLE 3-STEP ROADMAP + ACTIONS */}
       {/* ========================================================================= */}
-      <section 
-        aria-label="5 से 10 सेकंड क्विक ओरिएंटेशन गेटवे"
-        className="rounded-2xl bg-white border border-blue-200/90 shadow-md p-3.5 sm:p-5 md:p-6 space-y-4"
+      <section
+        aria-label="छात्र एवं सदस्य त्वरित मार्गदर्शन"
+        className="rounded-2xl bg-gradient-to-b from-white via-white to-slate-50/90 border border-slate-200/90 shadow-sm p-4 sm:p-6 md:p-7 space-y-6"
       >
-        {/* Header Strip: Quick Identity */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-gray-100">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-amber-500 text-white flex items-center justify-center font-black shadow-md shrink-0">
-              <Sparkles className="w-5 h-5 text-yellow-300" />
+        {/* Top Editorial Header (Zero-Pill Clean Typography) */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-200/70">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-[#2874f0] to-indigo-700 text-white flex items-center justify-center shadow-sm shrink-0">
+              <GraduationCap className="w-6 h-6 text-amber-300" />
             </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs sm:text-sm font-black text-slate-900 tracking-tight">
-                  ⚡ 5 से 10 सेकंड में समझें — ACC क्या है और आगे क्या करना है?
-                </span>
-                <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-md">
-                  100% वेरिफाइड डिजिटल मंच ✓
-                </span>
+            <div className="space-y-1">
+              <h2 className="text-base sm:text-xl font-bold text-slate-900 tracking-tight text-balance">
+                विद्यार्थियों व युवाओं के लिए सरल डिजिटल कमाई एवं बचत मंच
+              </h2>
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs sm:text-[13px] text-slate-600">
+                <span className="font-semibold text-emerald-700">वेरिफाइड छात्र कम्युनिटी</span>
+                <span aria-hidden="true" className="text-slate-300">·</span>
+                <span>पढ़ाई के साथ सुरक्षित पॉकेट मनी</span>
+                <span aria-hidden="true" className="text-slate-300">·</span>
+                <span>केवल ₹{siteConfig.activationFee || 249} वन-टाइम सदस्यता</span>
               </div>
-              <p className="text-[11px] sm:text-xs text-slate-600 mt-0.5">
-                भारत का #1 छात्र व युवा डिजिटल स्वावलंबन नेटवर्क • कॉलेज व पढ़ाई के साथ सुरक्षित पॉकेट मनी
-              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto text-[11px] text-slate-500 font-semibold bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg shrink-0">
-            <Clock className="w-3.5 h-3.5 text-blue-600" />
-            <span>त्वरित मार्गदर्शन (Quick Tour)</span>
-          </div>
-        </div>
-
-        {/* 3 Clear Visual Pillars: What ACC is */}
-        <div>
-          <div className="text-[11px] font-black text-blue-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-            <span>📌</span>
-            <span>वेबसाइट किस बारे में है? (3 मुख्य स्तंभ)</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
-            {/* Pillar 1: SWIS */}
-            <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200/90 hover:border-emerald-400 transition-all shadow-xs">
-              <div className="flex items-center gap-2 mb-1.5">
-                <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
-                  <Smartphone className="w-4 h-4" />
-                </div>
-                <div>
-                  <h2 className="text-xs font-black text-emerald-900 leading-tight">1. SWIS (रिचार्ज बचत)</h2>
-                  <span className="text-[10px] text-emerald-700 font-semibold">Self Work Income System</span>
-                </div>
-              </div>
-              <p className="text-[11.5px] text-slate-700 leading-relaxed">
-                सभी मोबाइल व DTH रिचार्ज पर <strong className="text-emerald-800">3.30% फिक्स्ड कमीशन</strong> सीधा आपके वॉलेट में लाइफटाइम बचत। कोई फीस नहीं।
-              </p>
+          {/* Simple 3-Step Visual Journey */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-3 bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 sm:px-4 sm:py-2.5 text-center shrink-0">
+            <div className="px-1">
+              <span className="text-[10px] font-bold text-[#2874f0] block">कदम 01</span>
+              <span className="text-[11px] sm:text-xs font-semibold text-slate-800 block">ऑनलाइन फॉर्म</span>
             </div>
-
-            {/* Pillar 2: TWIS */}
-            <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200/90 hover:border-blue-400 transition-all shadow-xs">
-              <div className="flex items-center gap-2 mb-1.5">
-                <div className="w-7 h-7 rounded-lg bg-[#2874f0] text-white flex items-center justify-center text-xs font-bold shrink-0">
-                  <Users className="w-4 h-4" />
-                </div>
-                <div>
-                  <h2 className="text-xs font-black text-blue-950 leading-tight">2. TWIS (टीम वर्क अर्निंग)</h2>
-                  <span className="text-[10px] text-blue-700 font-semibold">Team Work Income System</span>
-                </div>
-              </div>
-              <p className="text-[11.5px] text-slate-700 leading-relaxed">
-                कॉलेज व हॉस्टल के दोस्तों को रेफर करने पर <strong className="text-blue-900">₹150 प्रति सदस्य</strong> सीधा आपके बैंक / UPI खाते में तत्काल ट्रांसफर।
-              </p>
+            <div className="px-1 border-x border-slate-200">
+              <span className="text-[10px] font-bold text-emerald-700 block">कदम 02</span>
+              <span className="text-[11px] sm:text-xs font-semibold text-slate-800 block">सत्यापन व ID</span>
             </div>
-
-            {/* Pillar 3: Lifetime ID */}
-            <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200/90 hover:border-amber-400 transition-all shadow-xs">
-              <div className="flex items-center gap-2 mb-1.5">
-                <div className="w-7 h-7 rounded-lg bg-amber-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
-                  <CreditCard className="w-4 h-4" />
-                </div>
-                <div>
-                  <h2 className="text-xs font-black text-amber-950 leading-tight">3. लाइफटाइम 🆔 कार्ड</h2>
-                  <span className="text-[10px] text-amber-700 font-semibold">केवल ₹{siteConfig.activationFee || 249} एक बार</span>
-                </div>
-              </div>
-              <p className="text-[11.5px] text-slate-700 leading-relaxed">
-                वन-टाइम सक्रियण में लाइफटाइम स्टूडेंट 🆔, रियल APK ऐप, ACC MEMBER CHAT और 24x7 एडमिन सपोर्ट।
-              </p>
+            <div className="px-1">
+              <span className="text-[10px] font-bold text-amber-700 block">कदम 03</span>
+              <span className="text-[11px] sm:text-xs font-semibold text-slate-800 block">दैनिक कमाई शुरू</span>
             </div>
           </div>
         </div>
 
-        {/* Action Pathways: What Should the Visitor Do Next? */}
-        <div className="pt-2 border-t border-gray-100">
-          <div className="text-[11px] font-black text-slate-800 uppercase tracking-wider mb-2 flex items-center justify-between flex-wrap gap-1">
-            <span className="flex items-center gap-1.5">
-              <span>👉</span>
-              <span>आपको आगे क्या करना है? (अपनी पसंद अनुसार चयन करें):</span>
-            </span>
-            {currentUser && (
-              <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded font-bold">
-                लॉगिन सदस्य: {(currentUser.fullName || 'सदस्य').split(' ')[0]} ({currentUser.accId})
+        {/* 3 Clean Highlighted Value Pillars (Generous Whitespace, Zero Clutter) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-4">
+          {/* Pillar 1: SWIS */}
+          <div className="p-4 sm:p-5 rounded-xl bg-emerald-50/45 border border-emerald-200/80 hover:border-emerald-300 hover:bg-emerald-50/70 transition-colors flex flex-col justify-between gap-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <span className="text-[11px] font-semibold text-emerald-800 block">
+                  01 · Self Work Income System
+                </span>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                  SWIS रिचार्ज व बिल बचत
+                </h3>
+              </div>
+              <span className="font-mono-acc text-lg sm:text-xl font-bold text-emerald-700 shrink-0 tabular-nums">
+                3.30%
               </span>
+            </div>
+            <p className="text-xs sm:text-[13px] text-slate-700 leading-relaxed">
+              मोबाइल, DTH व बिल रिचार्ज पर हर बार फिक्स्ड 3.30% कमीशन सीधे आपके वॉलेट में जुड़ता है—बिना किसी प्लेटफॉर्म शुल्क के।
+            </p>
+          </div>
+
+          {/* Pillar 2: TWIS */}
+          <div className="p-4 sm:p-5 rounded-xl bg-blue-50/45 border border-blue-200/80 hover:border-blue-300 hover:bg-blue-50/70 transition-colors flex flex-col justify-between gap-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <span className="text-[11px] font-semibold text-[#2874f0] block">
+                  02 · Team Work Income System
+                </span>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                  TWIS डायरेक्ट रेफरल कमाई
+                </h3>
+              </div>
+              <span className="font-mono-acc text-lg sm:text-xl font-bold text-[#2874f0] shrink-0 tabular-nums">
+                ₹150
+              </span>
+            </div>
+            <p className="text-xs sm:text-[13px] text-slate-700 leading-relaxed">
+              कॉलेज, कोचिंग या हॉस्टल के प्रत्येक दोस्त को जोड़ने पर ₹150 प्रति सदस्य सीधा आपके बैंक या UPI खाते में प्राप्त करें।
+            </p>
+          </div>
+
+          {/* Pillar 3: Lifetime Digital ID */}
+          <div className="p-4 sm:p-5 rounded-xl bg-amber-50/45 border border-amber-200/80 hover:border-amber-300 hover:bg-amber-50/70 transition-colors flex flex-col justify-between gap-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <span className="text-[11px] font-semibold text-amber-800 block">
+                  03 · वन-टाइम सदस्यता
+                </span>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                  लाइफटाइम 🆔 व रियल ऐप
+                </h3>
+              </div>
+              <span className="font-mono-acc text-lg sm:text-xl font-bold text-amber-700 shrink-0 tabular-nums">
+                ₹{siteConfig.activationFee || 249}
+              </span>
+            </div>
+            <p className="text-xs sm:text-[13px] text-slate-700 leading-relaxed">
+              एक बार के सक्रियण में सत्यापित डिजिटल ID कार्ड, ऑफिशियल ऐप एक्सेस, कम्युनिटी चैट व 24x7 हेल्पडेस्क सहायता मिलती है।
+            </p>
+          </div>
+        </div>
+
+        {/* Clear Action Pathways (1 Dominant Primary CTA + 3 Clean Supporting Options) */}
+        <div className="pt-4 border-t border-slate-200/70 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+            <span className="font-bold text-slate-800">
+              आगे बढ़ने के लिए अपना विकल्प चुनें:
+            </span>
+            {currentUser ? (
+              <span className="text-emerald-700 font-semibold">
+                सक्रिय सत्र: {(currentUser.fullName || 'सदस्य').split(' ')[0]} · {currentUser.accId}
+              </span>
+            ) : (
+              <span>नए विद्यार्थी के लिए पहले वीडियो देखना या सीधे रजिस्ट्रेशन करना सबसे आसान है</span>
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
             {currentUser ? (
               <>
-                {/* Logged in action 1: Dashboard */}
+                {/* Logged in Primary Action 1: Dashboard */}
                 <button
                   type="button"
                   onClick={() => onNavigate('dashboard')}
-                  className="p-2.5 rounded-xl bg-gradient-to-b from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white text-left shadow-sm active:translate-y-0.5 transition cursor-pointer flex items-center gap-2.5 group"
+                  className="min-h-[56px] px-4 py-3 rounded-xl bg-[#2874f0] hover:bg-[#1e60d5] text-white text-left shadow-sm active:translate-y-0.5 transition cursor-pointer flex items-center gap-3 group"
                 >
-                  <div className="w-8 h-8 rounded-lg bg-white/20 text-white flex items-center justify-center shrink-0">
+                  <div className="w-9 h-9 rounded-lg bg-white/15 text-white flex items-center justify-center shrink-0">
                     <LayoutDashboard className="w-4 h-4" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className="text-xs font-black block truncate">1. डैशबोर्ड खोलें</span>
-                    <span className="text-[10.5px] text-blue-100 block truncate">कमाई, टीम व वॉलेट देखें</span>
+                    <span className="text-xs sm:text-[13px] font-bold block leading-snug">डैशबोर्ड खोलें</span>
+                    <span className="text-[11px] text-blue-100 block leading-snug mt-0.5">कमाई, टीम व वॉलेट देखें</span>
                   </div>
-                  <ArrowRight className="w-3.5 h-3.5 text-blue-200 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                  <ArrowRight className="w-4 h-4 text-blue-100 group-hover:translate-x-0.5 transition-transform shrink-0" />
                 </button>
 
-                {/* Logged in action 2: Add Member */}
+                {/* Logged in Action 2: Add Member */}
                 <button
                   type="button"
                   onClick={() => onNavigate('add-member')}
-                  className="p-2.5 rounded-xl bg-gradient-to-b from-orange-500 to-amber-600 hover:from-orange-400 hover:to-amber-500 text-white text-left shadow-sm active:translate-y-0.5 transition cursor-pointer flex items-center gap-2.5 group"
+                  className="min-h-[56px] px-4 py-3 rounded-xl bg-white hover:bg-orange-50/70 text-slate-900 text-left border border-slate-200 hover:border-orange-300 active:translate-y-0.5 transition cursor-pointer flex items-center gap-3 group"
                 >
-                  <div className="w-8 h-8 rounded-lg bg-yellow-300 text-slate-950 flex items-center justify-center shrink-0">
+                  <div className="w-9 h-9 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center shrink-0">
                     <UserPlus className="w-4 h-4" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className="text-xs font-black block truncate">2. नया सदस्य जोड़ें</span>
-                    <span className="text-[10.5px] text-amber-100 block truncate">₹150 पेआउट तुरंत पाएं</span>
+                    <span className="text-xs sm:text-[13px] font-bold block leading-snug">नया सदस्य जोड़ें</span>
+                    <span className="text-[11px] text-slate-600 block leading-snug mt-0.5">₹150 रेफरल पेआउट पाएं</span>
                   </div>
-                  <ArrowRight className="w-3.5 h-3.5 text-amber-200 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
                 </button>
 
-                {/* Logged in action 3: ACC MEMBER CHAT */}
+                {/* Logged in Action 3: ACC MEMBER CHAT */}
                 <button
                   type="button"
                   onClick={() => onNavigate('chat')}
-                  className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-left shadow-sm active:translate-y-0.5 transition cursor-pointer flex items-center gap-2.5 group border border-slate-700"
+                  className="min-h-[56px] px-4 py-3 rounded-xl bg-white hover:bg-slate-50 text-slate-900 text-left border border-slate-200 hover:border-slate-300 active:translate-y-0.5 transition cursor-pointer flex items-center gap-3 group"
                 >
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-400 to-orange-500 text-slate-950 flex items-center justify-center shrink-0">
+                  <div className="w-9 h-9 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
                     <MessageCircle className="w-4 h-4" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className="text-xs font-black block truncate">3. ACC MEMBER CHAT</span>
-                    <span className="text-[10.5px] text-slate-300 block truncate">साथी व ग्रुप्स से संवाद</span>
+                    <span className="text-xs sm:text-[13px] font-bold block leading-snug">कम्युनिटी चैट</span>
+                    <span className="text-[11px] text-slate-600 block leading-snug mt-0.5">साथियों व ग्रुप्स से संवाद</span>
                   </div>
-                  <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
                 </button>
 
-                {/* Logged in action 4: ID Card */}
+                {/* Logged in Action 4: ID Card */}
                 <button
                   type="button"
                   onClick={() => {
@@ -486,53 +502,53 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       onNavigate('idcard');
                     }
                   }}
-                  className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-900 text-left border border-slate-300 active:translate-y-0.5 transition cursor-pointer flex items-center gap-2.5 group"
+                  className="min-h-[56px] px-4 py-3 rounded-xl bg-white hover:bg-slate-50 text-slate-900 text-left border border-slate-200 hover:border-slate-300 active:translate-y-0.5 transition cursor-pointer flex items-center gap-3 group"
                 >
-                  <div className="w-8 h-8 rounded-lg bg-slate-800 text-yellow-300 flex items-center justify-center shrink-0">
+                  <div className="w-9 h-9 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center shrink-0">
                     <CreditCard className="w-4 h-4" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className="text-xs font-black block truncate">4. डिजिटल 🆔 कार्ड</span>
-                    <span className="text-[10.5px] text-slate-600 block truncate">सत्यापित पहचान पत्र</span>
+                    <span className="text-xs sm:text-[13px] font-bold block leading-snug">डिजिटल 🆔 कार्ड</span>
+                    <span className="text-[11px] text-slate-600 block leading-snug mt-0.5">सत्यापित पहचान पत्र देखें</span>
                   </div>
-                  <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
                 </button>
               </>
             ) : (
               <>
-                {/* New visitor action 1: Register */}
+                {/* Visitor Primary Dominant CTA: Register */}
                 <button
                   type="button"
                   onClick={() => onNavigate('register')}
-                  className="p-2.5 rounded-xl bg-gradient-to-b from-[#fb641b] via-[#ea580c] to-[#c2410c] hover:brightness-110 text-white text-left shadow-sm active:translate-y-0.5 transition cursor-pointer flex items-center gap-2.5 group border border-amber-300/40"
+                  className="min-h-[56px] px-4 py-3 rounded-xl bg-gradient-to-r from-[#fb641b] to-[#ea580c] hover:brightness-105 text-white text-left shadow-sm active:translate-y-0.5 transition cursor-pointer flex items-center gap-3 group"
                 >
-                  <div className="w-8 h-8 rounded-lg bg-yellow-300 text-slate-950 flex items-center justify-center shrink-0 font-bold">
-                    <Sparkles className="w-4 h-4" />
+                  <div className="w-9 h-9 rounded-lg bg-white/20 text-white flex items-center justify-center shrink-0">
+                    <UserPlus className="w-4 h-4" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className="text-xs font-black block truncate">1. नया रजिस्ट्रेशन (₹{siteConfig.activationFee || 249})</span>
-                    <span className="text-[10.5px] text-amber-100 block truncate">सीधा फॉर्म भरें व ID पाएं</span>
+                    <span className="text-xs sm:text-[13px] font-bold block leading-snug">नया रजिस्ट्रेशन (₹{siteConfig.activationFee || 249})</span>
+                    <span className="text-[11px] text-orange-50 block leading-snug mt-0.5">सीधा फॉर्म भरें व ID पाएं</span>
                   </div>
-                  <ArrowRight className="w-3.5 h-3.5 text-amber-200 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                  <ArrowRight className="w-4 h-4 text-orange-100 group-hover:translate-x-0.5 transition-transform shrink-0" />
                 </button>
 
-                {/* New visitor action 2: Watch Video */}
+                {/* Visitor Action 2: Watch Video */}
                 <button
                   type="button"
                   onClick={() => onNavigate('video')}
-                  className="p-2.5 rounded-xl bg-gradient-to-b from-rose-600 to-rose-700 hover:brightness-110 text-white text-left shadow-sm active:translate-y-0.5 transition cursor-pointer flex items-center gap-2.5 group"
+                  className="min-h-[56px] px-4 py-3 rounded-xl bg-white hover:bg-rose-50/70 text-slate-900 text-left border border-slate-200 hover:border-rose-300 active:translate-y-0.5 transition cursor-pointer flex items-center gap-3 group"
                 >
-                  <div className="w-8 h-8 rounded-lg bg-white/20 text-white flex items-center justify-center shrink-0">
-                    <Play className="w-4 h-4 fill-white" />
+                  <div className="w-9 h-9 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                    <Play className="w-4 h-4 fill-rose-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className="text-xs font-black block truncate">2. 2-मिनट प्लान वीडियो</span>
-                    <span className="text-[10.5px] text-rose-100 block truncate">कमाई का लाइव प्रोसेस देखें</span>
+                    <span className="text-xs sm:text-[13px] font-bold block leading-snug">2-मिनट प्लान वीडियो</span>
+                    <span className="text-[11px] text-slate-600 block leading-snug mt-0.5">कमाई का आसान वीडियो देखें</span>
                   </div>
-                  <ArrowRight className="w-3.5 h-3.5 text-rose-200 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
                 </button>
 
-                {/* New visitor action 3: Sponsor ID Verification */}
+                {/* Visitor Action 3: Sponsor ID Verification */}
                 <button
                   type="button"
                   onClick={() => {
@@ -542,32 +558,32 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       onNavigate('idcard');
                     }
                   }}
-                  className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-left shadow-sm active:translate-y-0.5 transition cursor-pointer flex items-center gap-2.5 group border border-slate-700"
+                  className="min-h-[56px] px-4 py-3 rounded-xl bg-white hover:bg-blue-50/70 text-slate-900 text-left border border-slate-200 hover:border-blue-300 active:translate-y-0.5 transition cursor-pointer flex items-center gap-3 group"
                 >
-                  <div className="w-8 h-8 rounded-lg bg-blue-500 text-white flex items-center justify-center shrink-0">
+                  <div className="w-9 h-9 rounded-lg bg-blue-100 text-[#2874f0] flex items-center justify-center shrink-0">
                     <ShieldCheck className="w-4 h-4" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className="text-xs font-black block truncate">3. स्पॉन्सर 🆔 सत्यापन</span>
-                    <span className="text-[10.5px] text-slate-300 block truncate">मेंटर की प्रोफाइल जांचें</span>
+                    <span className="text-xs sm:text-[13px] font-bold block leading-snug">स्पॉन्सर 🆔 सत्यापन</span>
+                    <span className="text-[11px] text-slate-600 block leading-snug mt-0.5">मेंटर की प्रोफाइल जांचें</span>
                   </div>
-                  <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
                 </button>
 
-                {/* New visitor action 4: FAQ & Guidelines */}
+                {/* Visitor Action 4: FAQ & Guidelines */}
                 <button
                   type="button"
                   onClick={() => onNavigate('faq')}
-                  className="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-900 text-left border border-slate-200 active:translate-y-0.5 transition cursor-pointer flex items-center gap-2.5 group"
+                  className="min-h-[56px] px-4 py-3 rounded-xl bg-white hover:bg-amber-50/70 text-slate-900 text-left border border-slate-200 hover:border-amber-300 active:translate-y-0.5 transition cursor-pointer flex items-center gap-3 group"
                 >
-                  <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                  <div className="w-9 h-9 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
                     <HelpCircle className="w-4 h-4" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className="text-xs font-black block truncate">4. FAQ व नियम समझें</span>
-                    <span className="text-[10.5px] text-slate-600 block truncate">सुरक्षा व विथड्रॉल जानकारी</span>
+                    <span className="text-xs sm:text-[13px] font-bold block leading-snug">सवाल व नियम (FAQ)</span>
+                    <span className="text-[11px] text-slate-600 block leading-snug mt-0.5">सुरक्षा व पेआउट की जानकारी</span>
                   </div>
-                  <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
                 </button>
               </>
             )}
